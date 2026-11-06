@@ -67,6 +67,19 @@ typedef struct {
 struct yyjson_val;
 av_status av_coldef_from_json(struct yyjson_val *obj, av_arena *a, av_coldef *out, av_err *e);
 
+/*
+ * Like av_coldef_from_json; internal != false additionally accepts the daemon-internal
+ * "manifest_key" field (written by av_coldef_to_json so a persisted definition round-trips).
+ */
+av_status av_coldef_from_json_ex(struct yyjson_val *obj, av_arena *a, bool internal, av_coldef *out, av_err *e);
+
+/* Parse JSON text (bad_request on a syntax error), then av_coldef_from_json_ex. */
+av_status av_coldef_from_text(const char *json, size_t len, av_arena *a, bool internal, av_coldef *out, av_err *e);
+
+/* Deep copy with malloc'd writers/attrs (so it outlives the parse arena). Release with av_coldef_release. */
+av_status av_coldef_clone(const av_coldef *src, av_coldef *dst, av_err *e);
+void av_coldef_release(av_coldef *d); /* frees what av_coldef_clone allocated */
+
 /* Serialize to a JSON object string (malloc'd, caller frees). */
 char *av_coldef_to_json(const av_coldef *d, size_t *len);
 
