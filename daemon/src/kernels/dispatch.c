@@ -207,14 +207,17 @@ av_pgfn av_kernel_fn_tier(const char *tier, av_vtype type, av_metric metric)
         return NULL;
     }
     const char *sup = supported_name;
-    if (strcmp(tier, "x86-64") == 0 || strcmp(tier, "generic") == 0 || strcmp(tier, sup) == 0 ||
-        strcmp(tier, "native") == 0 || strcmp(tier, "aarch64") == 0) {
+    if (strcmp(tier, sup) == 0 || strcmp(tier, "generic") == 0) {
         if (strcmp(tier, "x86-64-v4") == 0) {
             return tab_t4[type][metric];
         }
         if (strcmp(tier, "x86-64-v3") == 0) {
             return tab_t3[type][metric];
         }
+        return tab_base[type][metric];
+    }
+    bool x86 = strncmp(sup, "x86-64", 6) == 0;
+    if (x86 && strcmp(tier, "x86-64") == 0) {
         return tab_base[type][metric];
     }
     if (strcmp(tier, "x86-64-v3") == 0 && strcmp(sup, "x86-64-v4") == 0) {
