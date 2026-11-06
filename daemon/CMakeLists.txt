@@ -157,11 +157,18 @@ set(AV_CORE_SOURCES
     src/codec/hex.c
     src/codec/base64.c
     src/sync/ttl.c
-    src/arkiv/rlp.c)
+    src/arkiv/rlp.c
+    src/arkiv/keccak.c
+    src/arkiv/entity.c
+    src/arkiv/logs.c
+    src/arkiv/budget.c
+    src/arkiv/query_builder.c
+    src/arkiv/rpc.c
+    src/arkiv/ws.c)
 
 add_library(av_core STATIC ${AV_CORE_SOURCES})
 target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat Threads::Threads m)
+target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat av3p_curl av3p_keccak av3p_yyjson Threads::Threads m)
 target_compile_definitions(av_core PUBLIC AV_REPO_ROOT="${AV_REPO_ROOT}")
 av_strict(av_core)
 

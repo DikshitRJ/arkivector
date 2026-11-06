@@ -6,8 +6,11 @@ set(AV_UNIT_SOURCES
     unit/test_vectorbytes.c
     unit/test_text_io.c
     unit/test_ttl.c
-    unit/test_rlp.c)
-set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp)
+    unit/test_rlp.c
+    unit/test_keccak.c
+    unit/test_rpc_parse.c
+    unit/test_rpc_mock.c)
+set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp keccak arkiv_parse arkiv_rpc)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)
@@ -19,7 +22,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
 endif()
 
 add_executable(av_unit ${AV_UNIT_SOURCES})
-target_link_libraries(av_unit PRIVATE av_core av3p_greatest av3p_yyjson)
+target_link_libraries(av_unit PRIVATE av_core av3p_greatest av3p_yyjson av3p_curl)
 target_compile_options(av_unit PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare)
 if(AV_HAVE_HNSW_TEST)
   target_compile_definitions(av_unit PRIVATE AV_HAVE_HNSW_TEST=1)
@@ -40,6 +43,10 @@ if(AV_FUZZ)
   target_link_libraries(fuzz_vector_in PRIVATE av_core)
   target_compile_options(fuzz_vector_in PRIVATE -fsanitize=fuzzer-no-link)
   target_link_options(fuzz_vector_in PRIVATE -fsanitize=fuzzer)
+  add_executable(fuzz_rpc_response fuzz/fuzz_rpc_response.c)
+  target_link_libraries(fuzz_rpc_response PRIVATE av_core av3p_yyjson)
+  target_compile_options(fuzz_rpc_response PRIVATE -fsanitize=fuzzer-no-link)
+  target_link_options(fuzz_rpc_response PRIVATE -fsanitize=fuzzer)
 endif()
 
 # pgvector parity helper (used by test/parity/*.py; see test/parity/README.md)

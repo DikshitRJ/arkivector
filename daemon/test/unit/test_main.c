@@ -9,6 +9,9 @@ extern SUITE(vectorbytes);
 extern SUITE(text_io);
 extern SUITE(ttl);
 extern SUITE(rlp);
+extern SUITE(keccak);
+extern SUITE(arkiv_parse);
+extern SUITE(arkiv_rpc);
 #ifdef AV_HAVE_HNSW_TEST
 extern SUITE(hnsw);
 #endif
@@ -24,6 +27,9 @@ int main(int argc, char **argv)
     RUN_SUITE(text_io);
     RUN_SUITE(ttl);
     RUN_SUITE(rlp);
+    RUN_SUITE(keccak);
+    RUN_SUITE(arkiv_parse);
+    RUN_SUITE(arkiv_rpc);
 #ifdef AV_HAVE_HNSW_TEST
     RUN_SUITE(hnsw);
 #endif
