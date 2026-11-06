@@ -155,11 +155,42 @@ set(AV_CORE_SOURCES
     src/codec/text.c
     src/codec/vectorbytes.c
     src/codec/hex.c
-    src/codec/base64.c)
+    src/codec/base64.c
+    # D2 Lane A: runtime and HTTP server
+    src/config.c
+    src/core/threadpool.c
+    src/core/mpsc.c
+    src/server/http.c
+    src/server/router.c
+    src/server/json_io.c
+    src/server/problem.c
+    src/server/metrics.c
+    src/server/rest_ops.c)
 
-add_library(av_core STATIC ${AV_CORE_SOURCES})
+# Build-time generated headers (no runtime JSON reading, no runtime licence file lookup).
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(AV_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+add_custom_command(
+  OUTPUT ${AV_GEN_DIR}/av_error_table.h
+  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_error_table.py
+          ${AV_REPO_ROOT}/spec/error-codes.json ${AV_GEN_DIR}/av_error_table.h
+  DEPENDS ${AV_REPO_ROOT}/spec/error-codes.json ${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_error_table.py
+  COMMENT "Generating av_error_table.h from spec/error-codes.json"
+  VERBATIM)
+add_custom_command(
+  OUTPUT ${AV_GEN_DIR}/av_licenses.h
+  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_licenses.py
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/pgvector/LICENSE.pgvector
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/pgcompat/LICENSE.postgresql ${AV_GEN_DIR}/av_licenses.h
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pgvector/LICENSE.pgvector
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/pgcompat/LICENSE.postgresql
+          ${CMAKE_CURRENT_SOURCE_DIR}/cmake/gen_licenses.py
+  COMMENT "Generating av_licenses.h"
+  VERBATIM)
+
+add_library(av_core STATIC ${AV_CORE_SOURCES} ${AV_GEN_DIR}/av_error_table.h)
 target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat Threads::Threads m)
+target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat av3p_uv av3p_llhttp av3p_tomlc99 av3p_yyjson Threads::Threads m)
 target_compile_definitions(av_core PUBLIC AV_REPO_ROOT="${AV_REPO_ROOT}")
 av_strict(av_core)
 
@@ -171,7 +202,7 @@ if(AV_BUILD_BENCH)
   target_link_libraries(av_kernels_bench PRIVATE av_core)
 endif()
 
-add_executable(arkivectord src/main.c)
+add_executable(arkivectord src/main.c ${AV_GEN_DIR}/av_licenses.h)
 target_link_libraries(arkivectord PRIVATE av_core)
 av_strict(arkivectord)
 
