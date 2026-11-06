@@ -12,6 +12,11 @@ import {
   NotImplementedByDaemonError,
   HalfVector,
   F,
+  T,
+  Ttl,
+  EntityInput,
+  buildEntityAttributes,
+  toArkivSdkAttributes,
 } from "../src/index.js";
 
 async function main(): Promise<void> {
@@ -168,6 +173,120 @@ async function main(): Promise<void> {
   await new Promise<void>((resolve, reject) =>
     retryServer.close((err) => (err ? reject(err) : resolve())),
   );
+
+  // 8. Write operations (--write)
+  const isWrite = process.argv.includes("--write");
+  if (isWrite) {
+    console.log("\n--- Demonstrating write operations (--write) ---");
+    const writeClient = new Arkivector({ url, sessionConsistency: true });
+
+    const writeEntities: EntityInput[] = [
+      {
+        id: "quickstart-doc-1",
+        vector: new HalfVector([0.1, -0.2, 0.3, 0.4, -0.5, 0.6, 0.7, -0.8]),
+        document: "First quickstart document about blockchain technology.",
+        attributes: {
+          category: "tech",
+          score: T.dec("4.8"),
+        },
+        ttl: Ttl.days(30),
+      },
+      {
+        id: "quickstart-doc-2",
+        vector: new HalfVector([0.2, -0.3, 0.4, 0.5, -0.6, 0.7, 0.8, -0.9]),
+        document: "Second quickstart document about decentralized finance.",
+        attributes: {
+          category: "finance",
+          score: T.dec("4.2"),
+        },
+        ttl: Ttl.days(30),
+      },
+      {
+        id: "quickstart-doc-3",
+        vector: new HalfVector([0.3, -0.4, 0.5, 0.6, -0.7, 0.8, 0.9, -1.0]),
+        document: "Third quickstart document about vector embeddings.",
+        attributes: {
+          category: "ai",
+          score: T.dec("4.9"),
+        },
+        ttl: Ttl.days(30),
+      },
+    ];
+
+    console.log(`Upserting ${writeEntities.length} entities to demo.docs...`);
+    const upsertRes = await writeClient.upsert("demo.docs", writeEntities);
+    console.log(
+      `Upsert succeeded: ${upsertRes.results.length} result(s), txHashes=${upsertRes.txHashes.join(",")}, blockNumber=${upsertRes.blockNumber}`,
+    );
+    console.log(`writeClient.lastWriteBlock: ${writeClient.lastWriteBlock}`);
+    if (upsertRes.results.length === 0) {
+      throw new Error("Upsert returned 0 results");
+    }
+
+    console.log(
+      `Searching with session consistency (lastWriteBlock=${writeClient.lastWriteBlock})...`,
+    );
+    const searchAfterWrite = await writeClient.search("demo.docs", {
+      vector: new HalfVector([0.1, -0.2, 0.3, 0.4, -0.5, 0.6, 0.7, -0.8]),
+      k: 5,
+    });
+    console.log(
+      `Search returned ${searchAfterWrite.hits.length} hit(s) at asOfBlock=${searchAfterWrite.asOfBlock}`,
+    );
+
+    console.log("Deleting written entities...");
+    const delRes = await writeClient.delete("demo.docs", {
+      refs: ["quickstart-doc-1", "quickstart-doc-2", "quickstart-doc-3"],
+    });
+    console.log(
+      `Delete succeeded: affected=${delRes.affected}, txHashes=${delRes.txHashes.join(",")}, blockNumber=${delRes.blockNumber}`,
+    );
+
+    console.log("Demonstrating prepare for client-side signing...");
+    const prepRes = await writeClient.prepare("demo.docs", [writeEntities[0]], {
+      from: "0x1111111111111111111111111111111111111111",
+    });
+    console.log(
+      `Prepare succeeded: chainId=${prepRes.chainId}, ${prepRes.transactions.length} tx(s), ${prepRes.results.length} predicted key(s)`,
+    );
+
+    console.log("Verifying direct-write attribute builders...");
+    const colDef = await writeClient.getCollection("demo.docs");
+    const directAttrs = buildEntityAttributes(colDef, writeEntities[0]);
+    console.log(
+      `buildEntityAttributes produced ${directAttrs.length} attributes:`,
+    );
+    for (const a of directAttrs) {
+      console.log(
+        `  - ${a.name} (typeId=0x${a.typeId.toString(16)}, ${a.valueBytes.length} bytes)`,
+      );
+    }
+    if (
+      directAttrs[0].name !== "arkiv.schema" ||
+      directAttrs[0].typeId !== 0x88
+    ) {
+      throw new Error("Expected directAttrs[0] to be arkiv.schema (0x88)");
+    }
+    if (directAttrs[1].name !== "av.vec" || directAttrs[1].typeId !== 0x07) {
+      throw new Error("Expected directAttrs[1] to be av.vec (0x07)");
+    }
+    if (directAttrs[2].name !== "av.id" || directAttrs[2].typeId !== 0x88) {
+      throw new Error("Expected directAttrs[2] to be av.id (0x88)");
+    }
+    if (directAttrs[3].name !== "av.doc" || directAttrs[3].typeId !== 0x07) {
+      throw new Error("Expected directAttrs[3] to be av.doc (0x07)");
+    }
+
+    const sdkAttrs = toArkivSdkAttributes(colDef, writeEntities[0]);
+    console.log(
+      `toArkivSdkAttributes produced keys: ${Object.keys(sdkAttrs).join(", ")}`,
+    );
+    if (!sdkAttrs["arkiv.schema"] || !sdkAttrs["av.vec"]) {
+      throw new Error("Expected sdkAttrs to contain arkiv.schema and av.vec");
+    }
+
+    console.log("Write operations verified successfully.");
+  }
 
   console.log("\nQuickstart finished successfully.");
 }
