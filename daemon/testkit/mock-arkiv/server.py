@@ -197,7 +197,11 @@ class Mock:
             data = self.hex_param(params[0].get("data", params[0].get("input", "0x")), None, "data")
             return qty(21000 + 16 * len(data) + 50000)
         if method == "eth_sendRawTransaction":
-            raise RpcError(-32601, "not implemented in mock v0")
+            if not params or not isinstance(params[0], str):
+                raise RpcError(-32602, "Invalid params", "expected [rawTransactionHex]")
+            raw_bytes = self.hex_param(params[0], None, "rawTransaction")
+            from raw_tx import execute_raw_tx
+            return execute_raw_tx(c, raw_bytes)
         if method in ("eth_subscribe", "eth_unsubscribe"):
             raise RpcError(-32601, f"{method} requires a WebSocket connection")
         raise RpcError(-32601, "Method not found", method)

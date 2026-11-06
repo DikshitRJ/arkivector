@@ -166,7 +166,7 @@ def main() -> int:
         check(code == 429, "http_429_ratio=1 -> 429")
         check(c.http("GET", "/_mock/state")[0] == 200, "control API unaffected by faults")
         c.mock("POST", "/faults", {"http_429_ratio": 0})
-        check(c.rpc("eth_sendRawTransaction", "0x00")["error"]["code"] == -32601, "eth_sendRawTransaction -> -32601 (v0)")
+        check("error" in c.rpc("eth_sendRawTransaction", "0x00"), "eth_sendRawTransaction rejects invalid raw tx")
         print(f"\nselftest PASSED ({checks} checks)")
         return 0
     finally:
