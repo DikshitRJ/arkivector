@@ -155,11 +155,22 @@ set(AV_CORE_SOURCES
     src/codec/text.c
     src/codec/vectorbytes.c
     src/codec/hex.c
-    src/codec/base64.c)
+    src/codec/base64.c
+    src/store/lmdb_store.c
+    src/store/arena_file.c
+    src/store/checkpoint.c
+    src/index/docid.c
+    src/index/live.c
+    src/index/attr_index.c
+    src/index/segment.c
+    src/core/coldef.c
+    src/core/collection.c
+    src/core/registry.c)
 
 add_library(av_core STATIC ${AV_CORE_SOURCES})
 target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat Threads::Threads m)
+target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat av3p_lmdb av3p_roaring av3p_yyjson av3p_keccak
+                      Threads::Threads m)
 target_compile_definitions(av_core PUBLIC AV_REPO_ROOT="${AV_REPO_ROOT}")
 av_strict(av_core)
 
