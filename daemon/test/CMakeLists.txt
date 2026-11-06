@@ -2,8 +2,9 @@
 set(AV_UNIT_SOURCES
     unit/test_main.c
     unit/test_pgcompat.c
-    unit/test_kernels.c)
-set(AV_UNIT_SUITES pgcompat kernels)
+    unit/test_kernels.c
+    unit/test_text_io.c)
+set(AV_UNIT_SUITES pgcompat kernels text_io)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)
