@@ -14,6 +14,7 @@ if str(SDK_SRC) not in sys.path:
 from arkivector import (  # noqa: E402
     ApiError,
     Client,
+    F,
     NotImplementedByDaemon,
     ValidationError,
 )
@@ -99,7 +100,37 @@ def main() -> None:
             detail = client.get_collection(cols[0].name)
             print(f"Collection '{detail.name}' schema_tag: {detail.schema_tag}")
 
-    # 5. Error handling demonstration
+    # 5. Search, point lookup, count on demo.docs
+    print("\nExecuting vector similarity search on 'demo.docs':")
+    query_vector = [0.1, -0.2, 0.3, 0.4, -0.5, 0.6, 0.7, -0.8]
+    search_res = client.search(
+        "demo.docs",
+        vector=query_vector,
+        k=5,
+        filter=F.eq("category", "finance"),
+    )
+    print(
+        f"Search returned {len(search_res.hits)} hit(s) "
+        f"(as_of_block={search_res.as_of_block}, sync_state={search_res.sync_state}):"
+    )
+    for hit in search_res.hits:
+        print(
+            f" - [{hit.id}] distance={hit.distance:.4f} score={hit.score:.4f} "
+            f"attrs={hit.plain_attributes()}"
+        )
+
+    if search_res.hits and search_res.hits[0].id:
+        target_ref = search_res.hits[0].id
+        entity = client.get("demo.docs", target_ref)
+        print(
+            f"Point lookup '{target_ref}': key={entity.key[:18]}... "
+            f"owner={entity.owner[:10]}... attrs={entity.plain_attributes()}"
+        )
+
+    count_res = client.count("demo.docs", filter=F.eq("category", "finance"))
+    print(f"Count matching filter (category='finance'): {count_res.count}")
+
+    # 6. Error handling demonstration
     print("\nDemonstrating error handling:")
     try:
         client.check_capability("nonexistent.feature")
@@ -114,7 +145,7 @@ def main() -> None:
     except ApiError as e:
         print(f"Caught ApiError: [{e.status}] {e.code}: {e.title}")
 
-    # 6. Retry behavior demonstration
+    # 7. Retry behavior demonstration
     print("\nDemonstrating retry behavior:")
     demonstrate_retry()
 
