@@ -17,3 +17,9 @@ export * from "./vectorbytes.js";
 
 // Models, TypedValue, T and Ttl helpers
 export * from "./models.js";
+
+// HTTP transport and helpers
+export * from "./http.js";
+
+// Client
+export * from "./client.js";

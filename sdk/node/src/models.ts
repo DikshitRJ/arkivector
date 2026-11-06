@@ -1,6 +1,6 @@
 /**
- * Arkivector models: TypedValue, T helper, TTL helper
- * Docs: docs/api/filters.md §2, docs/api/entities.md §7
+ * Arkivector models: TypedValue, T helper, TTL helper, and API interfaces
+ * Docs: docs/api/filters.md §2, docs/api/entities.md §7, docs/api/collections.md, docs/api/operations.md
  */
 
 /**
@@ -157,6 +157,17 @@ export type Ttl =
   | { expires_at_block: number };
 
 /**
+ * TTL input accepting both snake_case and camelCase.
+ */
+export type TtlInput =
+  | Ttl
+  | { blocks: number }
+  | { seconds: number }
+  | { days: number }
+  | { expires_at_block: number }
+  | { expiresAtBlock: number };
+
+/**
  * TTL helpers for setting entity lifetime.
  */
 export const Ttl = {
@@ -223,4 +234,395 @@ export function plainAttributes(
     }
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Operations and Collections Models
+// ---------------------------------------------------------------------------
+
+/**
+ * Daemon version, API version and capabilities returned by GET /v1/version.
+ */
+export interface VersionInfo {
+  daemonVersion: string;
+  apiVersion: string;
+  pgvectorVersion: string;
+  kernelTier: string;
+  chainId: number;
+  writesEnabled: boolean;
+  capabilities: string[];
+}
+
+/**
+ * Readiness probe response from GET /readyz.
+ */
+export interface Readiness {
+  ready: boolean;
+  collections: Record<string, string>;
+}
+
+/**
+ * Sync status of a followed collection.
+ */
+export interface SyncStatus {
+  collection: string;
+  state: string;
+  headBlock: number;
+  asOfBlock: number;
+  indexedBlock?: number;
+  chainId?: number;
+  schemaTag?: string;
+  lastSyncTime?: string | number | null;
+  quarantineCount?: number;
+  error?: string | null;
+  // Aliases for wire field compatibility
+  name?: string;
+  lagBlocks?: number;
+  lastError?: string | null;
+}
+
+/**
+ * Column definition for vector table.
+ */
+export type VectorColumnType = "vector" | "halfvec" | "bit" | "sparsevec";
+
+export interface ColumnDef {
+  type: VectorColumnType | string;
+  dimensions: number;
+}
+
+export type Column = ColumnDef;
+
+/**
+ * Index definition.
+ */
+export interface IndexDef {
+  method: "hnsw" | "none" | string;
+  opclass: string;
+  with?: Record<string, unknown>;
+}
+
+/**
+ * Collection statistics.
+ */
+export interface CollectionStats {
+  liveEntities: number;
+  segments: number;
+  quarantined: number;
+  tombstones: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Collection model representing a synced pgvector collection.
+ */
+export interface Collection {
+  name: string;
+  schemaTag: string;
+  column: ColumnDef;
+  index: IndexDef;
+  writers: string[];
+  membership: "creator" | "owner" | "open" | string;
+  attributes: Record<string, string>;
+  defaultTtl?: TtlInput | null;
+  open: boolean;
+  manifestKey?: string | null;
+  stats?: CollectionStats | Record<string, unknown>;
+  sync?: SyncStatus;
+  model?: string | null;
+  mode?: "full" | "lite" | string;
+}
+
+/**
+ * Options for creating a collection via POST /v1/collections.
+ */
+export interface CreateCollectionOptions {
+  name: string;
+  column: ColumnDef;
+  index: IndexDef;
+  schemaTag?: string;
+  schema_tag?: string;
+  writers?: string[];
+  membership?: "creator" | "owner" | "open" | string;
+  attributes?: Record<string, AttrType | string>;
+  defaultTtl?: TtlInput | null;
+  default_ttl?: TtlInput | null;
+  publishManifest?: boolean;
+  publish_manifest?: boolean;
+  model?: string | null;
+  mode?: "full" | "lite" | string;
+}
+
+/**
+ * Options for following an existing collection via POST /v1/collections:follow.
+ */
+export interface FollowCollectionOptions {
+  manifestKey?: string;
+  manifest_key?: string;
+  name?: string;
+  definition?: CreateCollectionOptions;
+}
+
+/**
+ * Client configuration options.
+ */
+export interface ClientOptions {
+  url?: string;
+  apiKey?: string;
+  timeoutMs?: number;
+  timeout?: number;
+  maxRetries?: number;
+  sessionConsistency?: boolean;
+  fetch?: typeof globalThis.fetch;
+  userAgent?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Model Parsers & Serializers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse wire JSON into VersionInfo.
+ */
+export function parseVersionInfo(raw: Record<string, unknown>): VersionInfo {
+  return {
+    daemonVersion: String(raw.daemon_version ?? raw.daemonVersion ?? ""),
+    apiVersion: String(raw.api_version ?? raw.apiVersion ?? ""),
+    pgvectorVersion: String(raw.pgvector_version ?? raw.pgvectorVersion ?? ""),
+    kernelTier: String(raw.kernel_tier ?? raw.kernelTier ?? ""),
+    chainId: Number(raw.chain_id ?? raw.chainId ?? 0),
+    writesEnabled: Boolean(raw.writes_enabled ?? raw.writesEnabled ?? false),
+    capabilities: Array.isArray(raw.capabilities) ? raw.capabilities.map(String) : [],
+  };
+}
+
+/**
+ * Parse wire JSON into Readiness.
+ */
+export function parseReadiness(raw: Record<string, unknown>): Readiness {
+  return {
+    ready: Boolean(raw.ready ?? false),
+    collections: (raw.collections ?? {}) as Record<string, string>,
+  };
+}
+
+/**
+ * Parse wire JSON into SyncStatus.
+ */
+export function parseSyncStatus(raw: Record<string, unknown>): SyncStatus {
+  const collection = String(raw.collection ?? raw.name ?? "");
+  const state = String(raw.state ?? "");
+  const asOfBlock =
+    typeof raw.as_of_block === "number"
+      ? raw.as_of_block
+      : typeof raw.asOfBlock === "number"
+        ? raw.asOfBlock
+        : 0;
+  const headBlock =
+    typeof raw.head_block === "number"
+      ? raw.head_block
+      : typeof raw.headBlock === "number"
+        ? raw.headBlock
+        : 0;
+  const indexedBlock =
+    typeof raw.indexed_block === "number"
+      ? raw.indexed_block
+      : typeof raw.indexedBlock === "number"
+        ? raw.indexedBlock
+        : asOfBlock;
+  const lagBlocks =
+    typeof raw.lag_blocks === "number"
+      ? raw.lag_blocks
+      : typeof raw.lagBlocks === "number"
+        ? raw.lagBlocks
+        : headBlock >= asOfBlock
+          ? headBlock - asOfBlock
+          : 0;
+  const errVal = raw.error ?? raw.last_error ?? raw.lastError;
+  const error = errVal != null ? String(errVal) : null;
+
+  return {
+    collection,
+    name: collection,
+    state,
+    asOfBlock,
+    headBlock,
+    indexedBlock,
+    lagBlocks,
+    error,
+    lastError: error,
+    chainId:
+      typeof raw.chain_id === "number"
+        ? raw.chain_id
+        : typeof raw.chainId === "number"
+          ? raw.chainId
+          : undefined,
+    schemaTag:
+      typeof raw.schema_tag === "string"
+        ? raw.schema_tag
+        : typeof raw.schemaTag === "string"
+          ? raw.schemaTag
+          : undefined,
+    lastSyncTime: (raw.last_sync_time ?? raw.lastSyncTime) as string | number | null | undefined,
+    quarantineCount:
+      typeof raw.quarantine_count === "number"
+        ? raw.quarantine_count
+        : typeof raw.quarantineCount === "number"
+          ? raw.quarantineCount
+          : undefined,
+  };
+}
+
+/**
+ * Parse wire JSON into Collection.
+ */
+export function parseCollection(raw: Record<string, unknown>): Collection {
+  const name = String(raw.name ?? "");
+  const schemaTag = String(raw.schema_tag ?? raw.schemaTag ?? "");
+  const rawCol = (raw.column ?? {}) as Record<string, unknown>;
+  const column: ColumnDef = {
+    type: String(rawCol.type ?? "halfvec"),
+    dimensions: Number(rawCol.dimensions ?? 0),
+  };
+  const rawIdx = (raw.index ?? {}) as Record<string, unknown>;
+  const index: IndexDef = {
+    method: String(rawIdx.method ?? "hnsw"),
+    opclass: String(rawIdx.opclass ?? ""),
+  };
+  if (rawIdx.with && typeof rawIdx.with === "object") {
+    index.with = { ...(rawIdx.with as Record<string, unknown>) };
+  }
+  const writers = Array.isArray(raw.writers) ? raw.writers.map(String) : [];
+  const membership = String(raw.membership ?? "creator");
+  const attributes = (raw.attributes ?? {}) as Record<string, string>;
+  const defaultTtl = (raw.default_ttl ?? raw.defaultTtl) as TtlInput | null | undefined;
+  const open = Boolean(raw.open ?? (membership === "open"));
+  const manifestKey = (raw.manifest_key ?? raw.manifestKey) as string | null | undefined;
+
+  let stats: CollectionStats | undefined = undefined;
+  if (raw.stats && typeof raw.stats === "object") {
+    const s = raw.stats as Record<string, unknown>;
+    stats = {
+      liveEntities: Number(s.live_entities ?? s.liveEntities ?? 0),
+      segments: Number(s.segments ?? 0),
+      quarantined: Number(s.quarantined ?? 0),
+      tombstones: Number(s.tombstones ?? 0),
+      ...s,
+    };
+  }
+
+  let sync: SyncStatus | undefined = undefined;
+  if (raw.sync && typeof raw.sync === "object") {
+    sync = parseSyncStatus(raw.sync as Record<string, unknown>);
+  }
+
+  return {
+    name,
+    schemaTag,
+    column,
+    index,
+    writers,
+    membership,
+    attributes,
+    defaultTtl: defaultTtl ?? null,
+    open,
+    manifestKey: manifestKey ?? null,
+    stats,
+    sync,
+    model: (raw.model as string | null) ?? null,
+    mode: raw.mode != null ? String(raw.mode) : undefined,
+  };
+}
+
+/**
+ * Serialize TtlInput into wire JSON format.
+ */
+export function serializeTtl(ttl?: TtlInput | null): Record<string, unknown> | null | undefined {
+  if (ttl === undefined) return undefined;
+  if (ttl === null) return null;
+  if ("blocks" in ttl) return { blocks: ttl.blocks };
+  if ("seconds" in ttl) return { seconds: ttl.seconds };
+  if ("days" in ttl) return { days: ttl.days };
+  if ("expires_at_block" in ttl) return { expires_at_block: ttl.expires_at_block };
+  if ("expiresAtBlock" in ttl) return { expires_at_block: ttl.expiresAtBlock };
+  return ttl as Record<string, unknown>;
+}
+
+/**
+ * Serialize CreateCollectionOptions into wire JSON CollectionCreate format.
+ */
+export function serializeCollectionCreate(opts: CreateCollectionOptions): Record<string, unknown> {
+  const result: Record<string, unknown> = {
+    name: opts.name,
+    column: {
+      type: opts.column.type,
+      dimensions: opts.column.dimensions,
+    },
+    index: {
+      method: opts.index.method,
+      opclass: opts.index.opclass,
+    },
+  };
+
+  if (opts.index.with) {
+    const w: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(opts.index.with)) {
+      if (k === "efConstruction" || k === "ef_construction") {
+        w.ef_construction = v;
+      } else {
+        w[k] = v;
+      }
+    }
+    (result.index as Record<string, unknown>).with = w;
+  }
+
+  const schemaTag = opts.schemaTag ?? opts.schema_tag;
+  if (schemaTag !== undefined) {
+    result.schema_tag = schemaTag;
+  }
+  if (opts.writers !== undefined) {
+    result.writers = opts.writers;
+  }
+  if (opts.membership !== undefined) {
+    result.membership = opts.membership;
+  }
+  if (opts.attributes !== undefined) {
+    result.attributes = opts.attributes;
+  }
+  const defaultTtl = opts.defaultTtl ?? opts.default_ttl;
+  if (defaultTtl !== undefined) {
+    result.default_ttl = serializeTtl(defaultTtl);
+  }
+  const publishManifest = opts.publishManifest ?? opts.publish_manifest;
+  if (publishManifest !== undefined) {
+    result.publish_manifest = publishManifest;
+  }
+  if (opts.model !== undefined) {
+    result.model = opts.model;
+  }
+  if (opts.mode !== undefined) {
+    result.mode = opts.mode;
+  }
+
+  return result;
+}
+
+/**
+ * Serialize FollowCollectionOptions into wire JSON FollowRequest format.
+ */
+export function serializeFollowRequest(opts: FollowCollectionOptions): Record<string, unknown> {
+  const manifestKey = opts.manifestKey ?? opts.manifest_key;
+  if (manifestKey !== undefined) {
+    const res: Record<string, unknown> = { manifest_key: manifestKey };
+    if (opts.name !== undefined) {
+      res.name = opts.name;
+    }
+    return res;
+  }
+  if (opts.definition !== undefined) {
+    return {
+      definition: serializeCollectionCreate(opts.definition),
+    };
+  }
+  throw new Error("FollowCollectionOptions must provide either manifestKey or definition");
 }
