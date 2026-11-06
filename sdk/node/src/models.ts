@@ -3,19 +3,15 @@
  * Docs: docs/api/filters.md §2, docs/api/entities.md §7, docs/api/collections.md, docs/api/operations.md
  */
 
+import type { AnyVector } from "./types.js";
+import { vectorbytesDecodeAny } from "./vectorbytes.js";
+import type { Filter } from "./filter.js";
+
 /**
  * Supported attribute types for Arkiv entities.
  */
 export type AttrType =
-  | "bool"
-  | "i32"
-  | "u64"
-  | "u256"
-  | "dec"
-  | "str"
-  | "addr"
-  | "key"
-  | "bytes";
+  "bool" | "i32" | "u64" | "u256" | "dec" | "str" | "addr" | "key" | "bytes";
 
 /**
  * Canonical typed attribute value.
@@ -55,7 +51,9 @@ export class TypedValue<TType extends AttrType = AttrType, TVal = unknown> {
     }
     const n = Number(this.value);
     if (Number.isNaN(n)) {
-      throw new TypeError(`Cannot convert value '${String(this.value)}' to number`);
+      throw new TypeError(
+        `Cannot convert value '${String(this.value)}' to number`,
+      );
     }
     return n;
   }
@@ -180,7 +178,9 @@ export const Ttl = {
 
   seconds(n: number): { seconds: number } {
     if (n < 2 || n > 15768000 || n % 2 !== 0) {
-      throw new RangeError("seconds must be an even integer between 2 and 15768000");
+      throw new RangeError(
+        "seconds must be an even integer between 2 and 15768000",
+      );
     }
     return { seconds: Math.trunc(n) };
   },
@@ -206,7 +206,7 @@ export const Ttl = {
  * u64, u256, dec, addr, key stay strings; bytes stays Uint8Array.
  */
 export function plainAttributes(
-  attrs: Record<string, TypedValue | unknown>
+  attrs: Record<string, TypedValue | unknown>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(attrs)) {
@@ -392,7 +392,9 @@ export function parseVersionInfo(raw: Record<string, unknown>): VersionInfo {
     kernelTier: String(raw.kernel_tier ?? raw.kernelTier ?? ""),
     chainId: Number(raw.chain_id ?? raw.chainId ?? 0),
     writesEnabled: Boolean(raw.writes_enabled ?? raw.writesEnabled ?? false),
-    capabilities: Array.isArray(raw.capabilities) ? raw.capabilities.map(String) : [],
+    capabilities: Array.isArray(raw.capabilities)
+      ? raw.capabilities.map(String)
+      : [],
   };
 }
 
@@ -463,7 +465,8 @@ export function parseSyncStatus(raw: Record<string, unknown>): SyncStatus {
         : typeof raw.schemaTag === "string"
           ? raw.schemaTag
           : undefined,
-    lastSyncTime: (raw.last_sync_time ?? raw.lastSyncTime) as string | number | null | undefined,
+    lastSyncTime: (raw.last_sync_time ?? raw.lastSyncTime) as
+      string | number | null | undefined,
     quarantineCount:
       typeof raw.quarantine_count === "number"
         ? raw.quarantine_count
@@ -495,9 +498,11 @@ export function parseCollection(raw: Record<string, unknown>): Collection {
   const writers = Array.isArray(raw.writers) ? raw.writers.map(String) : [];
   const membership = String(raw.membership ?? "creator");
   const attributes = (raw.attributes ?? {}) as Record<string, string>;
-  const defaultTtl = (raw.default_ttl ?? raw.defaultTtl) as TtlInput | null | undefined;
-  const open = Boolean(raw.open ?? (membership === "open"));
-  const manifestKey = (raw.manifest_key ?? raw.manifestKey) as string | null | undefined;
+  const defaultTtl = (raw.default_ttl ?? raw.defaultTtl) as
+    TtlInput | null | undefined;
+  const open = Boolean(raw.open ?? membership === "open");
+  const manifestKey = (raw.manifest_key ?? raw.manifestKey) as
+    string | null | undefined;
 
   let stats: CollectionStats | undefined = undefined;
   if (raw.stats && typeof raw.stats === "object") {
@@ -537,13 +542,16 @@ export function parseCollection(raw: Record<string, unknown>): Collection {
 /**
  * Serialize TtlInput into wire JSON format.
  */
-export function serializeTtl(ttl?: TtlInput | null): Record<string, unknown> | null | undefined {
+export function serializeTtl(
+  ttl?: TtlInput | null,
+): Record<string, unknown> | null | undefined {
   if (ttl === undefined) return undefined;
   if (ttl === null) return null;
   if ("blocks" in ttl) return { blocks: ttl.blocks };
   if ("seconds" in ttl) return { seconds: ttl.seconds };
   if ("days" in ttl) return { days: ttl.days };
-  if ("expires_at_block" in ttl) return { expires_at_block: ttl.expires_at_block };
+  if ("expires_at_block" in ttl)
+    return { expires_at_block: ttl.expires_at_block };
   if ("expiresAtBlock" in ttl) return { expires_at_block: ttl.expiresAtBlock };
   return ttl as Record<string, unknown>;
 }
@@ -551,7 +559,9 @@ export function serializeTtl(ttl?: TtlInput | null): Record<string, unknown> | n
 /**
  * Serialize CreateCollectionOptions into wire JSON CollectionCreate format.
  */
-export function serializeCollectionCreate(opts: CreateCollectionOptions): Record<string, unknown> {
+export function serializeCollectionCreate(
+  opts: CreateCollectionOptions,
+): Record<string, unknown> {
   const result: Record<string, unknown> = {
     name: opts.name,
     column: {
@@ -610,7 +620,9 @@ export function serializeCollectionCreate(opts: CreateCollectionOptions): Record
 /**
  * Serialize FollowCollectionOptions into wire JSON FollowRequest format.
  */
-export function serializeFollowRequest(opts: FollowCollectionOptions): Record<string, unknown> {
+export function serializeFollowRequest(
+  opts: FollowCollectionOptions,
+): Record<string, unknown> {
   const manifestKey = opts.manifestKey ?? opts.manifest_key;
   if (manifestKey !== undefined) {
     const res: Record<string, unknown> = { manifest_key: manifestKey };
@@ -624,5 +636,561 @@ export function serializeFollowRequest(opts: FollowCollectionOptions): Record<st
       definition: serializeCollectionCreate(opts.definition),
     };
   }
-  throw new Error("FollowCollectionOptions must provide either manifestKey or definition");
+  throw new Error(
+    "FollowCollectionOptions must provide either manifestKey or definition",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Search, Consistency, and Read Models
+// ---------------------------------------------------------------------------
+
+/**
+ * Consistency specification for read requests.
+ * Docs: docs/api/consistency.md
+ */
+export interface Consistency {
+  minBlock?: number;
+  min_block?: number;
+  timeoutMs?: number;
+  timeout_ms?: number;
+}
+
+/**
+ * Serialize Consistency into wire JSON format.
+ */
+export function serializeConsistency(
+  c?: Consistency,
+): { min_block?: number; timeout_ms?: number } | undefined {
+  if (!c) return undefined;
+  const min_block = c.minBlock ?? c.min_block;
+  const timeout_ms = c.timeoutMs ?? c.timeout_ms;
+  if (min_block === undefined && timeout_ms === undefined) return undefined;
+  const result: { min_block?: number; timeout_ms?: number } = {};
+  if (min_block !== undefined) result.min_block = min_block;
+  if (timeout_ms !== undefined) result.timeout_ms = timeout_ms;
+  return result;
+}
+
+/**
+ * Parse an attributes map into typed values.
+ */
+export function parseAttributes(
+  raw: Record<string, unknown> | undefined | null,
+): Record<string, TypedValue> {
+  const result: Record<string, TypedValue> = {};
+  if (!raw || typeof raw !== "object") return result;
+
+  for (const [k, v] of Object.entries(raw)) {
+    if (v instanceof TypedValue) {
+      result[k] = v;
+    } else if (v && typeof v === "object" && "type" in v && "value" in v) {
+      const obj = v as { type: AttrType; value: unknown };
+      result[k] = new TypedValue(obj.type, obj.value);
+    } else if (typeof v === "string") {
+      result[k] = T.str(v);
+    } else if (typeof v === "boolean") {
+      result[k] = T.bool(v);
+    } else if (typeof v === "number") {
+      if (Number.isInteger(v)) {
+        result[k] = T.i32(v);
+      } else {
+        result[k] = T.dec(String(v));
+      }
+    } else if (typeof v === "bigint") {
+      result[k] = T.u64(String(v));
+    } else {
+      result[k] = new TypedValue("str", String(v));
+    }
+  }
+  return result;
+}
+
+/**
+ * Entity model representing one Arkiv entity in a collection.
+ * Docs: docs/api/entities.md §1
+ */
+export class Entity {
+  readonly key: string;
+  readonly id: string | null;
+  readonly owner: string;
+  readonly creator: string;
+  readonly createdAtBlock: number;
+  readonly updatedAtBlock: number;
+  readonly expiresAtBlock: number;
+  readonly attributes: Record<string, TypedValue>;
+  readonly document: string | null;
+  readonly vectorBytes: string | null;
+  vector: AnyVector | null;
+
+  get created_at_block(): number {
+    return this.createdAtBlock;
+  }
+  get updated_at_block(): number {
+    return this.updatedAtBlock;
+  }
+  get expires_at_block(): number {
+    return this.expiresAtBlock;
+  }
+  get vector_bytes(): string | null {
+    return this.vectorBytes;
+  }
+
+  constructor(init: {
+    key: string;
+    id?: string | null;
+    owner: string;
+    creator: string;
+    createdAtBlock: number;
+    updatedAtBlock: number;
+    expiresAtBlock: number;
+    attributes: Record<string, TypedValue>;
+    document?: string | null;
+    vectorBytes?: string | null;
+    vector?: AnyVector | null;
+  }) {
+    this.key = init.key;
+    this.id = init.id ?? null;
+    this.owner = init.owner;
+    this.creator = init.creator;
+    this.createdAtBlock = init.createdAtBlock;
+    this.updatedAtBlock = init.updatedAtBlock;
+    this.expiresAtBlock = init.expiresAtBlock;
+    this.attributes = init.attributes;
+    this.document = init.document ?? null;
+    this.vectorBytes = init.vectorBytes ?? null;
+    this.vector = init.vector ?? null;
+  }
+
+  plainAttributes(): Record<string, unknown> {
+    return plainAttributes(this.attributes);
+  }
+}
+
+/**
+ * Search hit item returned in SearchResult.
+ * Docs: docs/api/search.md §1
+ */
+export class SearchHit {
+  readonly key: string;
+  readonly id: string | null;
+  readonly distance: number;
+  readonly score: number;
+  readonly owner: string;
+  readonly creator: string;
+  readonly expiresAtBlock: number;
+  readonly attributes: Record<string, TypedValue>;
+  readonly document: string | null;
+  readonly vectorBytes: string | null;
+  vector: AnyVector | null;
+
+  get expires_at_block(): number {
+    return this.expiresAtBlock;
+  }
+  get vector_bytes(): string | null {
+    return this.vectorBytes;
+  }
+
+  constructor(init: {
+    key: string;
+    id?: string | null;
+    distance: number;
+    score: number;
+    owner: string;
+    creator: string;
+    expiresAtBlock: number;
+    attributes: Record<string, TypedValue>;
+    document?: string | null;
+    vectorBytes?: string | null;
+    vector?: AnyVector | null;
+  }) {
+    this.key = init.key;
+    this.id = init.id ?? null;
+    this.distance = init.distance;
+    this.score = init.score;
+    this.owner = init.owner;
+    this.creator = init.creator;
+    this.expiresAtBlock = init.expiresAtBlock;
+    this.attributes = init.attributes;
+    this.document = init.document ?? null;
+    this.vectorBytes = init.vectorBytes ?? null;
+    this.vector = init.vector ?? null;
+  }
+
+  plainAttributes(): Record<string, unknown> {
+    return plainAttributes(this.attributes);
+  }
+}
+
+/**
+ * Search result object from search().
+ * Docs: docs/api/search.md §1
+ */
+export class SearchResult {
+  readonly asOfBlock: number;
+  readonly syncState: string;
+  readonly openCollection: boolean;
+  readonly hits: SearchHit[];
+  readonly plan?: Record<string, unknown>;
+
+  get as_of_block(): number {
+    return this.asOfBlock;
+  }
+  get sync_state(): string {
+    return this.syncState;
+  }
+  get open_collection(): boolean {
+    return this.openCollection;
+  }
+  get results(): SearchHit[] {
+    return this.hits;
+  }
+
+  constructor(init: {
+    asOfBlock: number;
+    syncState: string;
+    openCollection?: boolean;
+    hits: SearchHit[];
+    plan?: Record<string, unknown>;
+  }) {
+    this.asOfBlock = init.asOfBlock;
+    this.syncState = init.syncState;
+    this.openCollection = init.openCollection ?? false;
+    this.hits = init.hits;
+    this.plan = init.plan;
+  }
+}
+
+/**
+ * Result of batch search from searchBatch().
+ * Docs: docs/api/search.md §2
+ */
+export class BatchResult {
+  readonly asOfBlock: number;
+  readonly syncState: string;
+  readonly results: SearchResult[];
+
+  get as_of_block(): number {
+    return this.asOfBlock;
+  }
+  get sync_state(): string {
+    return this.syncState;
+  }
+  get responses(): SearchResult[] {
+    return this.results;
+  }
+
+  constructor(init: {
+    asOfBlock: number;
+    syncState: string;
+    results: SearchResult[];
+  }) {
+    this.asOfBlock = init.asOfBlock;
+    this.syncState = init.syncState;
+    this.results = init.results;
+  }
+}
+
+/**
+ * One page of scroll results.
+ * Docs: docs/api/search.md §3
+ */
+export class ScrollPage {
+  readonly entities: Entity[];
+  readonly nextCursor: string | null;
+  readonly asOfBlock: number;
+
+  get next_cursor(): string | null {
+    return this.nextCursor;
+  }
+  get as_of_block(): number {
+    return this.asOfBlock;
+  }
+
+  constructor(init: {
+    entities: Entity[];
+    nextCursor?: string | null;
+    asOfBlock: number;
+  }) {
+    this.entities = init.entities;
+    this.nextCursor = init.nextCursor ?? null;
+    this.asOfBlock = init.asOfBlock;
+  }
+}
+
+/**
+ * Result of count().
+ * Docs: docs/api/search.md §4
+ */
+export class CountResult {
+  readonly count: number;
+  readonly asOfBlock: number;
+
+  get as_of_block(): number {
+    return this.asOfBlock;
+  }
+
+  constructor(init: { count: number; asOfBlock: number }) {
+    this.count = init.count;
+    this.asOfBlock = init.asOfBlock;
+  }
+}
+
+/**
+ * Options for search().
+ */
+export interface SearchOptions {
+  vector?:
+    | AnyVector
+    | number[]
+    | Float32Array
+    | Float64Array
+    | string
+    | { dim: number; indices: number[]; values: number[] }
+    | unknown;
+  vectorBytes?: string | Uint8Array;
+  vector_bytes?: string | Uint8Array;
+  k?: number;
+  offset?: number;
+  operator?: "<->" | "<#>" | "<=>" | "<+>" | "<~>" | "<%>" | string;
+  filter?: Filter;
+  where?: string;
+  efSearch?: number;
+  ef_search?: number;
+  iterativeScan?: "off" | "relaxed_order" | "strict_order" | string;
+  iterative_scan?: "off" | "relaxed_order" | "strict_order" | string;
+  maxScanTuples?: number;
+  max_scan_tuples?: number;
+  maxDistance?: number;
+  max_distance?: number;
+  minScore?: number;
+  min_score?: number;
+  exact?: boolean;
+  include?: ("attributes" | "document" | "vector" | string)[];
+  consistency?: Consistency;
+  explain?: boolean;
+}
+
+/**
+ * Options for scroll() and scrollPage().
+ */
+export interface ScrollOptions {
+  filter?: Filter;
+  where?: string;
+  limit?: number;
+  cursor?: string | null;
+  include?: ("attributes" | "document" | "vector" | string)[];
+  consistency?: Consistency;
+}
+
+/**
+ * Options for count().
+ */
+export interface CountOptions {
+  filter?: Filter;
+  where?: string;
+  consistency?: Consistency;
+}
+
+/**
+ * Options for get().
+ */
+export interface GetEntityOptions {
+  include?: ("attributes" | "document" | "vector" | string)[];
+  verify?: boolean;
+  consistency?: Consistency;
+  minBlock?: number;
+  min_block?: number;
+  timeoutMs?: number;
+  timeout_ms?: number;
+}
+
+/**
+ * Parse wire JSON into Entity.
+ */
+export function parseEntity(raw: Record<string, unknown>): Entity {
+  const key = String(raw.key ?? "");
+  const id = raw.id != null ? String(raw.id) : null;
+  const owner = String(raw.owner ?? "");
+  const creator = String(raw.creator ?? "");
+  const createdAtBlock = Number(
+    raw.created_at_block ?? raw.createdAtBlock ?? 0,
+  );
+  const updatedAtBlock = Number(
+    raw.updated_at_block ?? raw.updatedAtBlock ?? 0,
+  );
+  const expiresAtBlock = Number(
+    raw.expires_at_block ?? raw.expiresAtBlock ?? 0,
+  );
+  const attributes = parseAttributes(
+    (raw.attributes as Record<string, unknown>) ?? {},
+  );
+  const document = raw.document != null ? String(raw.document) : null;
+  const vb = (raw.vector_bytes ?? raw.vectorBytes) as string | null | undefined;
+  const vectorBytes = vb != null ? String(vb) : null;
+
+  let vector: AnyVector | null = null;
+  if (vectorBytes) {
+    try {
+      const buf = Buffer.from(vectorBytes, "base64");
+      if (buf.length >= 4) {
+        vector = vectorbytesDecodeAny(
+          new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength),
+        );
+      }
+    } catch {
+      vector = null;
+    }
+  }
+
+  return new Entity({
+    key,
+    id,
+    owner,
+    creator,
+    createdAtBlock,
+    updatedAtBlock,
+    expiresAtBlock,
+    attributes,
+    document,
+    vectorBytes,
+    vector,
+  });
+}
+
+/**
+ * Parse wire JSON into SearchHit.
+ */
+export function parseSearchHit(raw: Record<string, unknown>): SearchHit {
+  const key = String(raw.key ?? "");
+  const id = raw.id != null ? String(raw.id) : null;
+  const distance = Number(raw.distance ?? 0);
+  const score = Number(raw.score ?? 0);
+  const owner = String(raw.owner ?? "");
+  const creator = String(raw.creator ?? "");
+  const expiresAtBlock = Number(
+    raw.expires_at_block ?? raw.expiresAtBlock ?? 0,
+  );
+  const attributes = parseAttributes(
+    (raw.attributes as Record<string, unknown>) ?? {},
+  );
+  const document = raw.document != null ? String(raw.document) : null;
+  const vb = (raw.vector_bytes ?? raw.vectorBytes) as string | null | undefined;
+  const vectorBytes = vb != null ? String(vb) : null;
+
+  let vector: AnyVector | null = null;
+  if (vectorBytes) {
+    try {
+      const buf = Buffer.from(vectorBytes, "base64");
+      if (buf.length >= 4) {
+        vector = vectorbytesDecodeAny(
+          new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength),
+        );
+      }
+    } catch {
+      vector = null;
+    }
+  }
+
+  return new SearchHit({
+    key,
+    id,
+    distance,
+    score,
+    owner,
+    creator,
+    expiresAtBlock,
+    attributes,
+    document,
+    vectorBytes,
+    vector,
+  });
+}
+
+/**
+ * Parse wire JSON into SearchResult.
+ */
+export function parseSearchResult(raw: Record<string, unknown>): SearchResult {
+  const asOfBlock = Number(raw.as_of_block ?? raw.asOfBlock ?? 0);
+  const syncState = String(raw.sync_state ?? raw.syncState ?? "");
+  const openCollection = Boolean(
+    raw.open_collection ?? raw.openCollection ?? false,
+  );
+  const rawHits = Array.isArray(raw.results)
+    ? raw.results
+    : Array.isArray(raw.hits)
+      ? raw.hits
+      : [];
+  const hits = rawHits.map((h) => parseSearchHit(h as Record<string, unknown>));
+  const plan = (raw.plan as Record<string, unknown> | undefined) ?? undefined;
+
+  return new SearchResult({
+    asOfBlock,
+    syncState,
+    openCollection,
+    hits,
+    plan,
+  });
+}
+
+/**
+ * Parse wire JSON into BatchResult.
+ */
+export function parseBatchResult(raw: Record<string, unknown>): BatchResult {
+  const asOfBlock = Number(raw.as_of_block ?? raw.asOfBlock ?? 0);
+  const syncState = String(raw.sync_state ?? raw.syncState ?? "");
+  const rawResponses = Array.isArray(raw.responses) ? raw.responses : [];
+  const results = rawResponses.map((r: Record<string, unknown>) => {
+    const rawHits = Array.isArray(r.results) ? r.results : [];
+    const hits = rawHits.map((h) =>
+      parseSearchHit(h as Record<string, unknown>),
+    );
+    const plan = (r.plan as Record<string, unknown> | undefined) ?? undefined;
+    return new SearchResult({
+      asOfBlock,
+      syncState,
+      openCollection: false,
+      hits,
+      plan,
+    });
+  });
+
+  return new BatchResult({
+    asOfBlock,
+    syncState,
+    results,
+  });
+}
+
+/**
+ * Parse wire JSON into ScrollPage.
+ */
+export function parseScrollPage(raw: Record<string, unknown>): ScrollPage {
+  const asOfBlock = Number(raw.as_of_block ?? raw.asOfBlock ?? 0);
+  const rawEntities = Array.isArray(raw.entities) ? raw.entities : [];
+  const entities = rawEntities.map((e) =>
+    parseEntity(e as Record<string, unknown>),
+  );
+  const nextCursor =
+    raw.next_cursor != null
+      ? String(raw.next_cursor)
+      : raw.nextCursor != null
+        ? String(raw.nextCursor)
+        : null;
+
+  return new ScrollPage({
+    entities,
+    nextCursor,
+    asOfBlock,
+  });
+}
+
+/**
+ * Parse wire JSON into CountResult.
+ */
+export function parseCountResult(raw: Record<string, unknown>): CountResult {
+  return new CountResult({
+    count: Number(raw.count ?? 0),
+    asOfBlock: Number(raw.as_of_block ?? raw.asOfBlock ?? 0),
+  });
 }

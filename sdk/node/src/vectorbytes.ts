@@ -67,13 +67,13 @@ export function toHalf(f: number): number {
     let h = mant >>> shift;
     const rem = mant & ((1 << shift) - 1);
     const half = 1 << (shift - 1);
-    if (rem > half || (rem === half && (h & 1))) h++;
+    if (rem > half || (rem === half && h & 1)) h++;
     return sign | h;
   }
 
   let h = sign | (e << 10) | (mant >>> 13);
   const rem = mant & 0x1fff;
-  if (rem > 0x1000 || (rem === 0x1000 && (h & 1))) h++; // may carry into exponent: correct
+  if (rem > 0x1000 || (rem === 0x1000 && h & 1)) h++; // may carry into exponent: correct
   if ((h & 0x7c00) === 0x7c00) throw new VectorBytesError("VB_NON_FINITE");
   return h;
 }
@@ -300,7 +300,10 @@ export function encodeVector(vector: Vector, normalized?: boolean): Uint8Array {
 /**
  * Encode a half-precision HalfVector into VectorBytes v1 format.
  */
-export function encodeHalfVector(vector: HalfVector, normalized?: boolean): Uint8Array {
+export function encodeHalfVector(
+  vector: HalfVector,
+  normalized?: boolean,
+): Uint8Array {
   const isNorm = normalized ?? vector.normalized;
   const dim = vector.dim;
   if (dim < 1 || dim > 16000) {
@@ -366,7 +369,10 @@ export function encodeBit(bit: Bit, normalized?: boolean): Uint8Array {
 /**
  * Encode a SparseVector into VectorBytes v1 format.
  */
-export function encodeSparseVector(sparse: SparseVector, normalized?: boolean): Uint8Array {
+export function encodeSparseVector(
+  sparse: SparseVector,
+  normalized?: boolean,
+): Uint8Array {
   const isNorm = normalized ?? sparse.normalized;
   const dim = sparse.dim;
   const nnz = sparse.nnz;
@@ -419,7 +425,10 @@ export function encodeSparseVector(sparse: SparseVector, normalized?: boolean): 
 /**
  * Polymorphic encode function for any Vector type.
  */
-export function vectorbytesEncode(vector: AnyVector, normalized?: boolean): Uint8Array {
+export function vectorbytesEncode(
+  vector: AnyVector,
+  normalized?: boolean,
+): Uint8Array {
   if (vector instanceof Vector) {
     return encodeVector(vector, normalized);
   } else if (vector instanceof HalfVector) {

@@ -15,6 +15,9 @@ export * from "./types.js";
 // VectorBytes codec
 export * from "./vectorbytes.js";
 
+// Filter builder F and filter types
+export * from "./filter.js";
+
 // Models, TypedValue, T and Ttl helpers
 export * from "./models.js";
 

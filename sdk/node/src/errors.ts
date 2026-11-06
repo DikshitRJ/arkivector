@@ -53,7 +53,10 @@ export class ApiError extends Error {
   readonly revertError?: string;
   readonly raw?: unknown;
 
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     let msg: string;
     let opts: Partial<ApiErrorOptions>;
 
@@ -62,7 +65,10 @@ export class ApiError extends Error {
       opts = options ?? {};
     } else {
       opts = messageOrOptions;
-      msg = opts.detail ?? opts.title ?? `Arkivector API error: ${opts.code ?? "unknown"}`;
+      msg =
+        opts.detail ??
+        opts.title ??
+        `Arkivector API error: ${opts.code ?? "unknown"}`;
     }
 
     super(msg);
@@ -87,7 +93,10 @@ export class ApiError extends Error {
  * Network / transport error when no HTTP response is received.
  */
 export class TransportError extends ApiError {
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     super(messageOrOptions, options);
     this.name = "TransportError";
     Object.setPrototypeOf(this, new.target.prototype);
@@ -98,7 +107,10 @@ export class TransportError extends ApiError {
  * Authentication / authorization error (unauthorized, forbidden, write_disabled).
  */
 export class AuthError extends ApiError {
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     super(messageOrOptions, options);
     this.name = "AuthError";
     Object.setPrototypeOf(this, new.target.prototype);
@@ -109,7 +121,10 @@ export class AuthError extends ApiError {
  * Resource not found error (*_not_found).
  */
 export class NotFoundError extends ApiError {
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     super(messageOrOptions, options);
     this.name = "NotFoundError";
     Object.setPrototypeOf(this, new.target.prototype);
@@ -120,7 +135,10 @@ export class NotFoundError extends ApiError {
  * Conflict error (collection_exists, not_owner, tx_reverted, idempotency_conflict).
  */
 export class ConflictError extends ApiError {
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     super(messageOrOptions, options);
     this.name = "ConflictError";
     Object.setPrototypeOf(this, new.target.prototype);
@@ -131,7 +149,10 @@ export class ConflictError extends ApiError {
  * Validation error (bad_request, invalid_*, dimension_mismatch, payload_too_large, unsupported_media_type).
  */
 export class ValidationError extends ApiError {
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     super(messageOrOptions, options);
     this.name = "ValidationError";
     Object.setPrototypeOf(this, new.target.prototype);
@@ -142,7 +163,10 @@ export class ValidationError extends ApiError {
  * Service unavailable or temporary failure (rate_limited, arkiv_rpc_error, not_ready, timeout, consistency_timeout).
  */
 export class UnavailableError extends ApiError {
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     super(messageOrOptions, options);
     this.name = "UnavailableError";
     Object.setPrototypeOf(this, new.target.prototype);
@@ -153,7 +177,10 @@ export class UnavailableError extends ApiError {
  * Feature not implemented by this daemon build (not_implemented).
  */
 export class NotImplementedByDaemonError extends ApiError {
-  constructor(messageOrOptions: string | ApiErrorOptions, options?: Partial<ApiErrorOptions>) {
+  constructor(
+    messageOrOptions: string | ApiErrorOptions,
+    options?: Partial<ApiErrorOptions>,
+  ) {
     super(messageOrOptions, options);
     this.name = "NotImplementedByDaemonError";
     Object.setPrototypeOf(this, new.target.prototype);
@@ -165,16 +192,24 @@ export class NotImplementedByDaemonError extends ApiError {
  */
 export function errorFromProblem(problem: Record<string, unknown>): ApiError {
   const code = typeof problem.code === "string" ? problem.code : "api_error";
-  const status = typeof problem.status === "number" ? problem.status : undefined;
+  const status =
+    typeof problem.status === "number" ? problem.status : undefined;
   const title = typeof problem.title === "string" ? problem.title : undefined;
-  const detail = typeof problem.detail === "string" ? problem.detail : undefined;
-  const retryable = typeof problem.retryable === "boolean" ? problem.retryable : false;
-  const requestId = typeof problem.request_id === "string" ? problem.request_id : undefined;
+  const detail =
+    typeof problem.detail === "string" ? problem.detail : undefined;
+  const retryable =
+    typeof problem.retryable === "boolean" ? problem.retryable : false;
+  const requestId =
+    typeof problem.request_id === "string" ? problem.request_id : undefined;
   const field = typeof problem.field === "string" ? problem.field : undefined;
-  const position = typeof problem.position === "number" ? problem.position : undefined;
-  const vbError = typeof problem.vb_error === "string" ? problem.vb_error : undefined;
-  const asOfBlock = typeof problem.as_of_block === "number" ? problem.as_of_block : undefined;
-  const revertError = typeof problem.revert_error === "string" ? problem.revert_error : undefined;
+  const position =
+    typeof problem.position === "number" ? problem.position : undefined;
+  const vbError =
+    typeof problem.vb_error === "string" ? problem.vb_error : undefined;
+  const asOfBlock =
+    typeof problem.as_of_block === "number" ? problem.as_of_block : undefined;
+  const revertError =
+    typeof problem.revert_error === "string" ? problem.revert_error : undefined;
 
   const opts: ApiErrorOptions = {
     code,

@@ -78,7 +78,12 @@ export function calculateBackoff(attempt: number): number {
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new TransportError("Request aborted by caller", { code: "aborted", retryable: false }));
+      reject(
+        new TransportError("Request aborted by caller", {
+          code: "aborted",
+          retryable: false,
+        }),
+      );
       return;
     }
     const timer = setTimeout(resolve, ms);
@@ -86,7 +91,10 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       const onAbort = () => {
         clearTimeout(timer);
         reject(
-          new TransportError("Request aborted by caller", { code: "aborted", retryable: false })
+          new TransportError("Request aborted by caller", {
+            code: "aborted",
+            retryable: false,
+          }),
         );
       };
       signal.addEventListener("abort", onAbort, { once: true });
@@ -101,7 +109,7 @@ export function isOperationRetryable(
   method: string,
   path: string,
   idempotencyKey?: string,
-  explicitIdempotent?: boolean
+  explicitIdempotent?: boolean,
 ): boolean {
   if (explicitIdempotent !== undefined) {
     return explicitIdempotent;
@@ -184,7 +192,7 @@ export class HttpTransport {
       method,
       options.path,
       options.idempotencyKey,
-      options.isIdempotent
+      options.isIdempotent,
     );
 
     const headers: Record<string, string> = {
@@ -203,8 +211,13 @@ export class HttpTransport {
     let bodyJson: string | undefined = undefined;
     if (options.body !== undefined) {
       headers["content-type"] =
-        headers["content-type"] ?? headers["Content-Type"] ?? "application/json";
-      bodyJson = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+        headers["content-type"] ??
+        headers["Content-Type"] ??
+        "application/json";
+      bodyJson =
+        typeof options.body === "string"
+          ? options.body
+          : JSON.stringify(options.body);
     }
 
     if (options.idempotencyKey) {
@@ -231,7 +244,8 @@ export class HttpTransport {
         }
         const onCallerAbort = () => controller.abort();
         options.signal.addEventListener("abort", onCallerAbort, { once: true });
-        removeCallerListener = () => options.signal?.removeEventListener("abort", onCallerAbort);
+        removeCallerListener = () =>
+          options.signal?.removeEventListener("abort", onCallerAbort);
       }
 
       try {
@@ -272,17 +286,22 @@ export class HttpTransport {
             parsedProblem.status = res.status;
           }
           if (parsedProblem.request_id === undefined) {
-            parsedProblem.request_id = res.headers.get("x-request-id") ?? headers["x-request-id"];
+            parsedProblem.request_id =
+              res.headers.get("x-request-id") ?? headers["x-request-id"];
           }
           apiError = errorFromProblem(parsedProblem);
         } else {
           const isRetryableStatus =
-            res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
+            res.status === 429 ||
+            res.status === 502 ||
+            res.status === 503 ||
+            res.status === 504;
           apiError = new ApiError(res.statusText || `HTTP ${res.status}`, {
             status: res.status,
             code: "http_error",
             retryable: isRetryableStatus,
-            requestId: res.headers.get("x-request-id") ?? headers["x-request-id"],
+            requestId:
+              res.headers.get("x-request-id") ?? headers["x-request-id"],
             raw: text,
           });
         }
@@ -290,7 +309,8 @@ export class HttpTransport {
         // Retry check
         if (isRetryableOp && apiError.retryable && attempt < maxRetries) {
           let delayMs = calculateBackoff(attempt);
-          const retryAfterHeader = res.headers.get("Retry-After") ?? res.headers.get("retry-after");
+          const retryAfterHeader =
+            res.headers.get("Retry-After") ?? res.headers.get("retry-after");
           if (retryAfterHeader) {
             const sec = parseFloat(retryAfterHeader);
             if (!isNaN(sec) && sec >= 0) {
@@ -319,15 +339,21 @@ export class HttpTransport {
 
         let transportError: TransportError;
         if (timedOut) {
-          transportError = new TransportError(`Request timed out after ${timeoutMs}ms`, {
-            code: "timeout",
-            retryable: true,
-          });
+          transportError = new TransportError(
+            `Request timed out after ${timeoutMs}ms`,
+            {
+              code: "timeout",
+              retryable: true,
+            },
+          );
         } else {
-          transportError = new TransportError(err instanceof Error ? err.message : String(err), {
-            code: "transport_error",
-            retryable: true,
-          });
+          transportError = new TransportError(
+            err instanceof Error ? err.message : String(err),
+            {
+              code: "transport_error",
+              retryable: true,
+            },
+          );
         }
 
         if (isRetryableOp && transportError.retryable && attempt < maxRetries) {
@@ -340,12 +366,14 @@ export class HttpTransport {
       }
     }
 
-    throw new TransportError("Max retries exceeded", { code: "max_retries_exceeded" });
+    throw new TransportError("Max retries exceeded", {
+      code: "max_retries_exceeded",
+    });
   }
 
   async get<T = unknown>(
     path: string,
-    options?: Omit<HttpRequestOptions, "path" | "method">
+    options?: Omit<HttpRequestOptions, "path" | "method">,
   ): Promise<T> {
     return this.request<T>({ ...options, path, method: "GET" });
   }
@@ -353,7 +381,7 @@ export class HttpTransport {
   async post<T = unknown>(
     path: string,
     body?: unknown,
-    options?: Omit<HttpRequestOptions, "path" | "method" | "body">
+    options?: Omit<HttpRequestOptions, "path" | "method" | "body">,
   ): Promise<T> {
     return this.request<T>({ ...options, path, method: "POST", body });
   }
@@ -361,14 +389,14 @@ export class HttpTransport {
   async put<T = unknown>(
     path: string,
     body?: unknown,
-    options?: Omit<HttpRequestOptions, "path" | "method" | "body">
+    options?: Omit<HttpRequestOptions, "path" | "method" | "body">,
   ): Promise<T> {
     return this.request<T>({ ...options, path, method: "PUT", body });
   }
 
   async delete<T = unknown>(
     path: string,
-    options?: Omit<HttpRequestOptions, "path" | "method">
+    options?: Omit<HttpRequestOptions, "path" | "method">,
   ): Promise<T> {
     return this.request<T>({ ...options, path, method: "DELETE" });
   }

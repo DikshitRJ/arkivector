@@ -28,7 +28,7 @@ export class Vector {
 
   constructor(
     input: Vector | number[] | Float32Array | Iterable<number> | string,
-    normalized: boolean = false
+    normalized: boolean = false,
   ) {
     if (input instanceof Vector) {
       this.data = new Float32Array(input.data);
@@ -95,7 +95,10 @@ export class Vector {
     vectorbytesValidate(bytes);
     const type = bytes[2] & 0x0f;
     if (type !== 1) {
-      throw new VectorBytesError("VB_UNKNOWN_TYPE", `Expected vector type 1, got ${type}`);
+      throw new VectorBytesError(
+        "VB_UNKNOWN_TYPE",
+        `Expected vector type 1, got ${type}`,
+      );
     }
     const normalized = (bytes[3] & 0x01) === 0x01;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -121,7 +124,7 @@ export class HalfVector {
    */
   static fromValues(
     input: number[] | Float32Array | Iterable<number> | string,
-    normalized: boolean = false
+    normalized: boolean = false,
   ): HalfVector {
     return new HalfVector(input, normalized);
   }
@@ -131,14 +134,20 @@ export class HalfVector {
    */
   static fromRaw(raw: Uint16Array, normalized: boolean = false): HalfVector {
     const v = Object.create(HalfVector.prototype) as HalfVector;
-    Object.defineProperty(v, "raw", { value: new Uint16Array(raw), writable: false });
-    Object.defineProperty(v, "normalized", { value: normalized, writable: false });
+    Object.defineProperty(v, "raw", {
+      value: new Uint16Array(raw),
+      writable: false,
+    });
+    Object.defineProperty(v, "normalized", {
+      value: normalized,
+      writable: false,
+    });
     return v;
   }
 
   constructor(
     input: HalfVector | number[] | Float32Array | Iterable<number> | string,
-    normalized: boolean = false
+    normalized: boolean = false,
   ) {
     if (input instanceof HalfVector) {
       this.raw = new Uint16Array(input.raw);
@@ -217,7 +226,10 @@ export class HalfVector {
     vectorbytesValidate(bytes);
     const type = bytes[2] & 0x0f;
     if (type !== 2) {
-      throw new VectorBytesError("VB_UNKNOWN_TYPE", `Expected halfvec type 2, got ${type}`);
+      throw new VectorBytesError(
+        "VB_UNKNOWN_TYPE",
+        `Expected halfvec type 2, got ${type}`,
+      );
     }
     const normalized = (bytes[3] & 0x01) === 0x01;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -242,7 +254,7 @@ export class Bit {
   constructor(
     value: Bit | string | boolean[] | number[] | Uint8Array,
     bitLen?: number,
-    normalized: boolean = false
+    normalized: boolean = false,
   ) {
     if (value instanceof Bit) {
       this.data = new Uint8Array(value.data);
@@ -326,7 +338,10 @@ export class Bit {
     vectorbytesValidate(bytes);
     const type = bytes[2] & 0x0f;
     if (type !== 3) {
-      throw new VectorBytesError("VB_UNKNOWN_TYPE", `Expected bit type 3, got ${type}`);
+      throw new VectorBytesError(
+        "VB_UNKNOWN_TYPE",
+        `Expected bit type 3, got ${type}`,
+      );
     }
     const normalized = (bytes[3] & 0x01) === 0x01;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -351,12 +366,16 @@ export class SparseVector {
   constructor(sparse: SparseVector, normalized?: boolean);
   constructor(text: string, normalized?: boolean);
   constructor(dense: number[] | Float32Array, normalized?: boolean);
-  constructor(dict: Record<number, number> | Map<number, number>, dim: number, normalized?: boolean);
+  constructor(
+    dict: Record<number, number> | Map<number, number>,
+    dim: number,
+    normalized?: boolean,
+  );
   constructor(
     dim: number,
     indices: ArrayLike<number>,
     values: ArrayLike<number>,
-    normalized?: boolean
+    normalized?: boolean,
   );
   constructor(
     arg1:
@@ -369,7 +388,7 @@ export class SparseVector {
       | Map<number, number>,
     arg2?: number | ArrayLike<number> | boolean,
     arg3?: ArrayLike<number> | boolean,
-    arg4?: boolean
+    arg4?: boolean,
   ) {
     if (arg1 instanceof SparseVector) {
       this.dim = arg1.dim;
@@ -473,7 +492,7 @@ export class SparseVector {
     for (let i = 0; i < this.indices.length; i++) {
       pairs.push(`${this.indices[i] + 1}:${this.values[i]}`);
     }
-    return `{${pairs.join(",") }}/${this.dim}`;
+    return `{${pairs.join(",")}}/${this.dim}`;
   }
 
   toString(): string {
@@ -488,16 +507,22 @@ export class SparseVector {
     const trimmed = text.trim();
     const slash = trimmed.lastIndexOf("/");
     if (slash === -1) {
-      throw new Error(`Invalid sparsevec text representation (missing '/'): ${text}`);
+      throw new Error(
+        `Invalid sparsevec text representation (missing '/'): ${text}`,
+      );
     }
     const dim = parseInt(trimmed.slice(slash + 1).trim(), 10);
     if (Number.isNaN(dim) || dim < 1) {
-      throw new Error(`Invalid dimension in sparsevec text: ${trimmed.slice(slash + 1)}`);
+      throw new Error(
+        `Invalid dimension in sparsevec text: ${trimmed.slice(slash + 1)}`,
+      );
     }
 
     const bracePart = trimmed.slice(0, slash).trim();
     if (!bracePart.startsWith("{") || !bracePart.endsWith("}")) {
-      throw new Error(`Invalid sparsevec text representation (missing '{}'): ${text}`);
+      throw new Error(
+        `Invalid sparsevec text representation (missing '{}'): ${text}`,
+      );
     }
 
     const inner = bracePart.slice(1, -1).trim();
@@ -533,7 +558,10 @@ export class SparseVector {
     vectorbytesValidate(bytes);
     const type = bytes[2] & 0x0f;
     if (type !== 4) {
-      throw new VectorBytesError("VB_UNKNOWN_TYPE", `Expected sparsevec type 4, got ${type}`);
+      throw new VectorBytesError(
+        "VB_UNKNOWN_TYPE",
+        `Expected sparsevec type 4, got ${type}`,
+      );
     }
     const normalized = (bytes[3] & 0x01) === 0x01;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
