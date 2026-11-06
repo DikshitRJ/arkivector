@@ -35,15 +35,15 @@ typedef enum {
     AV_AT_KEY = 10
 } av_attr_type;
 
-#define AV_ATTR_NAME_MAX 32
-#define AV_ATTR_STR_MAX 128
+#define AV_ATTR_NAME_MAX  32
+#define AV_ATTR_STR_MAX   128
 #define AV_ATTR_BYTES_MAX (128 * 1024)
 
 /* Reserved attribute names (docs/api/collections.md §4). */
 #define AV_ATTR_SCHEMA "arkiv.schema" /* str, indexed: collection schema tag */
-#define AV_ATTR_VEC "av.vec"          /* bytes: VectorBytes v1 */
-#define AV_ATTR_ID "av.id"            /* str, indexed: external id */
-#define AV_ATTR_DOC "av.doc"          /* bytes: UTF-8 document */
+#define AV_ATTR_VEC    "av.vec"       /* bytes: VectorBytes v1 */
+#define AV_ATTR_ID     "av.id"        /* str, indexed: external id */
+#define AV_ATTR_DOC    "av.doc"       /* bytes: UTF-8 document */
 
 typedef struct {
     char name[AV_ATTR_NAME_MAX + 1]; /* NUL-terminated */

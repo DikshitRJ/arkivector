@@ -15,9 +15,9 @@
 #include "kernels/opclass.h"
 #include "log.h"
 
-#define AV_COLL_NAME_MAX 63
-#define AV_SCHEMA_TAG_MAX 128
-#define AV_MAX_WRITERS 6500
+#define AV_COLL_NAME_MAX    63
+#define AV_SCHEMA_TAG_MAX   128
+#define AV_MAX_WRITERS      6500
 #define AV_MAX_SCHEMA_ATTRS 256
 
 typedef enum { AV_MEMBERSHIP_CREATOR = 0, AV_MEMBERSHIP_OWNER = 1, AV_MEMBERSHIP_OPEN = 2 } av_membership;
