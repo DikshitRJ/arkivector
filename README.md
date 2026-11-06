@@ -100,28 +100,6 @@ export ARKIVECTOR_STORAGE_DATA_DIR="$HOME/.local/share/arkivector"
 
 libcurl is bundled in the tarball. You need libuv and OpenSSL 3 from your distribution (`apt install libuv1 libssl3`, `dnf install libuv openssl`, and so on).
 
-#### macOS and Windows, from source
-
-The daemon targets Linux and glibc today, so on these systems you clone the repo and build the container image yourself:
-
-```bash
-git clone https://github.com/DikshitRJ/arkivector.git
-cd arkivector
-docker build -f daemon/Dockerfile -t arkivectord .
-docker run -d --name arkivectord -p 127.0.0.1:8080:8080 -v arkivector-data:/data \
-  -e ARKIVECTOR_ARKIV_ACCESS_KEY="..." -e ARKIV_PRIVATE_KEY="..." arkivectord
-```
-
-On Windows you can also build natively inside WSL2 (Ubuntu 24.04 works):
-
-```bash
-sudo apt install build-essential cmake ninja-build pkg-config libuv1-dev libssl-dev libcurl4-openssl-dev python3
-cd daemon
-cmake --preset release -DAV_BUILD_TESTS=OFF
-cmake --build --preset release --target arkivectord
-./build/release/arkivectord --help
-```
-
 The daemon needs libcurl 8.11 or newer for WebSocket support. If your distribution ships something older, `daemon/tools/ci-install-curl.sh` builds a current one.
 
 ### 2. Give it a wallet
@@ -144,17 +122,12 @@ Put the daemon wallet's address in each collection's `writers` list. A collectio
 
 ### 3. Install an SDK
 
-Python and Node.js are supported today. More languages are planned; the `sdk/` folder already has placeholders for C, C++, and Rust.
-
+Python and Node.js are supported today. More languages are planned.
 ```bash
 pip install arkivector
 ```
 
 ```bash
-# Node.js, from the GitHub release (no token needed)
-npm install https://github.com/DikshitRJ/arkivector/releases/download/v1.0.1/arkivector-node-1.0.1.tgz
-
-# or from GitHub Packages (needs a GitHub token with read:packages in ~/.npmrc)
 echo "@dikshitrj:registry=https://npm.pkg.github.com" >> .npmrc
 npm install @dikshitrj/arkivector
 ```
