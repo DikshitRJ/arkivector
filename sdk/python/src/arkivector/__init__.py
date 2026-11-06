@@ -1,6 +1,6 @@
 """Arkivector Python SDK."""
 
-from arkivector.client import Client
+from arkivector.client import Client, build_entity_attributes
 from arkivector.errors import (
     ApiError,
     AuthError,
@@ -21,8 +21,12 @@ from arkivector.models import (
     ColumnDef,
     Consistency,
     CountResult,
+    DirectAttribute,
     Entity,
+    EntityInput,
     IndexDef,
+    PreparedTransaction,
+    PrepareResult,
     Readiness,
     ScrollPage,
     SearchHit,
@@ -30,7 +34,10 @@ from arkivector.models import (
     SyncStatus,
     T,
     Ttl,
+    TxResult,
     TypedValue,
+    UpsertItemResult,
+    UpsertResult,
     VersionInfo,
 )
 from arkivector.types import (
@@ -60,12 +67,16 @@ __all__ = [
     "ConflictError",
     "Consistency",
     "CountResult",
+    "DirectAttribute",
     "Entity",
+    "EntityInput",
     "F",
     "HalfVector",
     "IndexDef",
     "NotFoundError",
     "NotImplementedByDaemon",
+    "PrepareResult",
+    "PreparedTransaction",
     "Readiness",
     "ScrollPage",
     "SearchHit",
@@ -75,12 +86,16 @@ __all__ = [
     "T",
     "TransportError",
     "Ttl",
+    "TxResult",
     "TypedValue",
     "UnavailableError",
+    "UpsertItemResult",
+    "UpsertResult",
     "ValidationError",
     "Vector",
     "VectorBytesError",
     "VersionInfo",
+    "build_entity_attributes",
     "error_from_problem",
     "vectorbytes_decode_any",
 ]

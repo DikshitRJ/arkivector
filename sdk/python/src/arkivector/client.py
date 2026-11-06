@@ -5,6 +5,8 @@ import os
 import re
 import threading
 import urllib.parse
+import uuid
+from decimal import Decimal
 from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, Union
 
 from arkivector._http import HttpTransport
@@ -16,16 +18,23 @@ from arkivector.models import (
     ColumnDef,
     Consistency,
     CountResult,
+    DirectAttribute,
     Entity,
+    EntityInput,
     IndexDef,
+    PrepareResult,
     Readiness,
     ScrollPage,
     SearchResult,
     SyncStatus,
     Ttl,
+    TxResult,
+    TypedValue,
+    UpsertResult,
     VersionInfo,
 )
 from arkivector.types import Bit, HalfVector, SparseVector, Vector
+from arkivector.vectorbytes import encode_halfvec, encode_vector
 
 SUPPORTED_API_MAJOR = 1
 
@@ -40,6 +49,7 @@ class Client:
         timeout: float = 10.0,
         max_retries: int = 3,
         session_consistency: bool = False,
+        idempotency: bool = True,
     ) -> None:
         raw_url = url or os.environ.get("ARKIVECTOR_URL") or "http://127.0.0.1:8080"
         self.url = raw_url.rstrip("/")
@@ -47,7 +57,8 @@ class Client:
         self.timeout = float(timeout)
         self.max_retries = int(max_retries)
         self.session_consistency = bool(session_consistency)
-        self.last_written_block: Optional[int] = None
+        self.idempotency = bool(idempotency)
+        self.last_write_block: Optional[int] = None
 
         self._version_info: Optional[VersionInfo] = None
         self._collection_column_types: Dict[str, str] = {}
@@ -59,6 +70,15 @@ class Client:
             timeout=self.timeout,
             max_retries=self.max_retries,
         )
+
+    @property
+    def last_written_block(self) -> Optional[int]:
+        """Alias for last_write_block."""
+        return self.last_write_block
+
+    @last_written_block.setter
+    def last_written_block(self, val: Optional[int]) -> None:
+        self.last_write_block = val
 
     def version(self) -> VersionInfo:
         """Fetch daemon version, API version, and capabilities (lazily cached)."""
@@ -343,8 +363,8 @@ class Client:
             )
         if verify:
             params["verify"] = "true"
-        if min_block is None and self.session_consistency and self.last_written_block is not None:
-            min_block = self.last_written_block
+        if min_block is None and self.session_consistency and self.last_write_block is not None:
+            min_block = self.last_write_block
         if min_block is not None:
             params["min_block"] = int(min_block)
         if timeout_ms is not None:
@@ -440,8 +460,8 @@ class Client:
         if consistency is None:
             if min_block is not None or timeout_ms is not None:
                 consistency = Consistency(min_block=min_block, timeout_ms=timeout_ms)
-            elif self.session_consistency and self.last_written_block is not None:
-                consistency = Consistency(min_block=self.last_written_block)
+            elif self.session_consistency and self.last_write_block is not None:
+                consistency = Consistency(min_block=self.last_write_block)
 
         if consistency is not None:
             body["consistency"] = (
@@ -499,8 +519,8 @@ class Client:
             prepared.append(s_req)
 
         payload: Dict[str, Any] = {"searches": prepared}
-        if consistency is None and self.session_consistency and self.last_written_block is not None:
-            consistency = Consistency(min_block=self.last_written_block)
+        if consistency is None and self.session_consistency and self.last_write_block is not None:
+            consistency = Consistency(min_block=self.last_write_block)
 
         if consistency is not None:
             payload["consistency"] = (
@@ -551,8 +571,8 @@ class Client:
         if consistency is None:
             if min_block is not None or timeout_ms is not None:
                 consistency = Consistency(min_block=min_block, timeout_ms=timeout_ms)
-            elif self.session_consistency and self.last_written_block is not None:
-                consistency = Consistency(min_block=self.last_written_block)
+            elif self.session_consistency and self.last_write_block is not None:
+                consistency = Consistency(min_block=self.last_write_block)
 
         if consistency is not None:
             body["consistency"] = (
@@ -623,8 +643,8 @@ class Client:
         if consistency is None:
             if min_block is not None or timeout_ms is not None:
                 consistency = Consistency(min_block=min_block, timeout_ms=timeout_ms)
-            elif self.session_consistency and self.last_written_block is not None:
-                consistency = Consistency(min_block=self.last_written_block)
+            elif self.session_consistency and self.last_write_block is not None:
+                consistency = Consistency(min_block=self.last_write_block)
 
         if consistency is not None:
             body["consistency"] = (
@@ -637,6 +657,229 @@ class Client:
         data = resp.json() or {}
         return CountResult.from_json(data)
 
+    def upsert(
+        self,
+        collection: str,
+        entities: Sequence[Union[EntityInput, Dict[str, Any]]],
+        wait: str = "receipt",
+        timeout_ms: int = 60000,
+        idempotency_key: Optional[str] = None,
+    ) -> UpsertResult:
+        """Upsert entities through the daemon's managed signer.
+
+        Endpoint: POST /v1/collections/{name}/entities
+        """
+        self.check_capability("entities.write")
+        if not entities:
+            raise ValueError("entities list cannot be empty")
+        if len(entities) > 1000:
+            raise ValueError("entities list exceeds maximum of 1,000 items")
+
+        prepared_entities: List[Dict[str, Any]] = []
+        for e in entities:
+            if isinstance(e, EntityInput):
+                prepared_entities.append(e.to_json())
+            elif isinstance(e, dict):
+                prepared_entities.append(EntityInput.from_json(e).to_json())
+            else:
+                raise TypeError(f"Invalid entity type: {type(e).__name__}")
+
+        body: Dict[str, Any] = {
+            "entities": prepared_entities,
+            "wait": str(wait),
+            "timeout_ms": int(timeout_ms),
+        }
+
+        if idempotency_key is None and self.idempotency:
+            idempotency_key = str(uuid.uuid4())
+
+        http_timeout = max(self.timeout, (float(timeout_ms) / 1000.0) + 5.0)
+        encoded_col = urllib.parse.quote(collection, safe="")
+        resp = self._http.request(
+            "POST",
+            f"/v1/collections/{encoded_col}/entities",
+            body=body,
+            idempotency_key=idempotency_key,
+            timeout=http_timeout,
+        )
+        data = resp.json() or {}
+        res = UpsertResult.from_json(data)
+        if res.block_number is not None:
+            self.last_write_block = max(self.last_write_block or 0, res.block_number)
+        return res
+
+    def prepare(
+        self,
+        collection: str,
+        entities: Sequence[Union[EntityInput, Dict[str, Any]]],
+        from_address: str,
+    ) -> PrepareResult:
+        """Build unsigned execute(ops) transactions for client-side signing.
+
+        Endpoint: POST /v1/collections/{name}/entities:prepare
+        """
+        self.check_capability("entities.prepare")
+        if not entities:
+            raise ValueError("entities list cannot be empty")
+        if len(entities) > 1000:
+            raise ValueError("entities list exceeds maximum of 1,000 items")
+
+        prepared_entities: List[Dict[str, Any]] = []
+        for e in entities:
+            if isinstance(e, EntityInput):
+                prepared_entities.append(e.to_json())
+            elif isinstance(e, dict):
+                prepared_entities.append(EntityInput.from_json(e).to_json())
+            else:
+                raise TypeError(f"Invalid entity type: {type(e).__name__}")
+
+        body: Dict[str, Any] = {
+            "entities": prepared_entities,
+            "from": str(from_address),
+        }
+
+        encoded_col = urllib.parse.quote(collection, safe="")
+        resp = self._http.request(
+            "POST",
+            f"/v1/collections/{encoded_col}/entities:prepare",
+            body=body,
+            is_idempotent=True,
+        )
+        data = resp.json() or {}
+        return PrepareResult.from_json(data)
+
+    def delete(
+        self,
+        collection: str,
+        refs: Optional[Sequence[str]] = None,
+        filter: Optional[Union[F, Dict[str, Any]]] = None,
+        where: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> TxResult:
+        """Delete entities by refs, filter, or where clause.
+
+        Endpoint: POST /v1/collections/{name}/entities:delete
+        (or DELETE /v1/collections/{name}/entities/{ref} if single ref and no filter/where).
+        """
+        self.check_capability("entities.write")
+        if filter is not None:
+            self.check_capability("search.filter.json")
+        if where is not None:
+            self.check_capability("search.filter.where")
+
+        has_refs = refs is not None and len(refs) > 0
+        has_filter = filter is not None
+        has_where = where is not None
+
+        count_targets = sum([has_refs, has_filter, has_where])
+        if count_targets != 1:
+            raise ValueError("Must specify exactly one of refs, filter, or where")
+
+        if idempotency_key is None and self.idempotency:
+            idempotency_key = str(uuid.uuid4())
+
+        encoded_col = urllib.parse.quote(collection, safe="")
+
+        if refs is not None and len(refs) == 1 and not has_filter and not has_where:
+            ref = refs[0]
+            is_hex_key = bool(re.match(r"^0x[0-9a-fA-F]{64}$", ref))
+            encoded_ref = ref if is_hex_key else urllib.parse.quote(ref, safe="")
+            resp = self._http.request(
+                "DELETE",
+                f"/v1/collections/{encoded_col}/entities/{encoded_ref}",
+                idempotency_key=idempotency_key,
+            )
+            data = resp.json() or {}
+            res = TxResult.from_json(data)
+            if res.block_number is not None:
+                self.last_write_block = max(self.last_write_block or 0, res.block_number)
+            return res
+
+        body: Dict[str, Any] = {}
+        if refs is not None:
+            if len(refs) > 1000:
+                raise ValueError("refs list exceeds maximum of 1,000 items")
+            body["refs"] = list(refs)
+        elif filter is not None:
+            body["filter"] = filter.to_dict() if hasattr(filter, "to_dict") else filter
+        elif where is not None:
+            body["where"] = str(where)
+
+        resp = self._http.request(
+            "POST",
+            f"/v1/collections/{encoded_col}/entities:delete",
+            body=body,
+            idempotency_key=idempotency_key,
+        )
+        data = resp.json() or {}
+        res = TxResult.from_json(data)
+        if res.block_number is not None:
+            self.last_write_block = max(self.last_write_block or 0, res.block_number)
+        return res
+
+    def extend(
+        self,
+        collection: str,
+        ttl: Union[Ttl, Dict[str, Any]],
+        refs: Optional[Sequence[str]] = None,
+        filter: Optional[Union[F, Dict[str, Any]]] = None,
+        where: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> TxResult:
+        """Extend entity TTL by refs, filter, or where clause.
+
+        Endpoint: POST /v1/collections/{name}/entities:extend
+        """
+        self.check_capability("entities.write")
+        if filter is not None:
+            self.check_capability("search.filter.json")
+        if where is not None:
+            self.check_capability("search.filter.where")
+
+        has_refs = refs is not None and len(refs) > 0
+        has_filter = filter is not None
+        has_where = where is not None
+
+        count_targets = sum([has_refs, has_filter, has_where])
+        if count_targets != 1:
+            raise ValueError("Must specify exactly one of refs, filter, or where")
+
+        body: Dict[str, Any] = {
+            "ttl": ttl.to_json() if isinstance(ttl, Ttl) else ttl,
+        }
+        if refs is not None:
+            if len(refs) > 1000:
+                raise ValueError("refs list exceeds maximum of 1,000 items")
+            body["refs"] = list(refs)
+        elif filter is not None:
+            body["filter"] = filter.to_dict() if hasattr(filter, "to_dict") else filter
+        elif where is not None:
+            body["where"] = str(where)
+
+        if idempotency_key is None and self.idempotency:
+            idempotency_key = str(uuid.uuid4())
+
+        encoded_col = urllib.parse.quote(collection, safe="")
+        resp = self._http.request(
+            "POST",
+            f"/v1/collections/{encoded_col}/entities:extend",
+            body=body,
+            idempotency_key=idempotency_key,
+        )
+        data = resp.json() or {}
+        res = TxResult.from_json(data)
+        if res.block_number is not None:
+            self.last_write_block = max(self.last_write_block or 0, res.block_number)
+        return res
+
+    @staticmethod
+    def build_entity_attributes(
+        collection_def: Union[Collection, Dict[str, Any]],
+        entity: Union[EntityInput, Dict[str, Any]],
+    ) -> List[Tuple[str, int, bytes]]:
+        """Direct-write attribute builder for on-chain entity creation."""
+        return build_entity_attributes(collection_def, entity)
+
     def close(self) -> None:
         """Close client connections."""
         self._http.close()
@@ -646,3 +889,236 @@ class Client:
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
+
+
+def _serialize_attribute_value(val: Any, declared_type: Optional[str] = None) -> Tuple[int, bytes]:
+    """Serialize a user attribute value to (type_id, value_bytes)."""
+    if isinstance(val, DirectAttribute):
+        return val.type_id, val.value_bytes
+    if (
+        isinstance(val, tuple)
+        and len(val) == 2
+        and isinstance(val[0], int)
+        and isinstance(val[1], (bytes, bytearray))
+    ):
+        return val[0], bytes(val[1])
+
+    if isinstance(val, TypedValue):
+        t_name = val.type
+        t_val = val.value
+    elif isinstance(val, dict) and "type" in val and "value" in val:
+        t_name = str(val["type"])
+        t_val = val["value"]
+    elif declared_type is not None:
+        t_name = declared_type
+        t_val = val
+    elif isinstance(val, bool):
+        t_name = "bool"
+        t_val = val
+    elif isinstance(val, int):
+        t_name = "i32"
+        t_val = val
+    elif isinstance(val, float):
+        t_name = "dec"
+        t_val = str(val)
+    elif isinstance(val, (bytes, bytearray)):
+        t_name = "bytes"
+        t_val = bytes(val)
+    elif isinstance(val, str):
+        t_name = "str"
+        t_val = val
+    else:
+        t_name = "str"
+        t_val = str(val)
+
+    if t_name == "bool":
+        b_val = bool(t_val) if not isinstance(t_val, str) else (t_val.lower() in ("true", "1"))
+        return 0x01, (1 if b_val else 0).to_bytes(32, "big")
+    elif t_name == "i32":
+        return 0x02, int(t_val).to_bytes(32, "big", signed=True)
+    elif t_name == "u64":
+        return 0x03, int(t_val).to_bytes(32, "big", signed=False)
+    elif t_name == "u256":
+        return 0x04, int(t_val).to_bytes(32, "big", signed=False)
+    elif t_name == "dec":
+        d = Decimal(str(t_val))
+        scaled = int(d * Decimal(10**18))
+        return 0x05, scaled.to_bytes(32, "big", signed=True)
+    elif t_name == "bytes":
+        if isinstance(t_val, (bytes, bytearray)):
+            raw_b = bytes(t_val)
+        elif isinstance(t_val, str):
+            raw_b = base64.b64decode(t_val)
+        else:
+            raw_b = bytes(t_val)
+        return 0x07, raw_b
+    elif t_name == "str":
+        return 0x08, str(t_val).encode("utf-8")
+    elif t_name == "addr":
+        clean_addr = str(t_val).lower().removeprefix("0x")
+        addr_bytes = bytes.fromhex(clean_addr)
+        return 0x09, addr_bytes.rjust(32, b"\x00")
+    elif t_name == "key":
+        clean_key = str(t_val).lower().removeprefix("0x")
+        return 0x0A, bytes.fromhex(clean_key)
+    else:
+        return 0x08, str(t_val).encode("utf-8")
+
+
+def build_entity_attributes(
+    collection_def: Union[Collection, Dict[str, Any]],
+    entity: Union[EntityInput, Dict[str, Any]],
+) -> List[Tuple[str, int, bytes]]:
+    """Build on-chain attribute list according to Arkiv entity layout.
+
+    Produces:
+    1. arkiv.schema (0x88, schema_tag)
+    2. av.vec (0x07, exact VectorBytes v1 matching collection column)
+    3. av.id (0x88, external id UTF-8 bytes if present)
+    4. av.doc (0x07, UTF-8 bytes of document if present)
+    5. User attributes sorted by name.
+    """
+    if isinstance(collection_def, Collection):
+        schema_tag = collection_def.schema_tag
+        col_type = collection_def.column.type
+        col_dim = collection_def.column.dimensions
+        col_attrs = collection_def.attributes
+    elif isinstance(collection_def, dict):
+        schema_tag = str(
+            collection_def.get("schema_tag") or f"arkivector.v1.{collection_def.get('name', '')}"
+        )
+        col_info = collection_def.get("column", {})
+        if isinstance(col_info, ColumnDef):
+            col_type = col_info.type
+            col_dim = col_info.dimensions
+        elif isinstance(col_info, dict):
+            col_type = str(col_info.get("type", ""))
+            col_dim = int(col_info.get("dimensions", 0))
+        elif isinstance(col_info, (list, tuple)) and len(col_info) >= 2:
+            col_type = str(col_info[0])
+            col_dim = int(col_info[1])
+        else:
+            col_type = ""
+            col_dim = 0
+        raw_attrs = collection_def.get("attributes", {})
+        col_attrs = dict(raw_attrs) if isinstance(raw_attrs, dict) else {}
+    else:
+        raise ValueError(f"Invalid collection definition: {type(collection_def).__name__}")
+
+    if isinstance(entity, EntityInput):
+        e_id = entity.id
+        e_vec = entity.vector
+        e_vec_bytes = entity.vector_bytes
+        e_doc = entity.document
+        e_attrs = entity.attributes or {}
+    elif isinstance(entity, dict):
+        e_id = entity.get("id")
+        e_vec = entity.get("vector")
+        e_vec_bytes = entity.get("vector_bytes")
+        e_doc = entity.get("document")
+        e_attrs = entity.get("attributes") or {}
+    else:
+        raise ValueError(f"Invalid entity: {type(entity).__name__}")
+
+    raw_vb: bytes
+    if e_vec_bytes is not None:
+        if isinstance(e_vec_bytes, (bytes, bytearray)):
+            raw_vb = bytes(e_vec_bytes)
+        else:
+            raw_vb = base64.b64decode(str(e_vec_bytes))
+    elif e_vec is not None:
+        if col_type == "vector":
+            if isinstance(e_vec, Vector):
+                raw_vb = e_vec.to_vectorbytes()
+            elif (
+                hasattr(e_vec, "to_list")
+                and callable(e_vec.to_list)
+                and not isinstance(e_vec, (str, bytes))
+            ):
+                raw_vb = encode_vector([float(x) for x in e_vec.to_list()])
+            elif isinstance(e_vec, (list, tuple)):
+                raw_vb = encode_vector([float(x) for x in e_vec])
+            elif isinstance(e_vec, str):
+                raw_vb = Vector.from_text(e_vec).to_vectorbytes()
+            else:
+                raise TypeError(
+                    f"Cannot encode {type(e_vec).__name__} to VectorBytes for vector column"
+                )
+        elif col_type == "halfvec":
+            if isinstance(e_vec, HalfVector):
+                raw_vb = e_vec.to_vectorbytes()
+            elif (
+                hasattr(e_vec, "to_list")
+                and callable(e_vec.to_list)
+                and not isinstance(e_vec, (str, bytes))
+            ):
+                raw_vb = encode_halfvec([float(x) for x in e_vec.to_list()])
+            elif isinstance(e_vec, (list, tuple)):
+                raw_vb = encode_halfvec([float(x) for x in e_vec])
+            elif isinstance(e_vec, str):
+                raw_vb = HalfVector.from_text(e_vec).to_vectorbytes()
+            else:
+                raise TypeError(
+                    f"Cannot encode {type(e_vec).__name__} to VectorBytes for halfvec column"
+                )
+        elif col_type == "bit":
+            if isinstance(e_vec, Bit):
+                raw_vb = e_vec.to_vectorbytes()
+            elif isinstance(e_vec, str):
+                raw_vb = Bit.from_text(e_vec).to_vectorbytes()
+            elif isinstance(e_vec, (bytes, bytearray)):
+                raw_vb = Bit(bytes(e_vec), bit_len=col_dim).to_vectorbytes()
+            elif isinstance(e_vec, (list, tuple)):
+                raw_vb = Bit(e_vec).to_vectorbytes()
+            else:
+                raise TypeError(
+                    f"Cannot encode {type(e_vec).__name__} to VectorBytes for bit column"
+                )
+        elif col_type == "sparsevec":
+            if isinstance(e_vec, SparseVector):
+                raw_vb = e_vec.to_vectorbytes()
+            elif isinstance(e_vec, str):
+                raw_vb = SparseVector.from_text(e_vec).to_vectorbytes()
+            elif isinstance(e_vec, dict):
+                if "indices" in e_vec and "values" in e_vec:
+                    s_dim = int(e_vec.get("dim", col_dim))
+                    raw_vb = SparseVector(
+                        s_dim,
+                        [int(i) for i in e_vec["indices"]],
+                        [float(v) for v in e_vec["values"]],
+                    ).to_vectorbytes()
+                else:
+                    raw_vb = SparseVector(
+                        col_dim, {int(k): float(v) for k, v in e_vec.items()}
+                    ).to_vectorbytes()
+            else:
+                raise TypeError(
+                    f"Cannot encode {type(e_vec).__name__} to VectorBytes for sparsevec column"
+                )
+        else:
+            if isinstance(e_vec, (Vector, HalfVector, Bit, SparseVector)):
+                raw_vb = e_vec.to_vectorbytes()
+            elif isinstance(e_vec, (list, tuple)):
+                raw_vb = encode_vector([float(x) for x in e_vec])
+            else:
+                raise ValueError(f"Cannot serialize vector without known column type {col_type!r}")
+    else:
+        raise ValueError("Entity must provide either vector or vector_bytes")
+
+    res: List[Tuple[str, int, bytes]] = [
+        DirectAttribute("arkiv.schema", 0x88, schema_tag.encode("utf-8")),
+        DirectAttribute("av.vec", 0x07, raw_vb),
+    ]
+
+    if e_id is not None:
+        res.append(DirectAttribute("av.id", 0x88, str(e_id).encode("utf-8")))
+
+    if e_doc is not None:
+        res.append(DirectAttribute("av.doc", 0x07, str(e_doc).encode("utf-8")))
+
+    for attr_name in sorted(e_attrs.keys()):
+        declared = col_attrs.get(attr_name)
+        type_id, val_bytes = _serialize_attribute_value(e_attrs[attr_name], declared)
+        res.append(DirectAttribute(attr_name, type_id, val_bytes))
+
+    return res

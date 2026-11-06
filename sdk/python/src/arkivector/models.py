@@ -2,7 +2,7 @@
 
 import base64
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Union
 
 from arkivector.vectorbytes import vectorbytes_decode_any
 
@@ -814,3 +814,266 @@ class CountResult:
             "as_of_block": self.as_of_block,
             "count": self.count,
         }
+
+
+class DirectAttribute(NamedTuple):
+    """Direct-write attribute representation (name, type_id, value_bytes)."""
+
+    name: str
+    type_id: int
+    value_bytes: bytes
+
+
+@dataclass
+class EntityInput:
+    """Arkivector entity input for upsert and prepare operations."""
+
+    id: Optional[str] = None
+    vector: Optional[Union["AnyVector", List[float], str, Dict[str, Any]]] = None
+    vector_bytes: Optional[str] = None
+    document: Optional[str] = None
+    attributes: Optional[Dict[str, Union[TypedValue, Any]]] = None
+    ttl: Optional[Union[Ttl, Dict[str, Any]]] = None
+
+    def to_json(self) -> Dict[str, Any]:
+        """Serialize to wire JSON dict."""
+        d: Dict[str, Any] = {}
+        if self.id is not None:
+            d["id"] = self.id
+        if self.vector_bytes is not None:
+            d["vector_bytes"] = self.vector_bytes
+        elif self.vector is not None:
+            if (
+                hasattr(self.vector, "to_text")
+                and callable(self.vector.to_text)
+                and not hasattr(self.vector, "dim")
+            ):
+                d["vector"] = str(self.vector.to_text())
+            elif hasattr(self.vector, "indices") and hasattr(self.vector, "values"):
+                # SparseVector or duck-typed sparsevec
+                d["vector"] = (
+                    str(self.vector.to_text()) if hasattr(self.vector, "to_text") else self.vector
+                )
+            elif hasattr(self.vector, "to_bytes") and hasattr(self.vector, "to_text"):
+                # Bit
+                d["vector"] = str(self.vector.to_text())
+            elif (
+                hasattr(self.vector, "to_list")
+                and callable(self.vector.to_list)
+                and not isinstance(self.vector, (str, bytes))
+            ):
+                d["vector"] = [float(x) for x in self.vector.to_list()]
+            elif hasattr(self.vector, "to_text") and callable(self.vector.to_text):
+                d["vector"] = str(self.vector.to_text())
+            elif isinstance(self.vector, (list, tuple)):
+                d["vector"] = [float(x) for x in self.vector]
+            elif isinstance(self.vector, (str, dict)):
+                d["vector"] = self.vector
+            else:
+                d["vector"] = self.vector
+
+        if self.document is not None:
+            d["document"] = self.document
+
+        if self.attributes is not None:
+            attrs: Dict[str, Any] = {}
+            for k, v in self.attributes.items():
+                if isinstance(v, TypedValue):
+                    attrs[k] = v.to_json()
+                elif hasattr(v, "to_json") and callable(v.to_json):
+                    attrs[k] = v.to_json()
+                elif isinstance(v, float):
+                    attrs[k] = {"type": "dec", "value": str(v)}
+                else:
+                    attrs[k] = v
+            d["attributes"] = attrs
+
+        if self.ttl is not None:
+            if isinstance(self.ttl, Ttl):
+                d["ttl"] = self.ttl.to_json()
+            elif hasattr(self.ttl, "to_json") and callable(self.ttl.to_json):
+                d["ttl"] = self.ttl.to_json()
+            elif isinstance(self.ttl, dict):
+                d["ttl"] = self.ttl
+        return d
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "EntityInput":
+        """Deserialize from wire JSON dict."""
+        raw_attrs = d.get("attributes")
+        attrs: Optional[Dict[str, Union[TypedValue, Any]]] = None
+        if isinstance(raw_attrs, dict):
+            attrs = {}
+            for k, v in raw_attrs.items():
+                if isinstance(v, dict) and "type" in v and "value" in v:
+                    attrs[str(k)] = TypedValue.from_json(v)
+                else:
+                    attrs[str(k)] = v
+
+        raw_ttl = d.get("ttl")
+        ttl: Optional[Union[Ttl, Dict[str, Any]]] = None
+        if isinstance(raw_ttl, dict):
+            ttl = Ttl.from_json(raw_ttl)
+        elif isinstance(raw_ttl, Ttl):
+            ttl = raw_ttl
+
+        return cls(
+            id=str(d["id"]) if d.get("id") is not None else None,
+            vector=d.get("vector"),
+            vector_bytes=str(d["vector_bytes"]) if d.get("vector_bytes") is not None else None,
+            document=str(d["document"]) if d.get("document") is not None else None,
+            attributes=attrs,
+            ttl=ttl,
+        )
+
+
+@dataclass
+class UpsertItemResult:
+    """Individual item result in an upsert response."""
+
+    id: Optional[str] = None
+    key: str = ""
+    op: str = ""
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "UpsertItemResult":
+        return cls(
+            id=str(d["id"]) if d.get("id") is not None else None,
+            key=str(d.get("key", "")),
+            op=str(d.get("op", "")),
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "key": self.key,
+            "op": self.op,
+        }
+        if self.id is not None:
+            d["id"] = self.id
+        return d
+
+
+@dataclass
+class UpsertResult:
+    """Managed upsert response containing op results, tx hashes, and inclusion block."""
+
+    results: List[UpsertItemResult]
+    tx_hashes: List[str]
+    block_number: Optional[int] = None
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "UpsertResult":
+        raw_results = d.get("results", [])
+        results = [
+            r if isinstance(r, UpsertItemResult) else UpsertItemResult.from_json(r)
+            for r in (raw_results or [])
+        ]
+        tx_hashes = [str(tx) for tx in d.get("tx_hashes", [])]
+        blk = d.get("block_number")
+        return cls(
+            results=results,
+            tx_hashes=tx_hashes,
+            block_number=int(blk) if blk is not None else None,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "results": [r.to_json() for r in self.results],
+            "tx_hashes": list(self.tx_hashes),
+            "block_number": self.block_number,
+        }
+        return d
+
+
+@dataclass
+class PreparedTransaction:
+    """Unsigned transaction built for client-side signing."""
+
+    to: str
+    data: str
+    value: str
+    nonce: int
+    gas_estimate: Optional[int] = None
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "PreparedTransaction":
+        ge = d.get("gas_estimate")
+        return cls(
+            to=str(d.get("to", "")),
+            data=str(d.get("data", "")),
+            value=str(d.get("value", "0x0")),
+            nonce=int(d.get("nonce", 0)),
+            gas_estimate=int(ge) if ge is not None else None,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "to": self.to,
+            "data": self.data,
+            "value": self.value,
+            "nonce": self.nonce,
+        }
+        if self.gas_estimate is not None:
+            d["gas_estimate"] = self.gas_estimate
+        return d
+
+
+@dataclass
+class PrepareResult:
+    """Prepare response containing chain ID, unsigned transactions, and predicted op results."""
+
+    chain_id: int
+    transactions: List[PreparedTransaction]
+    results: List[UpsertItemResult]
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "PrepareResult":
+        raw_txs = d.get("transactions", [])
+        txs = [
+            t if isinstance(t, PreparedTransaction) else PreparedTransaction.from_json(t)
+            for t in (raw_txs or [])
+        ]
+        raw_results = d.get("results", [])
+        results = [
+            r if isinstance(r, UpsertItemResult) else UpsertItemResult.from_json(r)
+            for r in (raw_results or [])
+        ]
+        return cls(
+            chain_id=int(d.get("chain_id", 0)),
+            transactions=txs,
+            results=results,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "chain_id": self.chain_id,
+            "transactions": [t.to_json() for t in self.transactions],
+            "results": [r.to_json() for r in self.results],
+        }
+
+
+@dataclass
+class TxResult:
+    """Mutation transaction result reporting affected count, tx hashes, and block number."""
+
+    affected: int
+    tx_hashes: List[str]
+    block_number: Optional[int] = None
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "TxResult":
+        blk = d.get("block_number")
+        return cls(
+            affected=int(d.get("affected", 0)),
+            tx_hashes=[str(tx) for tx in d.get("tx_hashes", [])],
+            block_number=int(blk) if blk is not None else None,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "affected": self.affected,
+            "tx_hashes": list(self.tx_hashes),
+        }
+        if self.block_number is not None:
+            d["block_number"] = self.block_number
+        return d
