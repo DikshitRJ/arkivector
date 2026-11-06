@@ -1,7 +1,8 @@
 {
   "name": "@arkivector/client",
   "version": "0.1.0",
-  "description": "Arkivector Node.js / TypeScript SDK",
+  "description": "Arkivector Node.js and TypeScript client library",
+  "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -18,6 +19,23 @@
   "files": [
     "dist/src",
     "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arkivector/arkivector.git",
+    "directory": "sdk/node"
+  },
+  "homepage": "https://github.com/arkivector/arkivector#readme",
+  "bugs": {
+    "url": "https://github.com/arkivector/arkivector/issues"
+  },
+  "keywords": [
+    "arkivector",
+    "vector",
+    "pgvector",
+    "arkiv",
+    "embedding",
+    "database"
   ],
   "engines": {
     "node": ">=18"
