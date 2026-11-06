@@ -63,8 +63,8 @@ static yyjson_mut_val *format_collection(yyjson_mut_doc *doc, av_collection *c)
 
     /* membership */
     const char *mstr = (d->membership == AV_MEMBERSHIP_CREATOR) ? "creator"
-                       : (d->membership == AV_MEMBERSHIP_OWNER)   ? "owner"
-                                                                 : "open";
+                       : (d->membership == AV_MEMBERSHIP_OWNER) ? "owner"
+                                                                : "open";
     yyjson_mut_obj_add_str(doc, obj, "membership", mstr);
 
     /* attributes */
@@ -372,8 +372,8 @@ static void h_delete_collection(const av_http_req *req, const char *const *param
 }
 
 /* Helper to parse an on-chain manifest entity into av_coldef */
-static av_status parse_manifest_entity(const av_entity *ent, const uint8_t mkey[32], const char *override_name,
-                                       av_arena *a, av_coldef *out, av_err *e)
+static av_status parse_manifest_entity(const av_entity *ent, const uint8_t mkey[32],
+                                       const char *override_name, av_arena *a, av_coldef *out, av_err *e)
 {
     const av_attr *schema_attr = av_entity_attr(ent, AV_ATTR_SCHEMA);
     if (schema_attr == NULL || schema_attr->type != AV_AT_STR ||
@@ -479,7 +479,8 @@ static av_status parse_manifest_entity(const av_entity *ent, const uint8_t mkey[
             if (op_open != NULL && op_close != NULL && op_close > op_open) {
                 *op_close = '\0';
                 const char *op_name = op_open + 1;
-                while (*op_name == ' ') op_name++;
+                while (*op_name == ' ')
+                    op_name++;
                 out->opclass = av_opclass_find(op_name);
                 if (out->opclass == NULL) {
                     av_err_set(e, "invalid_argument", "unknown opclass '%s' in manifest", op_name);
@@ -491,11 +492,11 @@ static av_status parse_manifest_entity(const av_entity *ent, const uint8_t mkey[
 
             char *m_pos = strstr(itext, "m = ");
             if (m_pos != NULL) {
-                out->m = atoi(m_pos + 4);
+                out->m = (int) strtol(m_pos + 4, NULL, 10);
             }
             char *ef_pos = strstr(itext, "ef_construction = ");
             if (ef_pos != NULL) {
-                out->ef_construction = atoi(ef_pos + 18);
+                out->ef_construction = (int) strtol(ef_pos + 18, NULL, 10);
             }
         }
     } else {
@@ -510,7 +511,8 @@ static av_status parse_manifest_entity(const av_entity *ent, const uint8_t mkey[
     const av_attr *wr_attr = av_entity_attr(ent, "av.writers");
     if (wr_attr != NULL && wr_attr->len > 0) {
         if (wr_attr->len % 20 != 0) {
-            av_err_set(e, "invalid_argument", "manifest av.writers length %zu is not a multiple of 20", wr_attr->len);
+            av_err_set(e, "invalid_argument", "manifest av.writers length %zu is not a multiple of 20",
+                       wr_attr->len);
             return AV_ERR;
         }
         size_t nw = wr_attr->len / 20;

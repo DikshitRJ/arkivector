@@ -14,7 +14,7 @@
 #include "store/schema.h"
 
 #define NAME_CAP 64
-#define MAX_DBS 4096u
+#define MAX_DBS  4096u
 
 enum { DB_ENT, DB_IDS, DB_CUR, DB_RING, DB_QUAR, DB_N };
 static const char *const db_prefix[DB_N] = {"entities:", "ids:", "cursor:", "ring:", "quarantine:"};
@@ -350,7 +350,8 @@ av_status av_store_open(const char *dir, size_t map_size, av_store **out, av_err
     MDB_txn *txn = NULL;
     if ((rc = mdb_env_set_maxdbs(s->env, MAX_DBS)) != 0 ||
         (rc = mdb_env_set_mapsize(s->env, map_size ? map_size : AV_STORE_DEFAULT_MAP_SIZE)) != 0 ||
-        (rc = mdb_env_open(s->env, dir, MDB_NOTLS, 0644)) != 0 || (rc = mdb_txn_begin(s->env, NULL, 0, &txn)) != 0) {
+        (rc = mdb_env_open(s->env, dir, MDB_NOTLS, 0644)) != 0 ||
+        (rc = mdb_txn_begin(s->env, NULL, 0, &txn)) != 0) {
         (void) mdb_fail(e, "env_open", rc);
         goto fail;
     }
@@ -384,7 +385,8 @@ av_status av_store_open(const char *dir, size_t map_size, av_store **out, av_err
         goto fail_txn;
     }
     MDB_val ck, cv;
-    for (rc = mdb_cursor_get(cur, &ck, &cv, MDB_FIRST); rc == 0; rc = mdb_cursor_get(cur, &ck, &cv, MDB_NEXT)) {
+    for (rc = mdb_cursor_get(cur, &ck, &cv, MDB_FIRST); rc == 0;
+         rc = mdb_cursor_get(cur, &ck, &cv, MDB_NEXT)) {
         char name[NAME_CAP];
         coll_dbs d;
         if (ck.mv_size == 0 || ck.mv_size >= NAME_CAP) {
@@ -558,7 +560,7 @@ av_status av_store_del_collection(av_txn *t, const char *name, av_err *e)
         }
     if (t->n_drop == t->cap_drop) {
         size_t nc = t->cap_drop ? t->cap_drop * 2 : 4;
-        char(*nb)[NAME_CAP] = realloc(t->dropped, nc * NAME_CAP);
+        char (*nb)[NAME_CAP] = realloc(t->dropped, nc * NAME_CAP);
         if (nb == NULL) {
             av_err_set(e, "internal", "out of memory");
             return AV_ERR;
@@ -603,7 +605,8 @@ av_status av_store_list_collections(av_store *s, av_store_coll_cb cb, void *ctx,
 
 /* ----------------------------------------------------------------- entities */
 
-av_status av_store_put_entity(av_txn *t, const char *coll, const uint8_t key[32], const av_row *row, av_err *e)
+av_status av_store_put_entity(av_txn *t, const char *coll, const uint8_t key[32], const av_row *row,
+                              av_err *e)
 {
     coll_dbs d;
     if (get_dbs(t->s, t, coll, &d, e) != AV_OK)
@@ -670,8 +673,8 @@ av_status av_store_get_entity(av_store *s, const char *coll, const uint8_t key[3
     return st;
 }
 
-av_status av_store_txn_get_entity(av_txn *t, const char *coll, const uint8_t key[32], av_arena *a, av_row *out,
-                                  bool *found, av_err *e)
+av_status av_store_txn_get_entity(av_txn *t, const char *coll, const uint8_t key[32], av_arena *a,
+                                  av_row *out, bool *found, av_err *e)
 {
     coll_dbs d;
     if (get_dbs(t->s, t, coll, &d, e) != AV_OK)
@@ -915,7 +918,7 @@ av_status av_store_ring_get(av_store *s, const char *coll, uint64_t block, uint8
         if (v.mv_size < 36 || n != (v.mv_size - 36) / 32 || (v.mv_size - 36) % 32 != 0) {
             st = corrupt(e, "ring entry length");
         } else {
-            uint8_t(*ks)[32] = av_arena_alloc(a, n ? n * 32 : 1, 8);
+            uint8_t (*ks)[32] = av_arena_alloc(a, n ? n * 32 : 1, 8);
             if (ks == NULL) {
                 av_err_set(e, "internal", "arena exhausted");
                 st = AV_ERR;
@@ -934,7 +937,7 @@ av_status av_store_ring_get(av_store *s, const char *coll, uint64_t block, uint8
 }
 
 av_status av_store_ring_list(av_store *s, const char *coll, av_arena *a, av_ring_entry **out, size_t *n_out,
-                            av_err *e)
+                             av_err *e)
 {
     coll_dbs d;
     if (get_dbs(s, NULL, coll, &d, e) != AV_OK)
@@ -955,7 +958,8 @@ av_status av_store_ring_list(av_store *s, const char *coll, av_arena *a, av_ring
         *n_out = 0;
         return AV_OK;
     }
-    av_ring_entry *entries = av_arena_alloc(a, sizeof(av_ring_entry) * stt.ms_entries, _Alignof(av_ring_entry));
+    av_ring_entry *entries =
+        av_arena_alloc(a, sizeof(av_ring_entry) * stt.ms_entries, _Alignof(av_ring_entry));
     if (entries == NULL) {
         mdb_txn_abort(txn);
         av_err_set(e, "internal", "arena exhausted");
@@ -1081,13 +1085,15 @@ av_status av_store_quarantine_put(av_txn *t, const char *coll, const uint8_t key
         rl = 256;
     uint8_t buf[8 + 256];
     put_le64(buf, updated_at);
-    memcpy(buf + 8, reason, rl);
+    /* Stored as length-delimited bytes (value length = 8 + rl), not as a C string. */
+    memcpy(buf + 8, reason, rl); // NOLINT(bugprone-not-null-terminated-result)
     MDB_val k = {32, (void *) key}, v = {8 + rl, buf};
     int rc = mdb_put(t->txn, d.dbi[DB_QUAR], &k, &v, 0);
     return rc == 0 ? AV_OK : mdb_fail(e, "quarantine", rc);
 }
 
-av_status av_store_quarantine(av_txn *t, const char *coll, const uint8_t key[32], const char *reason, av_err *e)
+av_status av_store_quarantine(av_txn *t, const char *coll, const uint8_t key[32], const char *reason,
+                              av_err *e)
 {
     return av_store_quarantine_put(t, coll, key, 0, reason, e);
 }
@@ -1102,8 +1108,8 @@ av_status av_store_unquarantine(av_txn *t, const char *coll, const uint8_t key[3
     return (rc == 0 || rc == MDB_NOTFOUND) ? AV_OK : mdb_fail(e, "unquarantine", rc);
 }
 
-av_status av_store_txn_get_quarantine(av_txn *t, const char *coll, const uint8_t key[32], uint64_t *updated_at,
-                                      bool *found, av_err *e)
+av_status av_store_txn_get_quarantine(av_txn *t, const char *coll, const uint8_t key[32],
+                                      uint64_t *updated_at, bool *found, av_err *e)
 {
     coll_dbs d;
     if (get_dbs(t->s, t, coll, &d, e) != AV_OK)

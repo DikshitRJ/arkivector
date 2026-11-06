@@ -7,7 +7,11 @@
 
 #include "postgres.h"
 #include <roaring.h>
+/* hnsw.h is verbatim pgvector code (flexible array members inside structs): keep -Wpedantic off for it only. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 #include "hnsw.h"
+#pragma GCC diagnostic pop
 #include "index/segment.h"
 #include "log.h"
 

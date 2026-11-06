@@ -34,11 +34,10 @@ static void err_internal(av_err *e)
 /* names and fields                                                          */
 /* ------------------------------------------------------------------------- */
 
-static const char *const k_reserved[] = {"and",  "or",     "not",    "true",   "false", "between", "startswith",
-                                         "exists", "typeof", "order",  "by",     "asc",   "desc",    "select",
-                                         "from", "where",  "limit",  "offset", "like",  "is",      "null",
-                                         "bool", "i32",    "u64",    "u256",   "dec",   "str",     "addr",
-                                         "key",  "bytes"};
+static const char *const k_reserved[] = {
+    "and",  "or",   "not",  "true",   "false", "between", "startswith", "exists", "typeof", "order",
+    "by",   "asc",  "desc", "select", "from",  "where",   "limit",      "offset", "like",   "is",
+    "null", "bool", "i32",  "u64",    "u256",  "dec",     "str",        "addr",   "key",    "bytes"};
 
 static bool is_alpha(char c)
 {
@@ -326,7 +325,8 @@ av_filter *av_fb_not(av_fbuild *fb, int pos, av_filter *kid, av_err *e)
     return n;
 }
 
-av_filter *av_fb_group(av_fbuild *fb, av_filter_kind kind, int pos, av_filter *const *kids, size_t n, av_err *e)
+av_filter *av_fb_group(av_fbuild *fb, av_filter_kind kind, int pos, av_filter *const *kids, size_t n,
+                       av_err *e)
 {
     if (n == 0 || (kind != AV_F_AND && kind != AV_F_OR)) {
         av_filter_err(e, pos, "empty or invalid AND/OR group");

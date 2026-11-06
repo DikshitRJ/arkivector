@@ -319,8 +319,9 @@ TEST test_between_key(void)
     roaring_bitmap_free(bm);
 
     /* Key range covering single doc */
-    const char *qsingle = "$key BETWEEN key(0x0300000000000000000000000000000000000000000000000000000000000000) "
-                          "AND key(0x0300000000000000000000000000000000000000000000000000000000000000)";
+    const char *qsingle =
+        "$key BETWEEN key(0x0300000000000000000000000000000000000000000000000000000000000000) "
+        "AND key(0x0300000000000000000000000000000000000000000000000000000000000000)";
     bm = eval_where(&fix, qsingle, 0);
     uint32_t exp3[] = {3};
     ASSERT(bitmap_matches(bm, exp3, 1));

@@ -92,16 +92,16 @@ bool av_request_id_valid(const char *s);
 struct av_router;
 
 typedef struct av_http_config {
-    const char *listen;       /* "host:port" or "[v6]:port" (port 0 = ephemeral) */
-    size_t max_body;          /* bytes; 0 = 32 MiB */
-    size_t workers;           /* query pool threads; 0 = 4 */
-    size_t max_queue;         /* pending handler tasks; 0 = 4096 */
-    size_t max_connections;   /* 0 = 1024 */
-    int request_timeout_ms;   /* receive a full request within this; 0 = 30000 */
-    int idle_timeout_ms;      /* keep-alive idle; 0 = 60000 */
-    int drain_timeout_ms;     /* graceful shutdown wait for in-flight; 0 = 10000 */
+    const char *listen;        /* "host:port" or "[v6]:port" (port 0 = ephemeral) */
+    size_t max_body;           /* bytes; 0 = 32 MiB */
+    size_t workers;            /* query pool threads; 0 = 4 */
+    size_t max_queue;          /* pending handler tasks; 0 = 4096 */
+    size_t max_connections;    /* 0 = 1024 */
+    int request_timeout_ms;    /* receive a full request within this; 0 = 30000 */
+    int idle_timeout_ms;       /* keep-alive idle; 0 = 60000 */
+    int drain_timeout_ms;      /* graceful shutdown wait for in-flight; 0 = 10000 */
     const char *api_keys_file; /* NULL or "" = auth disabled */
-    double ratelimit_rps;     /* 0 = disabled */
+    double ratelimit_rps;      /* 0 = disabled */
     double ratelimit_burst;
     struct av_router *router; /* not owned */
 } av_http_config;

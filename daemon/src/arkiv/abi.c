@@ -15,30 +15,28 @@
 static const struct {
     uint8_t sel[4];
     const char *name;
-} g_revert_catalogue[22] = {
-    {{0xc2, 0xe5, 0x34, 0x7d}, "EmptyBatch"},
-    {{0x6b, 0xd8, 0x47, 0xc6}, "InvalidOpType"},
-    {{0x89, 0xbc, 0x94, 0x48}, "NonCanonicalOperationData"},
-    {{0x32, 0x06, 0x84, 0x6a}, "AttributesNotSorted"},
-    {{0xd7, 0xce, 0x98, 0x1c}, "TooManyAttributes"},
-    {{0x78, 0xa5, 0x85, 0x38}, "EmptyMutations"},
-    {{0x42, 0x50, 0x1b, 0xac}, "TombstoneInCreate"},
-    {{0x01, 0x9f, 0x59, 0xdf}, "TombstoneValueNotEmpty"},
-    {{0x79, 0xb2, 0xb3, 0x98}, "SystemAttributeNotWritable"},
-    {{0x63, 0x9f, 0xb7, 0xab}, "InvalidValueType"},
-    {{0xc1, 0x09, 0xae, 0xf4}, "Ident32Empty"},
-    {{0x27, 0x6f, 0x77, 0x98}, "Ident32InvalidByte"},
-    {{0x66, 0xa8, 0x9f, 0x2a}, "EntityNotFound"},
-    {{0x24, 0x11, 0xcf, 0x56}, "EntityExpired"},
-    {{0xa3, 0x22, 0x1e, 0xf2}, "NotOwner"},
-    {{0xd8, 0x58, 0xa8, 0x24}, "ReadOnlyEntity"},
-    {{0xdc, 0xc1, 0x86, 0x11}, "ReservedCreationFlags"},
-    {{0x26, 0x04, 0x9d, 0x1c}, "ExpiryDeadOnArrival"},
-    {{0xdd, 0x7e, 0x98, 0x6b}, "ExpiryBeyondMaxLifetime"},
-    {{0x33, 0x26, 0x8a, 0x0d}, "ExpiryNotExtended"},
-    {{0x87, 0x42, 0xc6, 0x7c}, "TransferToZeroAddress"},
-    {{0xe3, 0x24, 0xb1, 0x69}, "TransferToSelf"}
-};
+} g_revert_catalogue[22] = {{{0xc2, 0xe5, 0x34, 0x7d}, "EmptyBatch"},
+                            {{0x6b, 0xd8, 0x47, 0xc6}, "InvalidOpType"},
+                            {{0x89, 0xbc, 0x94, 0x48}, "NonCanonicalOperationData"},
+                            {{0x32, 0x06, 0x84, 0x6a}, "AttributesNotSorted"},
+                            {{0xd7, 0xce, 0x98, 0x1c}, "TooManyAttributes"},
+                            {{0x78, 0xa5, 0x85, 0x38}, "EmptyMutations"},
+                            {{0x42, 0x50, 0x1b, 0xac}, "TombstoneInCreate"},
+                            {{0x01, 0x9f, 0x59, 0xdf}, "TombstoneValueNotEmpty"},
+                            {{0x79, 0xb2, 0xb3, 0x98}, "SystemAttributeNotWritable"},
+                            {{0x63, 0x9f, 0xb7, 0xab}, "InvalidValueType"},
+                            {{0xc1, 0x09, 0xae, 0xf4}, "Ident32Empty"},
+                            {{0x27, 0x6f, 0x77, 0x98}, "Ident32InvalidByte"},
+                            {{0x66, 0xa8, 0x9f, 0x2a}, "EntityNotFound"},
+                            {{0x24, 0x11, 0xcf, 0x56}, "EntityExpired"},
+                            {{0xa3, 0x22, 0x1e, 0xf2}, "NotOwner"},
+                            {{0xd8, 0x58, 0xa8, 0x24}, "ReadOnlyEntity"},
+                            {{0xdc, 0xc1, 0x86, 0x11}, "ReservedCreationFlags"},
+                            {{0x26, 0x04, 0x9d, 0x1c}, "ExpiryDeadOnArrival"},
+                            {{0xdd, 0x7e, 0x98, 0x6b}, "ExpiryBeyondMaxLifetime"},
+                            {{0x33, 0x26, 0x8a, 0x0d}, "ExpiryNotExtended"},
+                            {{0x87, 0x42, 0xc6, 0x7c}, "TransferToZeroAddress"},
+                            {{0xe3, 0x24, 0xb1, 0x69}, "TransferToSelf"}};
 
 const char *av_abi_decode_revert(const uint8_t *data, size_t len)
 {
@@ -56,9 +54,8 @@ const char *av_abi_revert_error_name(const uint8_t *data, size_t len)
     return av_abi_decode_revert(data, len);
 }
 
-void av_abi_predict_entity_key(uint64_t chain_id, const uint8_t contract_addr[20],
-                               const uint8_t owner[20], uint64_t nonce,
-                               const uint8_t salt[16], uint8_t out_key[32])
+void av_abi_predict_entity_key(uint64_t chain_id, const uint8_t contract_addr[20], const uint8_t owner[20],
+                               uint64_t nonce, const uint8_t salt[16], uint8_t out_key[32])
 {
     uint8_t packed[96];
     memset(packed, 0, 96);
@@ -106,10 +103,12 @@ static void buf_free(abi_buf *b)
 
 static bool buf_ensure(abi_buf *b, size_t extra)
 {
-    if (b->oom) return false;
+    if (b->oom)
+        return false;
     if (b->len + extra > b->cap) {
         size_t ncap = b->cap * 2;
-        while (b->len + extra > ncap) ncap *= 2;
+        while (b->len + extra > ncap)
+            ncap *= 2;
         uint8_t *nd = realloc(b->data, ncap);
         if (nd == NULL) {
             b->oom = true;
@@ -123,7 +122,8 @@ static bool buf_ensure(abi_buf *b, size_t extra)
 
 static void buf_write_raw(abi_buf *b, const void *ptr, size_t n)
 {
-    if (!buf_ensure(b, n)) return;
+    if (!buf_ensure(b, n))
+        return;
     memcpy(b->data + b->len, ptr, n);
     b->len += n;
 }
@@ -184,7 +184,8 @@ static void buf_write_bytes_padded(abi_buf *b, const uint8_t *bytes, size_t len)
 
 static void buf_set_word_u64(abi_buf *b, size_t offset, uint64_t val)
 {
-    if (offset + 32 > b->len) return;
+    if (offset + 32 > b->len)
+        return;
     uint8_t *w = b->data + offset;
     memset(w, 0, 32);
     for (int i = 0; i < 8; i++) {
@@ -203,7 +204,8 @@ static int attr_cmp(const void *a, const void *b)
 static void encode_attributes(abi_buf *b, const av_attr *attrs, size_t n_attrs)
 {
     buf_write_word_u64(b, n_attrs);
-    if (n_attrs == 0) return;
+    if (n_attrs == 0)
+        return;
 
     /* Sort attributes in strictly ascending order by name */
     av_attr *sorted = malloc(n_attrs * sizeof(av_attr));
@@ -230,7 +232,8 @@ static void encode_attributes(abi_buf *b, const av_attr *attrs, size_t n_attrs)
         uint8_t name_word[32];
         memset(name_word, 0, 32);
         size_t nlen = strlen(sorted[i].name);
-        if (nlen > 32) nlen = 32;
+        if (nlen > 32)
+            nlen = 32;
         memcpy(name_word, sorted[i].name, nlen);
         buf_write_raw(b, name_word, 32);
 
@@ -252,6 +255,9 @@ static void encode_op_payload(abi_buf *b, const av_mutation_op *op)
 {
     switch (op->type) {
     case AV_OP_CREATE: {
+        /* abi.encode(CreateOp): the struct is dynamic (Attribute[]), so a 0x20 head offset comes first.
+         * Verified against Rabdi, which rejects payloads without it ("type check failed for offset"). */
+        buf_write_word_u64(b, 32);
         /* uint128 salt */
         uint8_t salt_w[32];
         memset(salt_w, 0, 32);
@@ -274,6 +280,7 @@ static void encode_op_payload(abi_buf *b, const av_mutation_op *op)
         break;
     }
     case AV_OP_PATCH: {
+        buf_write_word_u64(b, 32); /* abi.encode(PatchOp): dynamic struct head offset */
         /* bytes32 entityKey */
         buf_write_word_bytes(b, op->u.patch.entity_key, 32);
 
@@ -302,7 +309,7 @@ static void encode_op_payload(abi_buf *b, const av_mutation_op *op)
 }
 
 av_status av_abi_encode_execute(const av_mutation_op *ops, size_t n_ops, av_arena *arena,
-                               uint8_t **out_calldata, size_t *out_len, av_err *e)
+                                uint8_t **out_calldata, size_t *out_len, av_err *e)
 {
     abi_buf b;
     buf_init(&b, 1024);
@@ -376,65 +383,88 @@ static uint64_t read_u64(const uint8_t *p)
     return val;
 }
 
-static bool decode_attributes(const uint8_t *data, size_t len, size_t offset,
-                             av_arena *arena, av_attr **out_attrs, size_t *out_n)
+/* An ABI offset/length word: the upper 24 bytes must be zero and the value must fit the buffer. */
+static bool read_size(const uint8_t *p, size_t limit, size_t *out)
 {
-    if (offset + 32 > len) return false;
-    size_t n = (size_t) read_u64(data + offset);
-    *out_n = n;
-    if (n == 0) {
-        *out_attrs = NULL;
-        return true;
+    for (int i = 0; i < 24; i++) {
+        if (p[i] != 0)
+            return false;
     }
+    uint64_t v = read_u64(p);
+    if (v > (uint64_t) limit)
+        return false;
+    *out = (size_t) v;
+    return true;
+}
+
+/* True when [off, off + need) lies inside a buffer of len bytes (overflow-safe). */
+static bool fits(size_t off, size_t need, size_t len)
+{
+    return off <= len && need <= len - off;
+}
+
+static bool decode_attributes(const uint8_t *data, size_t len, size_t offset, av_arena *arena,
+                              av_attr **out_attrs, size_t *out_n)
+{
+    *out_attrs = NULL;
+    *out_n = 0;
+    size_t n;
+    if (!fits(offset, 32, len) || !read_size(data + offset, len, &n))
+        return false;
+    if (n == 0)
+        return true;
+    size_t head_start = offset + 32;
+    if (n > (len - head_start) / 32) /* every element needs a 32-byte head word */
+        return false;
 
     av_attr *arr = av_arena_alloc(arena, n * sizeof(av_attr), 0);
-    if (arr == NULL) return false;
-
-    size_t head_start = offset + 32;
-    if (head_start + n * 32 > len) return false;
+    if (arr == NULL)
+        return false;
 
     for (size_t i = 0; i < n; i++) {
-        size_t tuple_rel = (size_t) read_u64(data + head_start + i * 32);
+        size_t tuple_rel;
+        if (!read_size(data + head_start + i * 32, len, &tuple_rel) || !fits(head_start, tuple_rel, len))
+            return false;
         size_t tuple_off = head_start + tuple_rel;
-        if (tuple_off + 96 > len) return false;
+        if (!fits(tuple_off, 96, len))
+            return false;
 
         /* 1. bytes32 name */
         memcpy(arr[i].name, data + tuple_off, 32);
         arr[i].name[32] = '\0';
-        /* Remove trailing NULs */
-        for (int c = 31; c >= 0 && arr[i].name[c] == '\0'; c--) {
-            arr[i].name[c] = '\0';
-        }
 
         /* 2. uint8 typeId */
         uint8_t tid = (uint8_t) (read_u64(data + tuple_off + 32) & 0xff);
         arr[i].type = (uint8_t) (tid & 0x7f);
         arr[i].indexed = (tid & 0x80) != 0;
 
-        /* 3. bytes value */
-        size_t val_rel = (size_t) read_u64(data + tuple_off + 64);
+        /* 3. bytes value (offset relative to the tuple) */
+        size_t val_rel;
+        if (!read_size(data + tuple_off + 64, len, &val_rel) || !fits(tuple_off, val_rel, len))
+            return false;
         size_t val_off = tuple_off + val_rel;
-        if (val_off + 32 > len) return false;
-
-        size_t vlen = (size_t) read_u64(data + val_off);
+        size_t vlen;
+        if (!fits(val_off, 32, len) || !read_size(data + val_off, len, &vlen) ||
+            !fits(val_off + 32, vlen, len))
+            return false;
         arr[i].len = vlen;
+        arr[i].val = NULL;
         if (vlen > 0) {
-            if (val_off + 32 + vlen > len) return false;
             uint8_t *vcopy = av_arena_alloc(arena, vlen, 0);
-            if (vcopy == NULL) return false;
+            if (vcopy == NULL)
+                return false;
             memcpy(vcopy, data + val_off + 32, vlen);
             arr[i].val = vcopy;
-        } else {
-            arr[i].val = NULL;
         }
     }
 
     *out_attrs = arr;
+    *out_n = n;
     return true;
 }
 
 av_status av_abi_decode_execute(const uint8_t *calldata, size_t len, av_arena *arena,
-                               av_mutation_op **out_ops, size_t *out_n_ops, av_err *e)
+                                av_mutation_op **out_ops, size_t *out_n_ops, av_err *e)
 {
     *out_ops = NULL;
     *out_n_ops = 0;
@@ -458,16 +488,25 @@ av_status av_abi_decode_execute(const uint8_t *calldata, size_t len, av_arena *a
         return AV_ERR;
     }
 
-    size_t array_offset = (size_t) read_u64(args);
-    if (array_offset + 32 > args_len) {
+    size_t array_offset;
+    if (!read_size(args, args_len, &array_offset) || !fits(array_offset, 32, args_len)) {
         av_err_set(e, "invalid_argument", "invalid array offset");
         return AV_ERR;
     }
 
-    size_t n_ops = (size_t) read_u64(args + array_offset);
-    *out_n_ops = n_ops;
+    size_t n_ops;
+    if (!read_size(args + array_offset, args_len, &n_ops)) {
+        av_err_set(e, "invalid_argument", "invalid ops count");
+        return AV_ERR;
+    }
     if (n_ops == 0)
         return AV_OK;
+
+    size_t head_start = array_offset + 32;
+    if (n_ops > (args_len - head_start) / 32) {
+        av_err_set(e, "invalid_argument", "ops head table truncated");
+        return AV_ERR;
+    }
 
     av_mutation_op *ops = av_arena_alloc(arena, n_ops * sizeof(av_mutation_op), 0);
     if (ops == NULL) {
@@ -476,39 +515,42 @@ av_status av_abi_decode_execute(const uint8_t *calldata, size_t len, av_arena *a
     }
     memset(ops, 0, n_ops * sizeof(av_mutation_op));
 
-    size_t head_start = array_offset + 32;
-    if (head_start + n_ops * 32 > args_len) {
-        av_err_set(e, "invalid_argument", "ops head table truncated");
-        return AV_ERR;
-    }
-
     for (size_t i = 0; i < n_ops; i++) {
-        size_t op_rel = (size_t) read_u64(args + head_start + i * 32);
-        size_t op_off = head_start + op_rel;
-        if (op_off + 64 > args_len) {
+        size_t op_rel;
+        if (!read_size(args + head_start + i * 32, args_len, &op_rel) ||
+            !fits(head_start, op_rel, args_len) || !fits(head_start + op_rel, 64, args_len)) {
             av_err_set(e, "invalid_argument", "op tuple truncated");
             return AV_ERR;
         }
+        size_t op_off = head_start + op_rel;
 
         uint64_t optype = read_u64(args + op_off);
         ops[i].type = (av_op_type) optype;
 
-        size_t data_rel = (size_t) read_u64(args + op_off + 32);
-        size_t data_off = op_off + data_rel;
-        if (data_off + 32 > args_len) {
+        size_t data_rel;
+        if (!read_size(args + op_off + 32, args_len, &data_rel) || !fits(op_off, data_rel, args_len) ||
+            !fits(op_off + data_rel, 32, args_len)) {
             av_err_set(e, "invalid_argument", "operationData truncated");
             return AV_ERR;
         }
+        size_t data_off = op_off + data_rel;
 
-        size_t dlen = (size_t) read_u64(args + data_off);
+        size_t dlen;
         const uint8_t *pdata = args + data_off + 32;
-        if (data_off + 32 + dlen > args_len) {
+        if (!read_size(args + data_off, args_len, &dlen) || !fits(data_off + 32, dlen, args_len)) {
             av_err_set(e, "invalid_argument", "operationData payload truncated");
             return AV_ERR;
         }
 
         switch (ops[i].type) {
         case AV_OP_CREATE: {
+            size_t hoff = 0;
+            if (dlen < 32 || !read_size(pdata, dlen, &hoff) || !fits(hoff, 0, dlen)) {
+                av_err_set(e, "invalid_argument", "CREATE head offset invalid");
+                return AV_ERR;
+            }
+            pdata += hoff;
+            dlen -= hoff;
             if (dlen < 160) {
                 av_err_set(e, "invalid_argument", "CREATE payload too short");
                 return AV_ERR;
@@ -517,25 +559,38 @@ av_status av_abi_decode_execute(const uint8_t *calldata, size_t len, av_arena *a
             ops[i].u.create.expires_at = read_u64(pdata + 32);
             ops[i].u.create.min_lifetime = read_u64(pdata + 64);
             ops[i].u.create.creation_flags = (uint8_t) (read_u64(pdata + 96) & 0xff);
-            size_t attr_off = (size_t) read_u64(pdata + 128);
-            if (!decode_attributes(pdata, dlen, attr_off, arena,
-                                  &ops[i].u.create.attributes,
-                                  &ops[i].u.create.n_attributes)) {
+            size_t attr_off = 0;
+            if (!read_size(pdata + 128, dlen, &attr_off)) {
+                av_err_set(e, "invalid_argument", "invalid CREATE attributes offset");
+                return AV_ERR;
+            }
+            if (!decode_attributes(pdata, dlen, attr_off, arena, &ops[i].u.create.attributes,
+                                   &ops[i].u.create.n_attributes)) {
                 av_err_set(e, "invalid_argument", "failed to decode CREATE attributes");
                 return AV_ERR;
             }
             break;
         }
         case AV_OP_PATCH: {
+            size_t hoff = 0;
+            if (dlen < 32 || !read_size(pdata, dlen, &hoff) || !fits(hoff, 0, dlen)) {
+                av_err_set(e, "invalid_argument", "PATCH head offset invalid");
+                return AV_ERR;
+            }
+            pdata += hoff;
+            dlen -= hoff;
             if (dlen < 64) {
                 av_err_set(e, "invalid_argument", "PATCH payload too short");
                 return AV_ERR;
             }
             memcpy(ops[i].u.patch.entity_key, pdata, 32);
-            size_t mut_off = (size_t) read_u64(pdata + 32);
-            if (!decode_attributes(pdata, dlen, mut_off, arena,
-                                  &ops[i].u.patch.mutations,
-                                  &ops[i].u.patch.n_mutations)) {
+            size_t mut_off = 0;
+            if (!read_size(pdata + 32, dlen, &mut_off)) {
+                av_err_set(e, "invalid_argument", "invalid PATCH mutations offset");
+                return AV_ERR;
+            }
+            if (!decode_attributes(pdata, dlen, mut_off, arena, &ops[i].u.patch.mutations,
+                                   &ops[i].u.patch.n_mutations)) {
                 av_err_set(e, "invalid_argument", "failed to decode PATCH mutations");
                 return AV_ERR;
             }
@@ -568,9 +623,13 @@ av_status av_abi_decode_execute(const uint8_t *calldata, size_t len, av_arena *a
             memcpy(ops[i].u.del.entity_key, pdata, 32);
             break;
         }
+        default:
+            av_err_set(e, "invalid_argument", "unknown operation type %llu", (unsigned long long) optype);
+            return AV_ERR;
         }
     }
 
     *out_ops = ops;
+    *out_n_ops = n_ops;
     return AV_OK;
 }

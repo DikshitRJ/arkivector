@@ -16,11 +16,7 @@
 #include "vector.h"
 
 static pthread_mutex_t g_calib_mu = PTHREAD_MUTEX_INITIALIZER;
-static av_calibration g_calib = {
-    .c_d_ns = 150.0,
-    .rho = 2.89,
-    .gamma = 1.7
-};
+static av_calibration g_calib = {.c_d_ns = 150.0, .rho = 2.89, .gamma = 1.7};
 
 static double time_now_ns(void)
 {
@@ -104,8 +100,10 @@ av_status av_calibrate_startup(av_calibration *out, av_err *e)
 
     double elapsed = t1 - t0;
     double cd = elapsed / (double) n_calls;
-    if (cd < 5.0) cd = 5.0;
-    if (cd > 5000.0) cd = 5000.0;
+    if (cd < 5.0)
+        cd = 5.0;
+    if (cd > 5000.0)
+        cd = 5000.0;
 
     pthread_mutex_lock(&g_calib_mu);
     g_calib.c_d_ns = cd;
@@ -150,9 +148,8 @@ static pthread_once_t g_recall_once = PTHREAD_ONCE_INIT;
 static void init_recall_metric(void)
 {
     static const char *const labels[] = {"collection"};
-    g_metric_recall = av_metric_register("arkivector_recall_at_k",
-                                         "Recall@k canary metric for approximate search",
-                                         AV_MTYPE_GAUGE, labels, 1);
+    g_metric_recall = av_metric_register(
+        "arkivector_recall_at_k", "Recall@k canary metric for approximate search", AV_MTYPE_GAUGE, labels, 1);
 }
 
 void av_recall_canary_record(const char *collection, double recall)

@@ -21,6 +21,7 @@
 #include "filter/json_filter.h"
 #include "filter/parser.h"
 #include "filter/value.h"
+#include "filter/value_json.h"
 #include "kernels/opclass.h"
 #include "query/calibrate.h"
 #include "query/executor.h"
@@ -47,49 +48,6 @@ static uint64_t hash_str(const char *s, size_t len)
         h *= 1099511628211ULL;
     }
     return h;
-}
-
-static yyjson_mut_val *format_typed_val(yyjson_mut_doc *doc, const av_attr *at, av_arena *arena)
-{
-    yyjson_mut_val *obj = yyjson_mut_obj(doc);
-    const char *tname = av_type_name((av_attr_type) at->type);
-    yyjson_mut_obj_add_str(doc, obj, "type", tname);
-
-    if (at->type == AV_AT_BOOL) {
-        bool val = (at->len >= 32 && at->val[31] != 0);
-        yyjson_mut_obj_add_bool(doc, obj, "value", val);
-    } else if (at->type == AV_AT_I32) {
-        av_value v;
-        if (av_value_from_stored(AV_AT_I32, at->val, at->len, &v)) {
-            char buf[64];
-            av_value_format(&v, buf, sizeof(buf));
-            yyjson_mut_obj_add_int(doc, obj, "value", atoi(buf));
-        } else {
-            yyjson_mut_obj_add_int(doc, obj, "value", 0);
-        }
-    } else if (at->type == AV_AT_STR) {
-        yyjson_mut_obj_add_strncpy(doc, obj, "value", (const char *) at->val, at->len);
-    } else if (at->type == AV_AT_BYTES) {
-        char *b64 = NULL;
-        size_t b64_len = 0;
-        av_err err;
-        av_err_clear(&err);
-        if (av_base64_encode(at->val, at->len, arena, &b64, &b64_len, &err) == AV_OK) {
-            yyjson_mut_obj_add_strncpy(doc, obj, "value", b64, b64_len);
-        } else {
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", "");
-        }
-    } else {
-        av_value v;
-        if (av_value_from_stored((av_attr_type) at->type, at->val, at->len, &v)) {
-            char buf[AV_VALUE_FORMAT_MAX];
-            av_value_format(&v, buf, sizeof(buf));
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", buf);
-        } else {
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", "");
-        }
-    }
-    return obj;
 }
 
 static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, const av_coldef *coldef,
@@ -125,8 +83,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
         }
 
         if (info.dim != coldef->dimensions) {
-            av_err_set(e, "dimension_mismatch", "expected %" PRId64 " dimensions, not %d",
-                       coldef->dimensions, info.dim);
+            av_err_set(e, "dimension_mismatch", "expected %" PRId64 " dimensions, not %d", coldef->dimensions,
+                       info.dim);
             av_err_field(e, "/vector_bytes");
             return AV_ERR;
         }
@@ -161,7 +119,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
             }
             size_t idx, max;
             yyjson_val *elem;
-            yyjson_arr_foreach(vec_val, idx, max, elem) {
+            yyjson_arr_foreach(vec_val, idx, max, elem)
+            {
                 if (!yyjson_is_int(elem)) {
                     av_err_set(e, "invalid_vector", "bit vector element must be 0 or 1");
                     av_err_field(e, "/vector");
@@ -176,7 +135,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
                 bit_str[idx] = (char) ('0' + v);
             }
             bit_str[n] = '\0';
-            if (av_text_to_pgvec(AV_VT_BIT, bit_str, (int32_t) coldef->dimensions, arena, out_pgvec, e) != AV_OK) {
+            if (av_text_to_pgvec(AV_VT_BIT, bit_str, (int32_t) coldef->dimensions, arena, out_pgvec, e) !=
+                AV_OK) {
                 av_err_field(e, "/vector");
                 return AV_ERR;
             }
@@ -195,7 +155,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
         buf[pos++] = '[';
         size_t idx, max;
         yyjson_val *elem;
-        yyjson_arr_foreach(vec_val, idx, max, elem) {
+        yyjson_arr_foreach(vec_val, idx, max, elem)
+        {
             if (!yyjson_is_num(elem)) {
                 av_err_set(e, "invalid_vector", "vector element must be a number");
                 av_err_field(e, "/vector");
@@ -217,7 +178,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
         buf[pos++] = ']';
         buf[pos] = '\0';
 
-        if (av_text_to_pgvec(coldef->vtype, buf, (int32_t) coldef->dimensions, arena, out_pgvec, e) != AV_OK) {
+        if (av_text_to_pgvec(coldef->vtype, buf, (int32_t) coldef->dimensions, arena, out_pgvec, e) !=
+            AV_OK) {
             av_err_field(e, "/vector");
             return AV_ERR;
         }
@@ -272,8 +234,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
             int64_t index0 = yyjson_get_int(iv);
             double val = yyjson_get_num(vv);
             /* pgvector sparse text format uses 1-based indexing */
-            int written = snprintf(buf + pos, cap - pos, "%s%" PRId64 ":%.9g",
-                                  (i > 0 ? "," : ""), index0 + 1, val);
+            int written =
+                snprintf(buf + pos, cap - pos, "%s%" PRId64 ":%.9g", (i > 0 ? "," : ""), index0 + 1, val);
             if (written < 0 || (size_t) written >= cap - pos) {
                 av_err_set(e, "internal", "buffer overflow formatting sparse vector");
                 return AV_ERR;
@@ -286,7 +248,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
             return AV_ERR;
         }
 
-        if (av_text_to_pgvec(AV_VT_SPARSEVEC, buf, (int32_t) coldef->dimensions, arena, out_pgvec, e) != AV_OK) {
+        if (av_text_to_pgvec(AV_VT_SPARSEVEC, buf, (int32_t) coldef->dimensions, arena, out_pgvec, e) !=
+            AV_OK) {
             av_err_field(e, "/vector");
             return AV_ERR;
         }
@@ -299,8 +262,8 @@ static av_status parse_query_vector(yyjson_val *vec_val, yyjson_val *vb_val, con
 }
 
 /* Parse consistency object and wait if needed */
-static av_status handle_consistency(yyjson_val *root, av_collection *c, const char *path,
-                                    av_http_resp *resp, av_err *e)
+static av_status handle_consistency(yyjson_val *root, av_collection *c, const char *path, av_http_resp *resp,
+                                    av_err *e)
 {
     yyjson_val *cons = yyjson_obj_get(root, "consistency");
     if (cons == NULL || yyjson_is_null(cons)) {
@@ -340,8 +303,10 @@ static av_status handle_consistency(yyjson_val *root, av_collection *c, const ch
                 return AV_ERR;
             }
             timeout_ms = yyjson_get_int(t_val);
-            if (timeout_ms < 0) timeout_ms = 0;
-            if (timeout_ms > 60000) timeout_ms = 60000;
+            if (timeout_ms < 0)
+                timeout_ms = 0;
+            if (timeout_ms > 60000)
+                timeout_ms = 60000;
         }
 
         if (av_collection_wait_block(c, min_block, timeout_ms, e) != AV_OK) {
@@ -404,8 +369,8 @@ static av_status parse_filter_or_where(yyjson_val *root, const av_coldef *coldef
 }
 
 /* POST /v1/collections/{name}/search */
-static void h_search(const av_http_req *req, const char *const *params, size_t n_params,
-                     av_http_resp *resp, void *ctx)
+static void h_search(const av_http_req *req, const char *const *params, size_t n_params, av_http_resp *resp,
+                     void *ctx)
 {
     (void) n_params;
     (void) ctx;
@@ -446,11 +411,12 @@ static void h_search(const av_http_req *req, const char *const *params, size_t n
     }
 
     static const char *const allowed_search[] = {
-        "vector", "vector_bytes", "k", "offset", "operator", "filter", "where",
-        "ef_search", "iterative_scan", "max_scan_tuples", "max_distance",
-        "min_score", "exact", "include", "consistency", "explain"
-    };
-    if (av_json_check_fields(root, allowed_search, sizeof(allowed_search) / sizeof(allowed_search[0]), "", &e) != AV_OK) {
+        "vector",       "vector_bytes", "k",         "offset",         "operator",
+        "filter",       "where",        "ef_search", "iterative_scan", "max_scan_tuples",
+        "max_distance", "min_score",    "exact",     "include",        "consistency",
+        "explain"};
+    if (av_json_check_fields(root, allowed_search, sizeof(allowed_search) / sizeof(allowed_search[0]), "",
+                             &e) != AV_OK) {
         av_collection_release(c);
         yyjson_doc_free(req_doc);
         av_problem_from_err(&e, resp, req->path);
@@ -559,8 +525,8 @@ static void h_search(const av_http_req *req, const char *const *params, size_t n
         if (found_oc == NULL) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            av_err_set(&e, "invalid_argument", "operator '%s' is not valid for column type '%s'",
-                       op_str, av_vtype_name(coldef->vtype));
+            av_err_set(&e, "invalid_argument", "operator '%s' is not valid for column type '%s'", op_str,
+                       av_vtype_name(coldef->vtype));
             av_err_field(&e, "/operator");
             av_problem_from_err(&e, resp, req->path);
             return;
@@ -583,7 +549,8 @@ static void h_search(const av_http_req *req, const char *const *params, size_t n
         include_flags = 0;
         size_t idx, max;
         yyjson_val *elem;
-        yyjson_arr_foreach(inc_val, idx, max, elem) {
+        yyjson_arr_foreach(inc_val, idx, max, elem)
+        {
             const char *is = yyjson_get_str(elem);
             if (is != NULL) {
                 if (strcmp(is, "attributes") == 0) {
@@ -846,8 +813,8 @@ static bool scroll_collect_cb(uint32_t docid, void *ptr)
     return true;
 }
 
-static void h_scroll(const av_http_req *req, const char *const *params, size_t n_params,
-                     av_http_resp *resp, void *ctx)
+static void h_scroll(const av_http_req *req, const char *const *params, size_t n_params, av_http_resp *resp,
+                     void *ctx)
 {
     (void) n_params;
     (void) ctx;
@@ -890,10 +857,10 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
     }
 
     if (root != NULL) {
-        static const char *const allowed_scroll[] = {
-            "filter", "where", "limit", "cursor", "include", "consistency"
-        };
-        if (av_json_check_fields(root, allowed_scroll, sizeof(allowed_scroll) / sizeof(allowed_scroll[0]), "", &e) != AV_OK) {
+        static const char *const allowed_scroll[] = {"filter", "where",   "limit",
+                                                     "cursor", "include", "consistency"};
+        if (av_json_check_fields(root, allowed_scroll, sizeof(allowed_scroll) / sizeof(allowed_scroll[0]), "",
+                                 &e) != AV_OK) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
             av_problem_from_err(&e, resp, req->path);
@@ -939,7 +906,8 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
             include_flags = 0;
             size_t idx, max;
             yyjson_val *elem;
-            yyjson_arr_foreach(inc_val, idx, max, elem) {
+            yyjson_arr_foreach(inc_val, idx, max, elem)
+            {
                 const char *is = yyjson_get_str(elem);
                 if (is != NULL) {
                     if (strcmp(is, "attributes") == 0) {
@@ -988,16 +956,20 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
             memcpy(ctext, cbuf, copy_len);
             ctext[copy_len] = '\0';
 
-            /* Format: v1|<as_of>|<last_key_hex>|<filter_hash> */
-            char version[16] = {0};
-            uint64_t cur_as_of = 0;
-            char key_hex[128] = {0};
-            char fhash_str[64] = {0};
-
-            if (sscanf(ctext, "%15[^|]|%" SCNu64 "|%127[^|]|%63s", version, &cur_as_of, key_hex, fhash_str) >= 3 &&
-                strcmp(version, "v1") == 0) {
-                if (strlen(key_hex) == 66 && av_key_from_hex(key_hex, cursor_key)) {
-                    has_cursor = true;
+            /* Format: v1|<as_of>|<last_key_hex>[|<filter_hash>]. Only the key is used to resume. */
+            const char *p1 = strchr(ctext, '|');
+            const char *p2 = p1 != NULL ? strchr(p1 + 1, '|') : NULL;
+            if (p1 != NULL && p2 != NULL && (size_t) (p1 - ctext) == 2 && strncmp(ctext, "v1", 2) == 0) {
+                const char *kbeg = p2 + 1;
+                const char *kend = strchr(kbeg, '|');
+                size_t klen = kend != NULL ? (size_t) (kend - kbeg) : strlen(kbeg);
+                char key_hex[67];
+                if (klen == 66) {
+                    memcpy(key_hex, kbeg, 66);
+                    key_hex[66] = '\0';
+                    if (av_key_from_hex(key_hex, cursor_key)) {
+                        has_cursor = true;
+                    }
                 }
             }
 
@@ -1130,7 +1102,7 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
                         vec_len = at->len;
                     } else if (strncmp(at->name, "av.", 3) != 0 && strcmp(at->name, AV_ATTR_SCHEMA) != 0) {
                         if (include_flags & AV_INCLUDE_ATTRIBUTES) {
-                            yyjson_mut_val *tv = format_typed_val(doc, at, req->arena);
+                            yyjson_mut_val *tv = av_attr_to_typed_json(doc, at, req->arena);
                             yyjson_mut_obj_add_val(doc, attrs_obj, at->name, tv);
                         }
                     }
@@ -1189,7 +1161,8 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
         size_t next_cur_len = 0;
         av_err err;
         av_err_clear(&err);
-        if (av_base64_encode((const uint8_t *) token, strlen(token), req->arena, &next_cur, &next_cur_len, &err) == AV_OK) {
+        if (av_base64_encode((const uint8_t *) token, strlen(token), req->arena, &next_cur, &next_cur_len,
+                             &err) == AV_OK) {
             yyjson_mut_obj_add_strncpy(doc, root_resp, "next_cursor", next_cur, next_cur_len);
         } else {
             yyjson_mut_obj_add_null(doc, root_resp, "next_cursor");
@@ -1207,8 +1180,8 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
 }
 
 /* POST /v1/collections/{name}/count */
-static void h_count(const av_http_req *req, const char *const *params, size_t n_params,
-                    av_http_resp *resp, void *ctx)
+static void h_count(const av_http_req *req, const char *const *params, size_t n_params, av_http_resp *resp,
+                    void *ctx)
 {
     (void) n_params;
     (void) ctx;
@@ -1363,7 +1336,8 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
     }
 
     static const char *const allowed_batch[] = {"searches", "consistency"};
-    if (av_json_check_fields(root, allowed_batch, sizeof(allowed_batch) / sizeof(allowed_batch[0]), "", &e) != AV_OK) {
+    if (av_json_check_fields(root, allowed_batch, sizeof(allowed_batch) / sizeof(allowed_batch[0]), "", &e) !=
+        AV_OK) {
         av_collection_release(c);
         yyjson_doc_free(req_doc);
         av_problem_from_err(&e, resp, req->path);
@@ -1421,7 +1395,8 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
 
     size_t sidx, smax;
     yyjson_val *sitem;
-    yyjson_arr_foreach(searches_arr, sidx, smax, sitem) {
+    yyjson_arr_foreach(searches_arr, sidx, smax, sitem)
+    {
         yyjson_val *vec_val = yyjson_obj_get(sitem, "vector");
         yyjson_val *vb_val = yyjson_obj_get(sitem, "vector_bytes");
 
@@ -1434,21 +1409,24 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
         yyjson_val *k_val = yyjson_obj_get(sitem, "k");
         if (k_val != NULL && yyjson_is_int(k_val)) {
             int64_t kv = yyjson_get_int(k_val);
-            if (kv >= 1 && kv <= 1000) k = (size_t) kv;
+            if (kv >= 1 && kv <= 1000)
+                k = (size_t) kv;
         }
 
         size_t offset = 0;
         yyjson_val *off_val = yyjson_obj_get(sitem, "offset");
         if (off_val != NULL && yyjson_is_int(off_val)) {
             int64_t ov = yyjson_get_int(off_val);
-            if (ov >= 0 && ov <= 999) offset = (size_t) ov;
+            if (ov >= 0 && ov <= 999)
+                offset = (size_t) ov;
         }
 
         const av_opclass *oc = coldef->opclass;
         yyjson_val *op_val = yyjson_obj_get(sitem, "operator");
         if (op_val != NULL && yyjson_is_str(op_val)) {
             const av_opclass *found_oc = av_opclass_for_operator(coldef->vtype, yyjson_get_str(op_val));
-            if (found_oc != NULL) oc = found_oc;
+            if (found_oc != NULL)
+                oc = found_oc;
         }
 
         int inc_flags = AV_INCLUDE_ATTRIBUTES;
@@ -1457,23 +1435,29 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
             inc_flags = 0;
             size_t ii, imax;
             yyjson_val *ielem;
-            yyjson_arr_foreach(inc_val, ii, imax, ielem) {
+            yyjson_arr_foreach(inc_val, ii, imax, ielem)
+            {
                 const char *is = yyjson_get_str(ielem);
                 if (is != NULL) {
-                    if (strcmp(is, "attributes") == 0) inc_flags |= AV_INCLUDE_ATTRIBUTES;
-                    else if (strcmp(is, "document") == 0) inc_flags |= AV_INCLUDE_DOCUMENT;
-                    else if (strcmp(is, "vector") == 0) inc_flags |= AV_INCLUDE_VECTOR;
+                    if (strcmp(is, "attributes") == 0)
+                        inc_flags |= AV_INCLUDE_ATTRIBUTES;
+                    else if (strcmp(is, "document") == 0)
+                        inc_flags |= AV_INCLUDE_DOCUMENT;
+                    else if (strcmp(is, "vector") == 0)
+                        inc_flags |= AV_INCLUDE_VECTOR;
                 }
             }
         }
 
         bool exact = false;
         yyjson_val *ex_val = yyjson_obj_get(sitem, "exact");
-        if (ex_val != NULL && yyjson_is_bool(ex_val)) exact = yyjson_get_bool(ex_val);
+        if (ex_val != NULL && yyjson_is_bool(ex_val))
+            exact = yyjson_get_bool(ex_val);
 
         bool explain = false;
         yyjson_val *exp_val = yyjson_obj_get(sitem, "explain");
-        if (exp_val != NULL && yyjson_is_bool(exp_val)) explain = yyjson_get_bool(exp_val);
+        if (exp_val != NULL && yyjson_is_bool(exp_val))
+            explain = yyjson_get_bool(exp_val);
 
         av_filter *ast = NULL;
         uint64_t fhash = 0;
@@ -1503,8 +1487,10 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
                 char khex[67];
                 av_key_to_hex(h->key, khex);
                 yyjson_mut_obj_add_strcpy(resp_doc, ho, "key", khex);
-                if (h->has_id) yyjson_mut_obj_add_strcpy(resp_doc, ho, "id", h->id);
-                else yyjson_mut_obj_add_null(resp_doc, ho, "id");
+                if (h->has_id)
+                    yyjson_mut_obj_add_strcpy(resp_doc, ho, "id", h->id);
+                else
+                    yyjson_mut_obj_add_null(resp_doc, ho, "id");
                 yyjson_mut_obj_add_real(resp_doc, ho, "distance", h->distance);
                 yyjson_mut_obj_add_real(resp_doc, ho, "score", h->score);
                 char ahex[43];
@@ -1519,7 +1505,8 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
 
             if (explain) {
                 yyjson_mut_val *plan_obj = yyjson_mut_obj(resp_doc);
-                yyjson_mut_obj_add_str(resp_doc, plan_obj, "strategy", av_plan_strategy_name(sres.plan.strategy));
+                yyjson_mut_obj_add_str(resp_doc, plan_obj, "strategy",
+                                       av_plan_strategy_name(sres.plan.strategy));
                 yyjson_mut_obj_add_bool(resp_doc, plan_obj, "exact", sres.plan.exact);
                 yyjson_mut_obj_add_real(resp_doc, plan_obj, "elapsed_ms", sres.plan.elapsed_ms);
                 yyjson_mut_obj_add_val(resp_doc, item_resp, "plan", plan_obj);
@@ -1529,7 +1516,8 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
             av_search_result_free(&sres);
         }
 
-        if (cand != NULL) roaring_bitmap_free(cand);
+        if (cand != NULL)
+            roaring_bitmap_free(cand);
     }
 
     av_collection_read_unlock(c);
@@ -1702,7 +1690,7 @@ static void h_debug_entity(const av_http_req *req, const char *const *params, si
 
     yyjson_mut_val *at_obj = yyjson_mut_obj(doc);
     for (size_t i = 0; i < n_attrs; i++) {
-        yyjson_mut_val *tv = format_typed_val(doc, &attrs[i], req->arena);
+        yyjson_mut_val *tv = av_attr_to_typed_json(doc, &attrs[i], req->arena);
         yyjson_mut_obj_add_val(doc, at_obj, attrs[i].name, tv);
     }
     yyjson_mut_obj_add_val(doc, root, "attributes", at_obj);

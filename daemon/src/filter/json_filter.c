@@ -228,7 +228,7 @@ static av_filter *jnode(jctx *c, yyjson_val *v, int depth)
     static const struct {
         const char *name;
         av_cmp_op op;
-    } cmps[] = {{"eq", AV_OP_EQ}, {"ne", AV_OP_NE}, {"lt", AV_OP_LT},
+    } cmps[] = {{"eq", AV_OP_EQ},  {"ne", AV_OP_NE}, {"lt", AV_OP_LT},
                 {"lte", AV_OP_LE}, {"gt", AV_OP_GT}, {"gte", AV_OP_GE}};
 
     if (opn == 3 && memcmp(op, "and", 3) == 0) {
@@ -294,7 +294,8 @@ static av_filter *jnode(jctx *c, yyjson_val *v, int depth)
                     } else if (is_starts) {
                         if (!yyjson_is_str(fval)) {
                             fail(c, "startswith takes a string prefix");
-                        } else if (!av_value_str(&a, (const uint8_t *) yyjson_get_str(fval), yyjson_get_len(fval))) {
+                        } else if (!av_value_str(&a, (const uint8_t *) yyjson_get_str(fval),
+                                                 yyjson_get_len(fval))) {
                             fail(c, "prefix must be valid UTF-8 of at most 128 bytes");
                         } else {
                             res = built(c, av_fb_startswith(&c->fb, -1, &f, &a, c->e));
@@ -303,7 +304,8 @@ static av_filter *jnode(jctx *c, yyjson_val *v, int depth)
                         av_attr_type t;
                         if (!yyjson_is_str(fval) ||
                             !av_type_from_name(yyjson_get_str(fval), yyjson_get_len(fval), &t)) {
-                            fail(c, "typeof takes a type name (bool, i32, u64, u256, dec, str, addr, key, bytes)");
+                            fail(c, "typeof takes a type name (bool, i32, u64, u256, dec, str, addr, key, "
+                                    "bytes)");
                         } else {
                             res = built(c, av_fb_typeof(&c->fb, -1, &f, t, c->e));
                         }

@@ -89,9 +89,9 @@ static bool scan_cb(uint32_t id, void *p)
     return true;
 }
 
-av_status av_flat_scan(const av_segment *s, const av_docmap *docmap, const void *query,
-                       const av_opclass *oc, const roaring_bitmap_t *cand,
-                       size_t offset, size_t k, av_hit *out, size_t *n_out, av_err *e)
+av_status av_flat_scan(const av_segment *s, const av_docmap *docmap, const void *query, const av_opclass *oc,
+                       const roaring_bitmap_t *cand, size_t offset, size_t k, av_hit *out, size_t *n_out,
+                       av_err *e)
 {
     *n_out = 0;
     if (k == 0)

@@ -409,11 +409,6 @@ typedef struct HnswPageOpaqueData
 
 typedef HnswPageOpaqueData * HnswPageOpaque;
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#endif
-
 typedef struct HnswElementTupleData
 {
 	uint8		type;
@@ -425,10 +420,6 @@ typedef struct HnswElementTupleData
 	uint16		unused;
 	Vector		data;
 }			HnswElementTupleData;
-
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
 
 typedef HnswElementTupleData * HnswElementTuple;
 

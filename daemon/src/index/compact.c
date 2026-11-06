@@ -88,11 +88,7 @@ av_status av_compact_rebuild(av_collection *col, const av_compact_config *cfg, a
         return AV_ERR;
     }
 
-    av_compact_config def_cfg;
-    if (cfg == NULL) {
-        av_compact_config_init(&def_cfg);
-        cfg = &def_cfg;
-    }
+    (void) cfg; /* expiry bands / parallel inserters not implemented yet: single-segment rebuild */
 
     av_collection_read_lock(col);
     const av_segment *old_seg = av_collection_segment(col);
@@ -107,8 +103,8 @@ av_status av_compact_rebuild(av_collection *col, const av_compact_config *cfg, a
     if (def->method == AV_INDEX_HNSW) {
         int m = def->m > 0 ? def->m : 16;
         int ef_c = def->ef_construction > 0 ? def->ef_construction : 64;
-        st = av_segment_create_hnsw(NULL, def->vtype, (int) def->dimensions, def->opclass,
-                                    m, ef_c, 0, &new_seg, e);
+        st = av_segment_create_hnsw(NULL, def->vtype, (int) def->dimensions, def->opclass, m, ef_c, 0,
+                                    &new_seg, e);
     } else {
         st = av_segment_create_flat(NULL, def->vtype, (int) def->dimensions, 0, &new_seg, e);
     }

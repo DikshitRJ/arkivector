@@ -827,8 +827,8 @@ static void send_job(job *j)
         free(hdr);
         free(wc);
         job_free(j);
+        conn_close(c); /* before release: release may free c once it is closing */
         conn_release(c);
-        conn_close(c);
     }
 }
 
@@ -889,7 +889,9 @@ static void done_cb(av_mpsc_wake *w, void *ctx)
             continue;
         }
         send_job(j);
-        conn_release(c); /* the pool's pending reference; the write took its own */
+        /* The pool's pending reference; the write took its own. send_job() may conn_close(c), but that only
+         * starts uv_close: conn_free runs from the close callbacks, so c is still valid here. */
+        conn_release(c); // NOLINT(clang-analyzer-unix.Malloc)
     }
 }
 
@@ -910,7 +912,9 @@ static void respond_problem(job *j, const char *code, int status_override, const
         /* 405: same problem type as route_not_found, status 405 (patch the status member). */
         char *needle = strstr(j->resp.body, "\"status\":404");
         if (needle != NULL) {
-            memcpy(needle + 9, "405", 3);
+            needle[9] = '4';
+            needle[10] = '0';
+            needle[11] = '5';
         }
         j->resp.status = status_override;
     }
@@ -973,7 +977,8 @@ static void dispatch(conn *c)
     }
 
     if (s->ratelimit != NULL && av_ratelimit_is_enabled(s->ratelimit)) {
-        const char *id = req->authorization != NULL ? req->authorization : (c->peer[0] != '\0' ? c->peer : "127.0.0.1");
+        const char *id =
+            req->authorization != NULL ? req->authorization : (c->peer[0] != '\0' ? c->peer : "127.0.0.1");
         int retry_after = 0;
         av_err re;
         av_err_clear(&re);

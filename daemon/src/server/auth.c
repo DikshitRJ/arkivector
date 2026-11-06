@@ -10,6 +10,7 @@
 #include <openssl/crypto.h>
 #include <openssl/sha.h>
 
+#include "core/fileio.h"
 #include "toml.h"
 
 typedef struct av_api_key {
@@ -26,9 +27,12 @@ struct av_auth {
 
 static int hex_val(char c)
 {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
     return -1;
 }
 
@@ -58,9 +62,7 @@ bool av_auth_is_unauthenticated_path(const char *path)
     if (path == NULL) {
         return false;
     }
-    if (strcmp(path, "/healthz") == 0 ||
-        strcmp(path, "/readyz") == 0 ||
-        strcmp(path, "/v1/version") == 0 ||
+    if (strcmp(path, "/healthz") == 0 || strcmp(path, "/readyz") == 0 || strcmp(path, "/v1/version") == 0 ||
         strcmp(path, "/metrics") == 0) {
         return true;
     }
@@ -73,10 +75,8 @@ uint32_t av_auth_required_scope(const char *method, const char *path)
         return AV_AUTH_READ;
     }
 
-    bool is_write_method = (strcmp(method, "POST") == 0 ||
-                            strcmp(method, "PUT") == 0 ||
-                            strcmp(method, "DELETE") == 0 ||
-                            strcmp(method, "PATCH") == 0);
+    bool is_write_method = (strcmp(method, "POST") == 0 || strcmp(method, "PUT") == 0 ||
+                            strcmp(method, "DELETE") == 0 || strcmp(method, "PATCH") == 0);
     if (!is_write_method) {
         return AV_AUTH_READ;
     }
@@ -127,33 +127,12 @@ av_auth *av_auth_create(const char *api_keys_file, av_err *e)
         return a;
     }
 
-    FILE *fp = fopen(api_keys_file, "rb");
-    if (fp == NULL) {
-        av_err_set(e, "internal", "cannot open api_keys_file: %s", api_keys_file);
-        free(a);
-        return NULL;
-    }
-
-    fseek(fp, 0, SEEK_END);
-    long sz = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    if (sz < 0 || sz > 10 * 1024 * 1024) {
-        fclose(fp);
-        av_err_set(e, "invalid_argument", "api_keys_file is too large or invalid");
-        free(a);
-        return NULL;
-    }
-
-    char *buf = malloc((size_t) sz + 1);
+    size_t nread = 0;
+    char *buf = av_read_file(api_keys_file, "api_keys_file", (size_t) 10 * 1024 * 1024, &nread, e);
     if (buf == NULL) {
-        fclose(fp);
-        av_err_set(e, "internal", "out of memory reading api_keys_file");
         free(a);
         return NULL;
     }
-    size_t nread = fread(buf, 1, (size_t) sz, fp);
-    fclose(fp);
-    buf[nread] = '\0';
 
     char errbuf[200];
     toml_table_t *root = toml_parse(buf, errbuf, (int) sizeof(errbuf));
@@ -186,7 +165,8 @@ av_auth *av_auth_create(const char *api_keys_file, av_err *e)
 
         for (int i = 0; i < n; i++) {
             toml_table_t *ktab = toml_table_at(keys_arr, i);
-            if (ktab == NULL) continue;
+            if (ktab == NULL)
+                continue;
 
             toml_datum_t d_id = toml_string_in(ktab, "id");
             if (d_id.ok) {

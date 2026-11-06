@@ -3,6 +3,7 @@
  */
 #include "query/executor.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,7 @@
 #include "codec/base64.h"
 #include "codec/hex.h"
 #include "filter/value.h"
+#include "filter/value_json.h"
 #include "index/flat.h"
 #include "store/schema.h"
 
@@ -19,48 +21,6 @@ static double current_time_ms(void)
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double) ts.tv_sec * 1000.0 + (double) ts.tv_nsec / 1e6;
-}
-
-static yyjson_mut_val *format_typed_val(yyjson_mut_doc *doc, const av_attr *at, av_arena *arena)
-{
-    yyjson_mut_val *obj = yyjson_mut_obj(doc);
-    const char *tname = av_type_name((av_attr_type) at->type);
-    yyjson_mut_obj_add_str(doc, obj, "type", tname);
-
-    if (at->type == AV_AT_BOOL) {
-        bool val = (at->len >= 32 ? (at->val[31] != 0) : (at->len > 0 ? (at->val[0] != 0) : false));
-        yyjson_mut_obj_add_bool(doc, obj, "value", val);
-    } else if (at->type == AV_AT_I32) {
-        av_value v;
-        if (av_value_from_stored(AV_AT_I32, at->val, at->len, &v)) {
-            char buf[64];
-            av_value_format(&v, buf, sizeof(buf));
-            yyjson_mut_obj_add_int(doc, obj, "value", atoi(buf));
-        } else {
-            yyjson_mut_obj_add_int(doc, obj, "value", 0);
-        }
-    } else if (at->type == AV_AT_STR) {
-        yyjson_mut_obj_add_strncpy(doc, obj, "value", (const char *) at->val, at->len);
-    } else if (at->type == AV_AT_BYTES) {
-        char *b64 = NULL;
-        size_t b64_len = 0;
-        av_err e;
-        av_err_clear(&e);
-        if (av_base64_encode(at->val, at->len, arena, &b64, &b64_len, &e) == AV_OK) {
-            yyjson_mut_obj_add_strncpy(doc, obj, "value", b64, b64_len);
-        }
-    } else {
-        /* u64, u256, dec, addr, key formatted as string via av_value_format */
-        av_value v;
-        if (av_value_from_stored((av_attr_type) at->type, at->val, at->len, &v)) {
-            char buf[AV_VALUE_FORMAT_MAX];
-            av_value_format(&v, buf, sizeof(buf));
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", buf);
-        } else {
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", "");
-        }
-    }
-    return obj;
 }
 
 av_status av_execute_search(av_collection *col, av_store *store, const av_search_params *params,
@@ -87,13 +47,15 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
                          av_collection_live_count(col), &plan, e);
 
     size_t n_raw = 0;
-    if ((plan.strategy == AV_STRAT_HNSW || plan.strategy == AV_STRAT_HNSW_ITERATIVE) &&
-        seg != NULL && av_segment_kind(seg) == AV_SEG_HNSW) {
+    if ((plan.strategy == AV_STRAT_HNSW || plan.strategy == AV_STRAT_HNSW_ITERATIVE) && seg != NULL &&
+        av_segment_kind(seg) == AV_SEG_HNSW) {
         int ef_search = params->ef_search > 0 ? params->ef_search : 40;
         if (plan.strategy == AV_STRAT_HNSW_ITERATIVE && plan.selectivity > 0.0) {
             int bumped = (int) ceil(1.5 * (double) k / plan.selectivity);
-            if (bumped > ef_search) ef_search = bumped;
-            if (ef_search > 1000) ef_search = 1000;
+            if (bumped > ef_search)
+                ef_search = bumped;
+            if (ef_search > 1000)
+                ef_search = 1000;
         }
         int iter_mode = 1; /* relaxed_order */
         if (params->iterative_scan != NULL) {
@@ -103,16 +65,19 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
                 iter_mode = 2;
         }
         if (av_segment_search_hnsw(seg, params->query_vec, ef_search, iter_mode,
-                                   (int) params->max_scan_tuples, cand, offset, k, raw_hits, &n_raw, e) != AV_OK) {
+                                   (int) params->max_scan_tuples, cand, offset, k, raw_hits, &n_raw,
+                                   e) != AV_OK) {
             n_raw = 0;
         }
         /* S2 -> S1 fallback when < k */
         if (n_raw < k && (cand == NULL || roaring_bitmap_get_cardinality(cand) > n_raw)) {
             n_raw = 0;
-            (void) av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw, e);
+            (void) av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw,
+                                e);
         }
     } else {
-        if (av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw, e) != AV_OK) {
+        if (av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw, e) !=
+            AV_OK) {
             free(raw_hits);
             return AV_ERR;
         }
@@ -126,7 +91,7 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
     }
 
     out->doc = doc;
-    out->hits = calloc(n_raw, sizeof(av_search_hit));
+    out->hits = calloc(n_raw > 0 ? n_raw : 1, sizeof(av_search_hit));
     if (out->hits == NULL && n_raw > 0) {
         free(raw_hits);
         yyjson_mut_doc_free(doc);
@@ -140,8 +105,11 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
     for (size_t i = 0; i < n_raw; i++) {
         av_hit h = raw_hits[i];
         double distance = h.distance;
-        double score = (params->oc != NULL && strcmp(params->oc->op, "<=>") == 0) ? (1.0 - distance) : (-distance);
+        double score =
+            (params->oc != NULL && strcmp(params->oc->op, "<=>") == 0) ? (1.0 - distance) : (-distance);
 
+        if (isnan(distance))
+            continue; /* zero-norm cosine operands: JSON cannot carry NaN */
         if (params->has_max_distance && distance > params->max_distance)
             continue;
         if (params->has_min_score && score < params->min_score)
@@ -179,24 +147,28 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
                             memcpy(dst->id, at->val, copy_len);
                             dst->id[copy_len] = '\0';
                             dst->has_id = true;
-                        } else if (strcmp(at->name, AV_ATTR_DOC) == 0 && (params->include_flags & AV_INCLUDE_DOCUMENT)) {
+                        } else if (strcmp(at->name, AV_ATTR_DOC) == 0 &&
+                                   (params->include_flags & AV_INCLUDE_DOCUMENT)) {
                             dst->document = malloc(at->len + 1);
                             if (dst->document != NULL) {
                                 memcpy(dst->document, at->val, at->len);
                                 dst->document[at->len] = '\0';
                                 dst->doc_len = at->len;
                             }
-                        } else if (strcmp(at->name, AV_ATTR_VEC) == 0 && (params->include_flags & AV_INCLUDE_VECTOR)) {
+                        } else if (strcmp(at->name, AV_ATTR_VEC) == 0 &&
+                                   (params->include_flags & AV_INCLUDE_VECTOR)) {
                             char *b64 = NULL;
                             size_t b64_len = 0;
                             av_err err;
                             av_err_clear(&err);
-                            if (av_base64_encode(at->val, at->len, row_arena, &b64, &b64_len, &err) == AV_OK) {
+                            if (av_base64_encode(at->val, at->len, row_arena, &b64, &b64_len, &err) ==
+                                AV_OK) {
                                 dst->vector_bytes = strdup(b64);
                             }
-                        } else if (strncmp(at->name, "av.", 3) != 0 && strcmp(at->name, AV_ATTR_SCHEMA) != 0) {
+                        } else if (strncmp(at->name, "av.", 3) != 0 &&
+                                   strcmp(at->name, AV_ATTR_SCHEMA) != 0) {
                             if (params->include_flags & AV_INCLUDE_ATTRIBUTES) {
-                                yyjson_mut_val *tv = format_typed_val(doc, at, row_arena);
+                                yyjson_mut_val *tv = av_attr_to_typed_json(doc, at, row_arena);
                                 yyjson_mut_obj_add_val(doc, attrs_obj, at->name, tv);
                             }
                         }

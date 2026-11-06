@@ -24,7 +24,7 @@
 #include "store/lmdb_store.h"
 
 #define MAX_COLLECTIONS 256
-#define BOOTSTRAP_PAGE 100
+#define BOOTSTRAP_PAGE  100
 
 typedef struct {
     av_collection *c;
@@ -81,7 +81,7 @@ static void set_state(av_sync *s, coll_state *cs, av_sync_state st, const char *
         av_collection_set_bootstrapping(cs->c, (st == AV_SYNC_BOOTSTRAP));
     }
     if (err != NULL) {
-        snprintf(cs->last_error, sizeof(cs->last_error), "%s", err);
+        snprintf(cs->last_error, sizeof(cs->last_error), "%.*s", (int) sizeof(cs->last_error) - 1, err);
     } else if (st == AV_SYNC_LIVE || st == AV_SYNC_CATCH_UP) {
         cs->last_error[0] = '\0';
     }
@@ -109,7 +109,8 @@ static av_status membership_query(const av_coldef *d, char *out, size_t cap, av_
     }
     if (d->membership != AV_MEMBERSHIP_OPEN && d->n_writers > 0) {
         char writers_q[4096];
-        if (av_qb_or_creators(writers_q, sizeof(writers_q), (const uint8_t (*)[20]) d->writers, d->n_writers, e) != AV_OK) {
+        if (av_qb_or_creators(writers_q, sizeof(writers_q), (const uint8_t (*)[20]) d->writers, d->n_writers,
+                              e) != AV_OK) {
             return AV_ERR;
         }
         if (av_qb_and(&qb, e) != AV_OK || av_qb_raw(&qb, writers_q, e) != AV_OK) {
@@ -214,7 +215,7 @@ static av_status fetch_and_apply(av_sync *s, coll_state *cs, av_txn *t, const ke
     while (i < ks->n) {
         size_t n = ks->n - i < (size_t) chunk ? ks->n - i : (size_t) chunk;
         char q[64 * 1024];
-        if (av_qb_or_keys(q, sizeof(q), (const uint8_t (*)[32]) &ks->keys[i], n, e) != AV_OK) {
+        if (av_qb_or_keys(q, sizeof(q), (const uint8_t (*)[32]) & ks->keys[i], n, e) != AV_OK) {
             return AV_ERR;
         }
         keyset found = {0};
@@ -589,7 +590,8 @@ static void step_collection(av_sync *s, coll_state *cs, uint64_t target)
     switch (cs->state) {
     case AV_SYNC_INIT: {
         bool found = false;
-        if (!s->cfg.resync && av_store_get_cursor(s->cfg.store, d->name, &cs->cur, &found, &e) == AV_OK && found) {
+        if (!s->cfg.resync && av_store_get_cursor(s->cfg.store, d->name, &cs->cur, &found, &e) == AV_OK &&
+            found) {
             cs->have_cur = true;
             cs->bootstrapped = true;
             av_collection_publish(cs->c, cs->cur.block); /* restored state is visible again */
@@ -656,7 +658,8 @@ static void step_collection(av_sync *s, coll_state *cs, uint64_t target)
                 return;
             }
         }
-        set_state(s, cs, target - cs->cur.block <= s->cfg.live_lag_blocks ? AV_SYNC_LIVE : AV_SYNC_CATCH_UP, NULL);
+        set_state(s, cs, target - cs->cur.block <= s->cfg.live_lag_blocks ? AV_SYNC_LIVE : AV_SYNC_CATCH_UP,
+                  NULL);
         /* reconciliation */
         if (cs->state == AV_SYNC_LIVE && now >= cs->next_probe) {
             bool mismatch = false;
@@ -742,7 +745,8 @@ static uint64_t observe_head(av_sync *s)
             return h;
         }
     } else {
-        struct timespec ts = {s->cfg.poll_interval_ms / 1000, (long) (s->cfg.poll_interval_ms % 1000) * 1000000L};
+        struct timespec ts = {s->cfg.poll_interval_ms / 1000,
+                              (long) (s->cfg.poll_interval_ms % 1000) * 1000000L};
         nanosleep(&ts, NULL);
     }
     if (av_rpc_block_number(s->cfg.rpc, &h, &e) != AV_OK) {

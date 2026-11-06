@@ -37,8 +37,7 @@ typedef struct {
 /*
  * In D3, always plans AV_STRAT_EXACT_FLAT with exact = true.
  */
-av_status av_plan_query(const av_collection *col, const void *query, const av_opclass *oc,
-                        bool force_exact, const roaring_bitmap_t *cand, size_t live_total,
-                        av_query_plan *out, av_err *e);
+av_status av_plan_query(const av_collection *col, const void *query, const av_opclass *oc, bool force_exact,
+                        const roaring_bitmap_t *cand, size_t live_total, av_query_plan *out, av_err *e);
 
 #endif /* AV_QUERY_PLANNER_H */

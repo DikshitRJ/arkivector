@@ -84,8 +84,8 @@ static void teardown_rest(void *udata)
     (void) system(cmd);
 }
 
-static void dispatch_req(const char *method, const char *path, const char *query,
-                         const char *body, av_http_resp *resp)
+static void dispatch_req(const char *method, const char *path, const char *query, const char *body,
+                         av_http_resp *resp)
 {
     memset(resp, 0, sizeof(*resp));
     av_arena_reset(g_arena);
@@ -123,29 +123,28 @@ TEST test_collections_crud(void)
     free(resp.body);
 
     /* 2. POST /v1/collections with publish_manifest=true -> 403 when signer absent */
-    const char *create_pm =
-        "{"
-        "  \"name\": \"demo.pm\","
-        "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
-        "  \"index\": {\"method\": \"hnsw\", \"opclass\": \"halfvec_cosine_ops\"},"
-        "  \"writers\": [\"0x1111111111111111111111111111111111111111\"],"
-        "  \"publish_manifest\": true"
-        "}";
+    const char *create_pm = "{"
+                            "  \"name\": \"demo.pm\","
+                            "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
+                            "  \"index\": {\"method\": \"hnsw\", \"opclass\": \"halfvec_cosine_ops\"},"
+                            "  \"writers\": [\"0x1111111111111111111111111111111111111111\"],"
+                            "  \"publish_manifest\": true"
+                            "}";
     dispatch_req("POST", "/v1/collections", NULL, create_pm, &resp);
     ASSERT_EQ(403, resp.status);
     ASSERT(strstr(resp.body, "write_disabled") != NULL);
     free(resp.body);
 
     /* 3. POST /v1/collections valid -> 201 */
-    const char *create_valid =
-        "{"
-        "  \"name\": \"demo.docs\","
-        "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
-        "  \"index\": {\"method\": \"hnsw\", \"opclass\": \"halfvec_cosine_ops\", \"with\": {\"m\": 16, \"ef_construction\": 64}},"
-        "  \"writers\": [\"0x1111111111111111111111111111111111111111\"],"
-        "  \"membership\": \"creator\","
-        "  \"attributes\": {\"category\": \"str\", \"score\": \"dec\"}"
-        "}";
+    const char *create_valid = "{"
+                               "  \"name\": \"demo.docs\","
+                               "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
+                               "  \"index\": {\"method\": \"hnsw\", \"opclass\": \"halfvec_cosine_ops\", "
+                               "\"with\": {\"m\": 16, \"ef_construction\": 64}},"
+                               "  \"writers\": [\"0x1111111111111111111111111111111111111111\"],"
+                               "  \"membership\": \"creator\","
+                               "  \"attributes\": {\"category\": \"str\", \"score\": \"dec\"}"
+                               "}";
     dispatch_req("POST", "/v1/collections", NULL, create_valid, &resp);
     ASSERT_EQ(201, resp.status);
     ASSERT(strstr(resp.body, "\"name\":\"demo.docs\"") != NULL);
@@ -196,15 +195,14 @@ TEST test_follow_collection(void)
     av_http_resp resp;
 
     /* Follow with definition */
-    const char *follow_def =
-        "{"
-        "  \"definition\": {"
-        "    \"name\": \"followed.docs\","
-        "    \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
-        "    \"index\": {\"method\": \"hnsw\", \"opclass\": \"halfvec_cosine_ops\"},"
-        "    \"writers\": [\"0x2222222222222222222222222222222222222222\"]"
-        "  }"
-        "}";
+    const char *follow_def = "{"
+                             "  \"definition\": {"
+                             "    \"name\": \"followed.docs\","
+                             "    \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
+                             "    \"index\": {\"method\": \"hnsw\", \"opclass\": \"halfvec_cosine_ops\"},"
+                             "    \"writers\": [\"0x2222222222222222222222222222222222222222\"]"
+                             "  }"
+                             "}";
     dispatch_req("POST", "/v1/collections:follow", NULL, follow_def, &resp);
     ASSERT_EQ(201, resp.status);
     ASSERT(strstr(resp.body, "\"name\":\"followed.docs\"") != NULL);
@@ -222,13 +220,12 @@ TEST test_entities_endpoint(void)
     av_http_resp resp;
 
     /* Setup collection */
-    const char *create_col =
-        "{"
-        "  \"name\": \"ent.col\","
-        "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
-        "  \"index\": {\"method\": \"none\", \"opclass\": \"halfvec_cosine_ops\"},"
-        "  \"writers\": [\"0x1111111111111111111111111111111111111111\"]"
-        "}";
+    const char *create_col = "{"
+                             "  \"name\": \"ent.col\","
+                             "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
+                             "  \"index\": {\"method\": \"none\", \"opclass\": \"halfvec_cosine_ops\"},"
+                             "  \"writers\": [\"0x1111111111111111111111111111111111111111\"]"
+                             "}";
     dispatch_req("POST", "/v1/collections", NULL, create_col, &resp);
     ASSERT_EQ(201, resp.status);
     free(resp.body);
@@ -283,13 +280,12 @@ TEST test_search_and_count(void)
     av_http_resp resp;
 
     /* Setup collection */
-    const char *create_col =
-        "{"
-        "  \"name\": \"search.col\","
-        "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
-        "  \"index\": {\"method\": \"none\", \"opclass\": \"halfvec_cosine_ops\"},"
-        "  \"writers\": [\"0x1111111111111111111111111111111111111111\"]"
-        "}";
+    const char *create_col = "{"
+                             "  \"name\": \"search.col\","
+                             "  \"column\": {\"type\": \"halfvec\", \"dimensions\": 4},"
+                             "  \"index\": {\"method\": \"none\", \"opclass\": \"halfvec_cosine_ops\"},"
+                             "  \"writers\": [\"0x1111111111111111111111111111111111111111\"]"
+                             "}";
     dispatch_req("POST", "/v1/collections", NULL, create_col, &resp);
     ASSERT_EQ(201, resp.status);
     free(resp.body);
@@ -301,12 +297,11 @@ TEST test_search_and_count(void)
     free(resp.body);
 
     /* POST search valid (empty results) */
-    const char *search_req =
-        "{"
-        "  \"vector\": [0.1, 0.2, 0.3, 0.4],"
-        "  \"k\": 5,"
-        "  \"explain\": true"
-        "}";
+    const char *search_req = "{"
+                             "  \"vector\": [0.1, 0.2, 0.3, 0.4],"
+                             "  \"k\": 5,"
+                             "  \"explain\": true"
+                             "}";
     dispatch_req("POST", "/v1/collections/search.col/search", NULL, search_req, &resp);
     ASSERT_EQ(200, resp.status);
     ASSERT(strstr(resp.body, "\"results\":[]") != NULL);
@@ -328,7 +323,8 @@ TEST test_search_and_count(void)
     free(resp.body);
 
     /* POST search:batch (implemented in D4) */
-    dispatch_req("POST", "/v1/collections/search.col/search:batch", NULL, "{\"searches\":[{\"vector\":[0.1,0.2,0.3,0.4]}]}", &resp);
+    dispatch_req("POST", "/v1/collections/search.col/search:batch", NULL,
+                 "{\"searches\":[{\"vector\":[0.1,0.2,0.3,0.4]}]}", &resp);
     ASSERT_EQ(200, resp.status);
     ASSERT(strstr(resp.body, "\"responses\":") != NULL);
     free(resp.body);

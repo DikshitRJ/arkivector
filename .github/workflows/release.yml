@@ -1,73 +1,167 @@
 name: release
 
+# Tag vX.Y.Z (or daemon-vX.Y.Z) to publish:
+#   - GitHub Release: arkivectord linux-x86_64 tarball (libcurl bundled), Python wheel + sdist, npm tarball
+#   - GitHub Packages (npm): @dikshitrj/arkivector-client
+#   - PyPI: trusted publishing from job pypi-publish (environment `pypi`; GitHub Packages has no pip registry)
 on:
   push:
-    tags:
-      - 'daemon-v*'
+    tags: ['v*', 'daemon-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 0.1.0); publishes packages but creates no Release'
+        required: true
 
 permissions:
   contents: write
   packages: write
 
-jobs:
-  build-binaries:
-    name: Build static binary (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: linux-x86_64
-            os: ubuntu-24.04
-          - target: darwin-arm64
-            os: macos-14
+env:
+  CURL_VERSION: '8.23.0'
+  CURL_PREFIX: /opt/curl
 
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      v: ${{ steps.v.outputs.v }}
+    steps:
+      - id: v
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then v="${{ github.event.inputs.version }}"; else
+            v="${GITHUB_REF_NAME#daemon-}"; v="${v#v}"; fi
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+
+  daemon:
+    name: arkivectord linux-x86_64
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build libuv1-dev libssl-dev pkg-config
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install ninja libuv openssl pkg-config
-      - name: Configure and build
+          sudo apt-get install -y --no-install-recommends ninja-build libuv1-dev libssl-dev pkg-config xz-utils patchelf
+      - name: Cache curl
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CURL_PREFIX }}
+          key: curl-${{ env.CURL_VERSION }}-ubuntu-24.04-openssl
+      - name: Build curl >= 8.11 from source
+        run: daemon/tools/ci-install-curl.sh
+      - name: Build
         working-directory: daemon
+        env:
+          PKG_CONFIG_PATH: ${{ env.CURL_PREFIX }}/lib/pkgconfig
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DAV_BUILD_TESTS=OFF -DAV_BUILD_BENCH=OFF
-          cmake --build build --target arkivectord
-          mkdir -p ../dist
-          cp build/arkivectord ../dist/arkivectord-${{ matrix.target }}
+          cmake --preset release -DAV_BUILD_TESTS=OFF -DAV_BUILD_BENCH=OFF
+          cmake --build --preset release --target arkivectord
+      - name: Package (bundle libcurl, RPATH $ORIGIN/../lib)
+        run: |
+          d=arkivectord-${{ needs.version.outputs.v }}-linux-x86_64
+          mkdir -p dist $d/bin $d/lib
+          cp daemon/build/release/arkivectord $d/bin/
+          cp -L $CURL_PREFIX/lib/libcurl.so.4 $d/lib/
+          patchelf --set-rpath '$ORIGIN/../lib' $d/bin/arkivectord
+          strip $d/bin/arkivectord
+          cp daemon/arkivector.example.toml $d/ 2>/dev/null || true
+          cp daemon/src/pgvector/LICENSE.pgvector daemon/src/pgcompat/LICENSE.postgresql $d/
+          $d/bin/arkivectord --version
+          tar -czf dist/$d.tar.gz $d
       - uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.target }}
-          path: dist/arkivectord-${{ matrix.target }}
+          name: daemon
+          path: dist/*
 
-  release:
-    name: Create GitHub Release & SBOM
-    needs: [build-binaries]
+  sdk-python:
+    name: Python SDK (wheel + sdist)
+    needs: version
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        working-directory: sdk/python
+        run: |
+          sed -i "s/^version = .*/version = \"${{ needs.version.outputs.v }}\"/" pyproject.toml
+          pip install build twine
+          python -m build
+          twine check dist/*
+          python -m venv /tmp/t && /tmp/t/bin/pip install dist/*.whl && /tmp/t/bin/python -c "import arkivector; print(arkivector.__name__, 'ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdk-python
+          path: sdk/python/dist/*
+
+  # PyPI trusted publishing (OIDC, no token). PyPI publisher settings must match:
+  #   owner DikshitRJ · repository arkivector · workflow release.yml · environment pypi
+  pypi-publish:
+    name: Publish Python SDK to PyPI
+    needs: sdk-python
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/arkivector
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-python
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true
+
+  sdk-node:
+    name: Node SDK (GitHub Packages)
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@dikshitrj'
+      - name: Build and pack
+        working-directory: sdk/node
+        run: |
+          npm ci
+          npm run build
+          npm pkg set name="@dikshitrj/arkivector-client" version="${{ needs.version.outputs.v }}" \
+            publishConfig.registry="https://npm.pkg.github.com" \
+            repository.type=git repository.url="git+https://github.com/${{ github.repository }}.git"
+          mkdir -p ../../dist && npm pack --pack-destination ../../dist
+      - name: Publish to GitHub Packages
+        working-directory: sdk/node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish || echo "::warning::version already published"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdk-node
+          path: dist/*.tgz
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [daemon, sdk-python, sdk-node]
+    runs-on: ubuntu-24.04
+    steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
-      - name: Generate SHA256SUMS
+      - name: SHA256SUMS
         working-directory: dist
-        run: |
-          sha256sum * > SHA256SUMS
-      - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
+        run: sha256sum * > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
         with:
-          path: dist
-          format: spdx-json
-          output-file: dist/sbom.spdx.json
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*
+          files: dist/*
           generate_release_notes: true

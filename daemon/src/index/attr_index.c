@@ -197,8 +197,8 @@ static av_status oom(av_err *e)
     return AV_ERR;
 }
 
-av_status av_attr_index_insert(av_attr_index *ix, av_docid id, const char *name, uint8_t type, const uint8_t *val,
-                               size_t len, av_err *e)
+av_status av_attr_index_insert(av_attr_index *ix, av_docid id, const char *name, uint8_t type,
+                               const uint8_t *val, size_t len, av_err *e)
 {
     field *f = get_field(ix, name, type);
     nameent *n = get_name(ix, name);
@@ -232,7 +232,7 @@ av_status av_attr_index_insert(av_attr_index *ix, av_docid id, const char *name,
     uint8_t *copy = dup_bytes(val, len);
     if (copy == NULL)
         return oom(e);
-    f->fresh[f->n_fresh++] = (fresh_ent) {copy, len, id};
+    f->fresh[f->n_fresh++] = (fresh_ent){copy, len, id};
     return AV_OK;
 }
 
@@ -258,8 +258,9 @@ static av_status flush_field(field *f, av_err *e)
         if (i == 0 || av_attr_value_cmp(type, f->fresh[i - 1].val, f->fresh[i - 1].len, f->fresh[i].val,
                                         f->fresh[i].len) != 0)
             distinct++;
-    size_t live = f->n - f->n_dead;
-    entry *out = malloc((live + distinct ? live + distinct : 1) * sizeof *out);
+    /* Upper bound: every main entry (dead ones are skipped) plus one posting per distinct fresh value. */
+    size_t cap = f->n + distinct;
+    entry *out = malloc((cap > 0 ? cap : 1) * sizeof *out);
     if (out == NULL)
         return oom(e);
     size_t no = 0, i = 0, j = 0;
@@ -270,8 +271,14 @@ static av_status flush_field(field *f, av_err *e)
         }
         if (i >= f->n && j >= f->n_fresh)
             break;
-        bool take_main = j >= f->n_fresh || (i < f->n && av_attr_value_cmp(type, f->ents[i].val, f->ents[i].len,
-                                                                          f->fresh[j].val, f->fresh[j].len) < 0);
+        bool take_main =
+            j >= f->n_fresh || (i < f->n && av_attr_value_cmp(type, f->ents[i].val, f->ents[i].len,
+                                                              f->fresh[j].val, f->fresh[j].len) < 0);
+        if (no >= cap) { /* unreachable: fresh values are never already in ents */
+            free(out);
+            av_err_set(e, "internal", "attribute index merge overflow");
+            return AV_ERR;
+        }
         if (take_main) {
             out[no++] = f->ents[i++];
             continue;
@@ -296,7 +303,7 @@ static av_status flush_field(field *f, av_err *e)
     free(f->ents);
     f->ents = out;
     f->n = no;
-    f->cap = live + distinct;
+    f->cap = cap;
     f->n_dead = 0;
     f->n_fresh = 0;
     return AV_OK;
@@ -311,8 +318,8 @@ av_status av_attr_index_flush(av_attr_index *ix, av_err *e)
     return AV_OK;
 }
 
-av_status av_attr_index_remove(av_attr_index *ix, av_docid id, const char *name, uint8_t type, const uint8_t *val,
-                               size_t len, av_err *e)
+av_status av_attr_index_remove(av_attr_index *ix, av_docid id, const char *name, uint8_t type,
+                               const uint8_t *val, size_t len, av_err *e)
 {
     field *f = find_field(ix, name, type);
     if (f == NULL)
@@ -354,8 +361,8 @@ const roaring_bitmap_t *av_attr_index_typed(const av_attr_index *ix, const char 
     return f != NULL ? f->typed : NULL;
 }
 
-const roaring_bitmap_t *av_attr_index_eq(const av_attr_index *ix, const char *name, uint8_t type, const uint8_t *val,
-                                         size_t len)
+const roaring_bitmap_t *av_attr_index_eq(const av_attr_index *ix, const char *name, uint8_t type,
+                                         const uint8_t *val, size_t len)
 {
     const field *f = find_field(ix, name, type);
     if (f == NULL)
@@ -365,9 +372,9 @@ const roaring_bitmap_t *av_attr_index_eq(const av_attr_index *ix, const char *na
     return eq ? f->ents[pos].bm : NULL;
 }
 
-void av_attr_index_scan(const av_attr_index *ix, const char *name, uint8_t type, const uint8_t *lo, size_t lo_len,
-                        bool lo_incl, const uint8_t *hi, size_t hi_len, bool hi_incl, av_attr_scan_cb cb,
-                        void *ctx)
+void av_attr_index_scan(const av_attr_index *ix, const char *name, uint8_t type, const uint8_t *lo,
+                        size_t lo_len, bool lo_incl, const uint8_t *hi, size_t hi_len, bool hi_incl,
+                        av_attr_scan_cb cb, void *ctx)
 {
     const field *f = find_field(ix, name, type);
     if (f == NULL)

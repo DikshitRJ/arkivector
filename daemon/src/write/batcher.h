@@ -25,7 +25,6 @@ typedef struct {
 
 /* Pack a slice of operations into batches obeying size and op count limits */
 av_status av_batcher_pack(const av_mutation_op *ops, size_t n_ops, const av_batcher_config *cfg,
-                          av_arena *arena, av_op_batch **out_batches, size_t *out_n_batches,
-                          av_err *e);
+                          av_arena *arena, av_op_batch **out_batches, size_t *out_n_batches, av_err *e);
 
 #endif /* AV_WRITE_BATCHER_H */

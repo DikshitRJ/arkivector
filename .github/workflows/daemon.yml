@@ -59,8 +59,8 @@ jobs:
       - name: Build
         working-directory: daemon
         run: cmake --build --preset dev
-      - name: Install pinned clang-format
-        run: pip install "clang-format==$CLANG_FORMAT_VERSION"
+      - name: Install pinned clang-format and clang-tidy
+        run: pip install "clang-format==$CLANG_FORMAT_VERSION" "clang-tidy==$CLANG_FORMAT_VERSION"
       - name: clang-format check
         working-directory: daemon
         run: tools/format-files.sh | xargs clang-format --dry-run --Werror
@@ -129,9 +129,14 @@ jobs:
       - name: Unit tests (TSan)
         working-directory: daemon
         # TSan cannot map its shadow memory with the runner's vm.mmap_rnd_bits=32
+        # and clang-18's TSan runtime still segfaults at startup under ASLR on the 24.04 runner kernel:
+        # run with address randomization disabled (setarch -R), the documented workaround.
         run: |
           sudo sysctl -w vm.mmap_rnd_bits=28
-          ctest --preset tsan
+          setarch "$(uname -m)" -R ctest --preset tsan --output-on-failure
+      - name: Dev build (daemon binary for integration tests, parity CLI)
+        working-directory: daemon
+        run: cmake --preset dev && cmake --build --preset dev
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -140,10 +145,10 @@ jobs:
       - name: mock-arkiv selftest
         run: python daemon/testkit/mock-arkiv/selftest.py
       - name: Integration tests
+        # AV_REQUIRE_DAEMON=1: a missing binary is a failure, not a skip
+        env:
+          AV_REQUIRE_DAEMON: '1'
         run: pytest -q daemon/test/integration
-      - name: Dev build (parity CLI)
-        working-directory: daemon
-        run: cmake --preset dev && cmake --build --preset dev
       - name: pgvector parity suite (real pgvector 0.8.7)
         run: |
           pip install -r daemon/test/parity/requirements.txt

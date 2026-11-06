@@ -56,7 +56,7 @@ up() {
     echo "$DATA_DIR" > "$PID_DIR/data_dir"
 
     # 1. Start mock-arkiv on port 8545
-    setsid "$PYTHON" "$REPO_ROOT/daemon/testkit/mock-arkiv/server.py" --port 8545 </dev/null > "$PID_DIR/mock.log" 2>&1 &
+    setsid "$PYTHON" "$REPO_ROOT/daemon/testkit/mock-arkiv/server.py" --port 8545 --auto-mine-ms 2000 </dev/null > "$PID_DIR/mock.log" 2>&1 &
     MOCK_PID=$!
     echo "$MOCK_PID" > "$PID_DIR/mock.pid"
 
@@ -116,6 +116,16 @@ EOF
 
     # 5. Post demo collection
     COLL_JSON=$("$PYTHON" -c 'import json, sys; print(json.dumps(json.load(open(sys.argv[1]))["collection"]))' "$REPO_ROOT/spec/fixtures/demo-dataset.json")
+    # With a signer, the daemon's own address must be an allowed writer or its managed writes are not synced.
+    if [ -n "${ARKIV_PRIVATE_KEY:-}" ]; then
+        COLL_JSON=$(COLL_JSON="$COLL_JSON" "$PYTHON" -c '
+import json, os
+from eth_account import Account
+c = json.loads(os.environ["COLL_JSON"])
+addr = Account.from_key(os.environ["ARKIV_PRIVATE_KEY"]).address.lower()
+c["writers"] = sorted(set(w.lower() for w in c.get("writers", [])) | {addr})
+print(json.dumps(c))')
+    fi
     curl -s -X POST "http://127.0.0.1:8080/v1/collections" \
         -H "Content-Type: application/json" \
         -d "$COLL_JSON" >/dev/null 2>&1 || true

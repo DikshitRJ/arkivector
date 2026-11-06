@@ -73,28 +73,29 @@ av_status av_collection_wait_block(av_collection *c, uint64_t min_block, int tim
 /* ---- applier-side mutation API (single thread), applied between begin and publish ---- */
 
 typedef enum {
-    AV_UP_STALE,         /* updated_at older than the stored state: ignored (monotonic rule) */
-    AV_UP_NOT_MEMBER,    /* wrong schema tag or creator/owner not allowed: ignored */
-    AV_UP_REMOVED,       /* no longer a member (or invalid) and was stored: removed */
-    AV_UP_QUARANTINED,   /* malformed / mismatching av.vec: quarantined (and removed if stored) */
-    AV_UP_UNCHANGED,     /* identical state: nothing written */
-    AV_UP_CREATED,       /* new key: new docid */
+    AV_UP_STALE,          /* updated_at older than the stored state: ignored (monotonic rule) */
+    AV_UP_NOT_MEMBER,     /* wrong schema tag or creator/owner not allowed: ignored */
+    AV_UP_REMOVED,        /* no longer a member (or invalid) and was stored: removed */
+    AV_UP_QUARANTINED,    /* malformed / mismatching av.vec: quarantined (and removed if stored) */
+    AV_UP_UNCHANGED,      /* identical state: nothing written */
+    AV_UP_CREATED,        /* new key: new docid */
     AV_UP_VECTOR_CHANGED, /* av.vec hash changed: new docid, old tombstoned */
-    AV_UP_ATTRS_ONLY     /* docid kept, postings / row updated */
+    AV_UP_ATTRS_ONLY      /* docid kept, postings / row updated */
 } av_upsert_outcome;
 
-av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *ent, av_upsert_outcome *outcome,
-                                  av_err *e);
+av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *ent,
+                                  av_upsert_outcome *outcome, av_err *e);
 /* *changed is true for CREATED / VECTOR_CHANGED / ATTRS_ONLY. */
 av_status av_collection_upsert(av_collection *c, av_txn *t, const av_entity *ent, bool *changed, av_err *e);
 /* Unknown keys are ignored (idempotent). Also clears the quarantine entry. */
 av_status av_collection_delete(av_collection *c, av_txn *t, const uint8_t key[32], av_err *e);
-av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32], uint64_t expires_at, av_err *e);
+av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32], uint64_t expires_at,
+                               av_err *e);
 /* Reclaim up to budget entities whose expires_at <= block. budget 0 = default (10000). */
 av_status av_collection_expire(av_collection *c, av_txn *t, uint64_t block, size_t budget, av_err *e);
 /* Under membership=owner a transfer to a non-writer removes the entity. */
-av_status av_collection_transfer(av_collection *c, av_txn *t, const uint8_t key[32], const uint8_t new_owner[20],
-                                 av_err *e);
+av_status av_collection_transfer(av_collection *c, av_txn *t, const uint8_t key[32],
+                                 const uint8_t new_owner[20], av_err *e);
 /* After av_store_commit: apply staged edits under the write lock, swap live, set as_of, broadcast. */
 void av_collection_publish(av_collection *c, uint64_t block);
 /* After av_store_abort (or an applier error): drop staged edits and the working live copy. */
@@ -113,8 +114,8 @@ av_status av_collection_swap_segment(av_collection *c, av_segment *new_seg, av_e
  * Exact search: scores (filter AND live), or all live docids when filter is NULL. The caller
  * holds the read lock. Returns the best k ascending by (distance, docid) in out[0..*n_out).
  */
-av_status av_collection_scan_exact(const av_collection *c, const void *query, const roaring_bitmap_t *filter, size_t k,
-                                   av_hit *out, size_t *n_out, av_err *e);
+av_status av_collection_scan_exact(const av_collection *c, const void *query, const roaring_bitmap_t *filter,
+                                   size_t k, av_hit *out, size_t *n_out, av_err *e);
 
 typedef struct {
     size_t live;
@@ -125,7 +126,8 @@ typedef struct {
 void av_collection_get_stats(av_collection *c, av_collection_stats *out); /* takes the read lock itself */
 
 /* ---- debug routes ---- */
-typedef bool (*av_collection_key_cb)(const uint8_t key[32], uint64_t updated_at, uint64_t expires_at, void *ctx);
+typedef bool (*av_collection_key_cb)(const uint8_t key[32], uint64_t updated_at, uint64_t expires_at,
+                                     void *ctx);
 /* Takes the read lock itself (do not call while holding it). Sorted by key; false from cb stops. */
 void av_collection_each_live(av_collection *c, av_collection_key_cb cb, void *ctx);
 

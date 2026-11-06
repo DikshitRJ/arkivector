@@ -142,10 +142,13 @@ static void count_dropped(void)
 /* Caller holds m->mu. */
 static series *find_series(av_mfamily *m, const char *const *lv, int create)
 {
+    if (m->n_labels > 0 && lv == NULL) {
+        return NULL;
+    }
     for (size_t i = 0; i < m->n_series; i++) {
         series *s = &m->s[i];
         size_t k = 0;
-        while (k < m->n_labels && strcmp(s->labels[k], lv[k]) == 0) {
+        while (k < m->n_labels && s->labels[k] != NULL && lv[k] != NULL && strcmp(s->labels[k], lv[k]) == 0) {
             k++;
         }
         if (k == m->n_labels) {

@@ -143,8 +143,8 @@ static av_status stage_attr(av_collection *c, st_kind kind, av_docid id, const i
     return stage_push(c, &op, e);
 }
 
-static av_status stage_diff(av_collection *c, const ixa *ol, size_t no, av_docid oid, const ixa *nl, size_t nn,
-                            av_docid nid, bool same_doc, av_err *e)
+static av_status stage_diff(av_collection *c, const ixa *ol, size_t no, av_docid oid, const ixa *nl,
+                            size_t nn, av_docid nid, bool same_doc, av_err *e)
 {
     for (size_t i = 0; i < no; i++) {
         bool keep = false;
@@ -281,7 +281,8 @@ static bool load_row(const av_loaded_row *r, void *p)
     av_err_clear(&ve);
     if (av_vb_decode(r->vec, r->vec_len, scratch, &pg, &info, &ve) != AV_OK || info.type != c->def.vtype ||
         info.dim != c->def.dimensions) {
-        av_log(AV_LOG_ERROR, "collection", "%s: stored vector of docid %u is invalid, skipped", c->def.name, id);
+        av_log(AV_LOG_ERROR, "collection", "%s: stored vector of docid %u is invalid, skipped", c->def.name,
+               id);
         return true;
     }
     if (av_segment_insert(c->seg, id, pg, s->e) != AV_OK ||
@@ -339,7 +340,8 @@ av_collection *av_collection_create_opts(const av_coldef *def, av_store *store, 
     c->ttl = av_ttl_create();
     c->scratch = av_arena_create("coll-scratch", (size_t) 1 << 20, 0);
     c->pend = av_arena_create("coll-pend", (size_t) 1 << 16, 0);
-    if (c->docmap == NULL || c->ix == NULL || c->live == NULL || c->ttl == NULL || c->scratch == NULL || c->pend == NULL) {
+    if (c->docmap == NULL || c->ix == NULL || c->live == NULL || c->ttl == NULL || c->scratch == NULL ||
+        c->pend == NULL) {
         (void) oom(e);
         goto fail;
     }
@@ -561,8 +563,8 @@ av_status av_collection_swap_segment(av_collection *c, av_segment *new_seg, av_e
     return AV_OK;
 }
 
-av_status av_collection_scan_exact(const av_collection *c, const void *query, const roaring_bitmap_t *filter, size_t k,
-                                   av_hit *out, size_t *n_out, av_err *e)
+av_status av_collection_scan_exact(const av_collection *c, const void *query, const roaring_bitmap_t *filter,
+                                   size_t k, av_hit *out, size_t *n_out, av_err *e)
 {
     const roaring_bitmap_t *live = av_live_current(c->live);
     roaring_bitmap_t *tmp = NULL;
@@ -622,7 +624,7 @@ static bool live_collect(uint32_t id, void *p)
         c->v = nv;
         c->cap = nc;
     }
-    c->v[c->n++] = (live_ent) {k, u, x};
+    c->v[c->n++] = (live_ent){k, u, x};
     return true;
 }
 
@@ -636,7 +638,7 @@ void av_collection_each_live(av_collection *c, av_collection_key_cb cb, void *ct
     live_ctx lc = {c->docmap, NULL, 0, 0, false};
     av_collection_read_lock(c);
     roaring_iterate(av_live_current(c->live), live_collect, &lc);
-    if (!lc.oom) {
+    if (!lc.oom && lc.n > 0) {
         qsort(lc.v, lc.n, sizeof *lc.v, live_cmp);
         for (size_t i = 0; i < lc.n; i++)
             if (!cb(lc.v[i].key, lc.v[i].updated, lc.v[i].expires, ctx))
@@ -652,7 +654,8 @@ static bool is_member(const av_collection *c, const av_entity *ent)
 {
     const av_attr *tag = find_attr(ent->attrs, ent->n_attrs, AV_ATTR_SCHEMA);
     size_t tl = strlen(c->def.schema_tag);
-    if (tag == NULL || tag->type != AV_AT_STR || tag->len != tl || (tl > 0 && memcmp(tag->val, c->def.schema_tag, tl) != 0))
+    if (tag == NULL || tag->type != AV_AT_STR || tag->len != tl ||
+        (tl > 0 && memcmp(tag->val, c->def.schema_tag, tl) != 0))
         return false;
     switch (c->def.membership) {
     case AV_MEMBERSHIP_OPEN:
@@ -665,8 +668,8 @@ static bool is_member(const av_collection *c, const av_entity *ent)
     return false;
 }
 
-static void fill_row(av_row *r, av_docid id, const av_entity *ent, const uint8_t hash[32], const uint8_t *blob,
-                     size_t blob_len)
+static void fill_row(av_row *r, av_docid id, const av_entity *ent, const uint8_t hash[32],
+                     const uint8_t *blob, size_t blob_len)
 {
     memset(r, 0, sizeof *r);
     r->docid = id;
@@ -685,10 +688,12 @@ static av_status sync_id(av_collection *c, av_txn *t, const av_attr *old_id, con
                          const uint8_t key[32], av_err *e)
 {
     const char *coll = c->def.name;
-    if (old_id != NULL && (new_id == NULL || old_id->len != new_id->len || memcmp(old_id->val, new_id->val, old_id->len) != 0)) {
+    if (old_id != NULL && (new_id == NULL || old_id->len != new_id->len ||
+                           memcmp(old_id->val, new_id->val, old_id->len) != 0)) {
         uint8_t cur[32];
         bool found;
-        if (old_id->len > 0 && av_store_txn_get_id(t, coll, (const char *) old_id->val, old_id->len, cur, &found, e) != AV_OK)
+        if (old_id->len > 0 &&
+            av_store_txn_get_id(t, coll, (const char *) old_id->val, old_id->len, cur, &found, e) != AV_OK)
             return AV_ERR;
         if (old_id->len > 0 && found && memcmp(cur, key, 32) == 0 &&
             av_store_del_id(t, coll, (const char *) old_id->val, old_id->len, e) != AV_OK)
@@ -708,7 +713,8 @@ static av_status remove_row(av_collection *c, av_txn *t, const uint8_t key[32], 
         return AV_ERR;
     ixa *ol;
     size_t no;
-    if (build_ixa(c, oattrs, on, old->owner, old->creator, old->expires_at, c->scratch, &ol, &no, e) != AV_OK ||
+    if (build_ixa(c, oattrs, on, old->owner, old->creator, old->expires_at, c->scratch, &ol, &no, e) !=
+            AV_OK ||
         stage_diff(c, ol, no, old->docid, NULL, 0, 0, false, e) != AV_OK)
         return AV_ERR;
     roaring_bitmap_t *w = av_live_working(c->live);
@@ -727,8 +733,8 @@ static av_status remove_row(av_collection *c, av_txn *t, const uint8_t key[32], 
     return stage_push(c, &op, e);
 }
 
-av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *ent, av_upsert_outcome *outcome,
-                                  av_err *e)
+av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *ent,
+                                  av_upsert_outcome *outcome, av_err *e)
 {
     const char *coll = c->def.name;
     av_arena_reset(c->scratch);
@@ -765,6 +771,8 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
     const char *reason = NULL;
     void *pg = NULL;
     bool same_vec = false;
+    av_err ve; /* function scope: reason may point into ve.vb_error */
+    av_err_clear(&ve);
     if (vec == NULL || vec->type != AV_AT_BYTES) {
         reason = "VEC_MISSING";
     } else {
@@ -773,8 +781,6 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
                    roaring_bitmap_contains(av_live_working(c->live), old.docid);
         if (!same_vec) {
             av_vb_info info;
-            av_err ve;
-            av_err_clear(&ve);
             if (av_vb_decode(vec->val, vec->len, c->scratch, &pg, &info, &ve) != AV_OK)
                 reason = ve.vb_error[0] != '\0' ? ve.vb_error : "VEC_INVALID";
             else if (info.type != c->def.vtype)
@@ -817,12 +823,14 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
     if (have_old) {
         if (same_vec && old.attrs_len == blob_len && memcmp(old.attrs_blob, blob, blob_len) == 0 &&
             memcmp(old.owner, ent->owner, 20) == 0 && memcmp(old.creator, ent->creator, 20) == 0 &&
-            old.created_at == ent->created_at && old.updated_at == ent->updated_at && old.expires_at == ent->expires_at) {
+            old.created_at == ent->created_at && old.updated_at == ent->updated_at &&
+            old.expires_at == ent->expires_at) {
             *outcome = AV_UP_UNCHANGED;
             return AV_OK;
         }
         if (av_attrs_unpack(old.attrs_blob, old.attrs_len, c->scratch, &oattrs, &on, e) != AV_OK ||
-            build_ixa(c, oattrs, on, old.owner, old.creator, old.expires_at, c->scratch, &ol, &no, e) != AV_OK)
+            build_ixa(c, oattrs, on, old.owner, old.creator, old.expires_at, c->scratch, &ol, &no, e) !=
+                AV_OK)
             return AV_ERR;
     }
     if (build_ixa(c, kept, nk, ent->owner, ent->creator, ent->expires_at, c->scratch, &nl, &nn, e) != AV_OK)
@@ -914,8 +922,8 @@ av_status av_collection_delete(av_collection *c, av_txn *t, const uint8_t key[32
 }
 
 /* Replace one system-field posting of a stored row. */
-static av_status restage_sys(av_collection *c, av_docid id, const char *name, uint8_t type, const uint8_t oldw[32],
-                             const uint8_t neww[32], av_err *e)
+static av_status restage_sys(av_collection *c, av_docid id, const char *name, uint8_t type,
+                             const uint8_t oldw[32], const uint8_t neww[32], av_err *e)
 {
     ixa o = {.type = type, .val = oldw, .len = 32}, n = {.type = type, .val = neww, .len = 32};
     (void) snprintf(o.name, sizeof o.name, "%s", name);
@@ -925,7 +933,8 @@ static av_status restage_sys(av_collection *c, av_docid id, const char *name, ui
     return stage_attr(c, ST_ATTR_ADD, id, &n, e);
 }
 
-av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32], uint64_t expires_at, av_err *e)
+av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32], uint64_t expires_at,
+                               av_err *e)
 {
     av_arena_reset(c->scratch);
     av_row row;
@@ -958,8 +967,8 @@ av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32
     return stage_push(c, &op, e);
 }
 
-av_status av_collection_transfer(av_collection *c, av_txn *t, const uint8_t key[32], const uint8_t new_owner[20],
-                                 av_err *e)
+av_status av_collection_transfer(av_collection *c, av_txn *t, const uint8_t key[32],
+                                 const uint8_t new_owner[20], av_err *e)
 {
     av_arena_reset(c->scratch);
     av_row row;

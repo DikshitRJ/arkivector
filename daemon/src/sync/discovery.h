@@ -27,13 +27,13 @@ void av_discovery_destroy(av_discovery *d);
  * avoiding repeated membership queries until it expires.
  */
 void av_discovery_cache_not_mine(av_discovery *d, const char *coll_name, const uint8_t key[32],
-                                uint64_t expires_at);
+                                 uint64_t expires_at);
 
 /*
  * Check if a key is known to be "not mine" in the cache.
  */
 bool av_discovery_is_not_mine(av_discovery *d, const char *coll_name, const uint8_t key[32],
-                             uint64_t current_block);
+                              uint64_t current_block);
 
 /*
  * Filter candidate keys down to those that belong to the collection.
@@ -41,8 +41,7 @@ bool av_discovery_is_not_mine(av_discovery *d, const char *coll_name, const uint
  * to Strategy C (membership probe query).
  */
 av_status av_discovery_filter_keys(av_discovery *d, const av_coldef *coldef, uint64_t block_num,
-                                   const uint8_t (*cand_keys)[32], size_t n_cand,
-                                   uint8_t (*out_keys)[32], size_t *n_out, size_t max_out,
-                                   av_err *e);
+                                   const uint8_t (*cand_keys)[32], size_t n_cand, uint8_t (*out_keys)[32],
+                                   size_t *n_out, size_t max_out, av_err *e);
 
 #endif /* AV_SYNC_DISCOVERY_H */

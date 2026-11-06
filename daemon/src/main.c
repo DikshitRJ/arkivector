@@ -132,7 +132,8 @@ static av_status services_start(const av_config *cfg, av_err *e)
     for (size_t i = 0; i < cfg->n_collections; i++) {
         av_coldef def;
         memset(&def, 0, sizeof(def));
-        if (av_coldef_from_text(cfg->collections_json[i], strlen(cfg->collections_json[i]), parse_arena, false, &def, e) == AV_OK) {
+        if (av_coldef_from_text(cfg->collections_json[i], strlen(cfg->collections_json[i]), parse_arena,
+                                false, &def, e) == AV_OK) {
             av_collection *c = NULL;
             av_err ign;
             av_err_clear(&ign);
@@ -168,7 +169,8 @@ static av_status services_start(const av_config *cfg, av_err *e)
         .confirmations = (uint64_t) (cfg->arkiv.confirmations > 0 ? cfg->arkiv.confirmations : 0),
         .max_log_range = (uint64_t) (cfg->arkiv.max_log_range > 0 ? cfg->arkiv.max_log_range : 2000),
         .poll_interval_ms = (int) (cfg->sync.poll_interval_ms > 0 ? cfg->sync.poll_interval_ms : 1000),
-        .reconcile_interval_s = (int) (cfg->sync.reconcile_interval_s > 0 ? cfg->sync.reconcile_interval_s : 60),
+        .reconcile_interval_s =
+            (int) (cfg->sync.reconcile_interval_s > 0 ? cfg->sync.reconcile_interval_s : 60),
         .sweep_interval_s = 21600,
         .ring_size = (size_t) (cfg->sync.ring_size > 0 ? cfg->sync.ring_size : 32),
         .live_lag_blocks = 2,

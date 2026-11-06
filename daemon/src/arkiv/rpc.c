@@ -729,8 +729,7 @@ av_status av_rpc_count(av_rpc *r, const char *query, uint64_t as_of, uint64_t *o
     yyjson_mut_val *opts = yyjson_mut_obj(md);
     yyjson_mut_val *sel = yyjson_mut_obj(md);
     if (!opts || !sel || !yyjson_mut_obj_add_bool(md, sel, "count", true) ||
-        !yyjson_mut_obj_add_val(md, opts, "select", sel) ||
-        !yyjson_mut_arr_add_val(params, opts)) {
+        !yyjson_mut_obj_add_val(md, opts, "select", sel) || !yyjson_mut_arr_add_val(params, opts)) {
         yyjson_mut_doc_free(md);
         return oom(e);
     }

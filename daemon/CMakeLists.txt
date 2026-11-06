@@ -212,7 +212,9 @@ set(AV_CORE_SOURCES
     src/server/ratelimit.c
     src/server/qdrant.c
     src/server/mcp.c
-    src/sync/discovery.c)
+    src/sync/discovery.c
+    src/core/fileio.c
+    src/filter/value_json.c)
 
 # Build-time generated headers (no runtime JSON reading, no runtime licence file lookup).
 find_package(Python3 REQUIRED COMPONENTS Interpreter)

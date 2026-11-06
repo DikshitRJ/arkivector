@@ -119,7 +119,8 @@ static void handle_tools_list(av_http_resp *resp, yyjson_mut_val *id_val)
     {
         yyjson_mut_val *t = yyjson_mut_obj(tmp);
         yyjson_mut_obj_add_strcpy(tmp, t, "name", "arkivector_search");
-        yyjson_mut_obj_add_strcpy(tmp, t, "description", "Execute vector search with optional metadata filtering.");
+        yyjson_mut_obj_add_strcpy(tmp, t, "description",
+                                  "Execute vector search with optional metadata filtering.");
         yyjson_mut_val *schema = yyjson_mut_obj(tmp);
         yyjson_mut_obj_add_strcpy(tmp, schema, "type", "object");
         yyjson_mut_val *props = yyjson_mut_obj(tmp);
@@ -233,7 +234,7 @@ static void handle_tools_call(const av_http_req *req, av_http_resp *resp, yyjson
         yyjson_mut_val *root = yyjson_mut_obj(doc);
         yyjson_mut_doc_set_root(doc, root);
         yyjson_mut_val *arr = yyjson_mut_arr(doc);
-        mcp_list_acc acc = { doc, arr };
+        mcp_list_acc acc = {doc, arr};
         av_registry_each(reg, mcp_list_cb, &acc);
         yyjson_mut_obj_add_val(doc, root, "collections", arr);
 
@@ -280,8 +281,8 @@ static void handle_tools_call(const av_http_req *req, av_http_resp *resp, yyjson
         av_collection_release(c);
 
         char out[128];
-        snprintf(out, sizeof(out), "{\"count\": %llu, \"as_of_block\": %llu}",
-                 (unsigned long long) cnt, (unsigned long long) as_of);
+        snprintf(out, sizeof(out), "{\"count\": %llu, \"as_of_block\": %llu}", (unsigned long long) cnt,
+                 (unsigned long long) as_of);
         mcp_tool_result(resp, id_val, out, false);
         return;
     }
@@ -336,7 +337,8 @@ static void handle_tools_call(const av_http_req *req, av_http_resp *resp, yyjson
         char khex[67];
         av_key_to_hex(key, khex);
         char out[512];
-        snprintf(out, sizeof(out), "{\"as_of_block\": %llu, \"entity\": {\"key\": \"%s\", \"updated_at_block\": %llu}}",
+        snprintf(out, sizeof(out),
+                 "{\"as_of_block\": %llu, \"entity\": {\"key\": \"%s\", \"updated_at_block\": %llu}}",
                  (unsigned long long) as_of, khex, (unsigned long long) row.updated_at);
         mcp_tool_result(resp, id_val, out, false);
         return;
@@ -388,7 +390,8 @@ static void handle_tools_call(const av_http_req *req, av_http_resp *resp, yyjson
         av_err err;
         av_err_clear(&err);
         void *query_pgvec = NULL;
-        if (av_text_to_pgvec(coldef->vtype, buf, (int32_t) coldef->dimensions, req->arena, &query_pgvec, &err) != AV_OK) {
+        if (av_text_to_pgvec(coldef->vtype, buf, (int32_t) coldef->dimensions, req->arena, &query_pgvec,
+                             &err) != AV_OK) {
             av_collection_release(c);
             mcp_tool_result(resp, id_val, "invalid vector elements", true);
             return;
@@ -398,7 +401,8 @@ static void handle_tools_call(const av_http_req *req, av_http_resp *resp, yyjson
         yyjson_val *kv = yyjson_obj_get(args, "k");
         if (kv != NULL && yyjson_is_int(kv)) {
             int ki = yyjson_get_int(kv);
-            if (ki > 0 && ki <= 50) k = (size_t) ki;
+            if (ki > 0 && ki <= 50)
+                k = (size_t) ki;
         }
 
         av_search_params sp;
@@ -450,10 +454,12 @@ static void handle_tools_call(const av_http_req *req, av_http_resp *resp, yyjson
 }
 
 /* POST /mcp */
-static void h_mcp_post(const av_http_req *req, const char *const *params, size_t n_params,
-                       av_http_resp *resp, void *ctx)
+static void h_mcp_post(const av_http_req *req, const char *const *params, size_t n_params, av_http_resp *resp,
+                       void *ctx)
 {
-    (void) params; (void) n_params; (void) ctx;
+    (void) params;
+    (void) n_params;
+    (void) ctx;
 
     av_err e;
     av_err_clear(&e);
@@ -461,7 +467,8 @@ static void h_mcp_post(const av_http_req *req, const char *const *params, size_t
     if (av_json_parse(req->body, req->body_len, &req_doc, &e) != AV_OK) {
         resp->status = 400;
         resp->content_type = "application/json";
-        resp->body = strdup("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}");
+        resp->body = strdup(
+            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}");
         resp->body_len = strlen(resp->body);
         return;
     }
@@ -508,7 +515,8 @@ static void h_mcp_post(const av_http_req *req, const char *const *params, size_t
 
 void av_rest_register_mcp(av_router *r, bool debug_routes, void *ctx)
 {
-    (void) debug_routes; (void) ctx;
+    (void) debug_routes;
+    (void) ctx;
     av_err e;
     av_err_clear(&e);
     (void) av_router_add(r, "POST", "/mcp", h_mcp_post, NULL, &e);

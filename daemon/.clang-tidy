@@ -13,6 +13,9 @@
 #    and passed to vsnprintf in a helper.
 #  - clang-analyzer-optin.core.EnumCastOutOfRange: tests deliberately pass invalid enum values.
 #  - clang-analyzer-optin.performance.Padding: layout follows the documented field order (small structs).
+#  - multi-level-implicit-pointer-conversion: flags every realloc/qsort/memmove of a T** array through
+#    void *, which is the standard C idiom (clang-tidy >= 18).
+#  - assignment-in-if-condition: LMDB-style error chaining `if ((rc = f()) != 0 || (rc = g()) != 0)`.
 Checks: >-
   -*,
   bugprone-*,
@@ -24,6 +27,8 @@ Checks: >-
   -bugprone-narrowing-conversions,
   -bugprone-implicit-widening-of-multiplication-result,
   -bugprone-misplaced-widening-cast,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -bugprone-assignment-in-if-condition,
   cert-err34-c,
   clang-analyzer-*,
   -clang-analyzer-security.insecureAPI.*,

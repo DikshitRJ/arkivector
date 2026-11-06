@@ -13,6 +13,7 @@ The mock is started with ``sys.executable``, so run pytest from a venv that has
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import urllib.error
@@ -233,6 +234,8 @@ def _free_port() -> int:
 @pytest.fixture
 def daemon(mock_arkiv: MockArkiv) -> Iterator[DaemonClient]:
     if not DAEMON_BIN.exists():
+        if os.environ.get("AV_REQUIRE_DAEMON") == "1":
+            pytest.fail(f"daemon binary missing: {DAEMON_BIN} (AV_REQUIRE_DAEMON=1)")
         pytest.skip(f"daemon binary missing: {DAEMON_BIN}")
 
     port = _free_port()

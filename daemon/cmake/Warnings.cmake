@@ -5,9 +5,13 @@
 #
 # Copied code must compile unmodified, so it never gets our strict set (ARCHITECTURE §5.4).
 
+# We build gnu11 on purpose (CMAKE_C_EXTENSIONS ON). pgvector's HnswPtrAccess and
+# PostgreSQL's relptr_access macros expand to GNU statement expressions inside our
+# code; clang's -Wpedantic flags every such expansion, gcc does not.
 set(AV_STRICT_FLAGS
     -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror
-    -Wformat=2 -Wno-unused-parameter)
+    -Wformat=2 -Wno-unused-parameter
+    $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-gnu-statement-expression-from-macro-expansion>)
 
 # pgvector Makefile: PG_CFLAGS += $(OPTFLAGS) -ftree-vectorize -fassociative-math
 #                    -fno-signed-zeros -fno-trapping-math -ffp-contract=fast

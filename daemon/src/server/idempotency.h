@@ -14,9 +14,9 @@
 typedef struct av_idempotency_store av_idempotency_store;
 
 typedef enum {
-    AV_IDEM_NEW,       /* Key was not seen; current request is the leader */
-    AV_IDEM_REPLAY,    /* Key was previously completed with matching body; replay cached response */
-    AV_IDEM_CONFLICT   /* Key was previously seen or in-flight with DIFFERENT body; return 409 */
+    AV_IDEM_NEW,     /* Key was not seen; current request is the leader */
+    AV_IDEM_REPLAY,  /* Key was previously completed with matching body; replay cached response */
+    AV_IDEM_CONFLICT /* Key was previously seen or in-flight with DIFFERENT body; return 409 */
 } av_idem_action;
 
 typedef struct {
@@ -36,16 +36,12 @@ void av_idempotency_store_destroy(av_idempotency_store *s);
  * If AV_IDEM_REPLAY: caller reads *cached_out and returns immediately.
  * If AV_IDEM_CONFLICT: caller aborts with 409 idempotency_conflict.
  */
-av_status av_idempotency_check(av_idempotency_store *s, const char *key,
-                               const char *method, const char *path,
-                               const char *request_body, size_t request_body_len,
-                               av_idem_action *out_action,
-                               av_idem_cached_response *cached_out,
-                               void **out_handle, av_err *e);
+av_status av_idempotency_check(av_idempotency_store *s, const char *key, const char *method, const char *path,
+                               const char *request_body, size_t request_body_len, av_idem_action *out_action,
+                               av_idem_cached_response *cached_out, void **out_handle, av_err *e);
 
 /* Complete the request: store cached response and wake up any waiting callers */
-void av_idempotency_complete(av_idempotency_store *s, void *handle,
-                             int status_code, const char *content_type,
+void av_idempotency_complete(av_idempotency_store *s, void *handle, int status_code, const char *content_type,
                              const char *resp_body, size_t resp_body_len);
 
 /* Abort the in-flight request on internal error */

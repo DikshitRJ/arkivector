@@ -47,8 +47,8 @@ struct av_segment {
     uint64_t prng_seed;
 };
 
-av_status av_segment_create_flat(const char *path, av_vtype type, int dim, size_t reserve_bytes, av_segment **out,
-                                 av_err *e)
+av_status av_segment_create_flat(const char *path, av_vtype type, int dim, size_t reserve_bytes,
+                                 av_segment **out, av_err *e)
 {
     av_segment *s = calloc(1, sizeof *s);
     if (s == NULL) {
@@ -58,8 +58,8 @@ av_status av_segment_create_flat(const char *path, av_vtype type, int dim, size_
     s->kind = AV_SEG_FLAT;
     s->type = type;
     s->dim = dim;
-    if (av_arena_file_open(path, reserve_bytes ? reserve_bytes : AV_SEG_DEFAULT_RESERVE, AV_AF_TRUNCATE, &s->data, e) !=
-            AV_OK ||
+    if (av_arena_file_open(path, reserve_bytes ? reserve_bytes : AV_SEG_DEFAULT_RESERVE, AV_AF_TRUNCATE,
+                           &s->data, e) != AV_OK ||
         av_arena_file_open(NULL, DEFAULT_MAX_DOCIDS * sizeof(uint64_t), 0, &s->table, e) != AV_OK) {
         av_segment_destroy(s);
         return AV_ERR;
@@ -100,9 +100,8 @@ static size_t estimate_hnsw_reserve(size_t max_vectors, av_vtype type, int dim, 
     return total;
 }
 
-av_status av_segment_create_hnsw(const char *path, av_vtype type, int dim, const av_opclass *oc,
-                                 int m, int ef_construction, size_t reserve_bytes,
-                                 av_segment **out, av_err *e)
+av_status av_segment_create_hnsw(const char *path, av_vtype type, int dim, const av_opclass *oc, int m,
+                                 int ef_construction, size_t reserve_bytes, av_segment **out, av_err *e)
 {
     av_segment *s = calloc(1, sizeof *s);
     if (s == NULL) {
@@ -240,6 +239,11 @@ av_status av_segment_open_sealed(const char *path, av_segment **out, av_err *e)
     }
 
     char *base = (char *) av_arena_file_base(s->data);
+    if (base == NULL) {
+        av_segment_destroy(s);
+        av_err_set(e, "internal", "segment file is not mapped");
+        return AV_ERR;
+    }
     const av_seg_footer *footer = (const av_seg_footer *) (base + sz - sizeof(av_seg_footer));
 
     if (memcmp(footer->magic, AV_SEG_MAGIC, 6) != 0) {
@@ -387,8 +391,10 @@ static av_status av_hnsw_insert(av_segment *s, av_docid id, const void *pgvec, a
         s->max_docid = id;
         s->has_docid_range = true;
     } else {
-        if (id < s->min_docid) s->min_docid = id;
-        if (id > s->max_docid) s->max_docid = id;
+        if (id < s->min_docid)
+            s->min_docid = id;
+        if (id > s->max_docid)
+            s->max_docid = id;
     }
 
     return AV_OK;
@@ -441,9 +447,8 @@ const void *av_segment_get(const av_segment *s, av_docid id)
     return off != 0 ? (const uint8_t *) av_arena_file_base(s->data) + off : NULL;
 }
 
-av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_search,
-                                 int iterative_mode, int max_scan_tuples,
-                                 const roaring_bitmap_t *cand, size_t offset, size_t k,
+av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_search, int iterative_mode,
+                                 int max_scan_tuples, const roaring_bitmap_t *cand, size_t offset, size_t k,
                                  av_hit *out, size_t *n_out, av_err *e)
 {
     *n_out = 0;
@@ -470,9 +475,8 @@ av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_
     av_lwlock_readonly_arena = s->sealed;
 
     HnswSupport supp = s->support;
-    av_status st = av_hnsw_scan_mem(base, s->graph, &supp, s->m, qval, ef_search,
-                                   iterative_mode, max_scan_tuples, cand,
-                                   offset, k, out, n_out, e);
+    av_status st = av_hnsw_scan_mem(base, s->graph, &supp, s->m, qval, ef_search, iterative_mode,
+                                    max_scan_tuples, cand, offset, k, out, n_out, e);
 
     av_lwlock_readonly_arena = prev_ro;
     return st;

@@ -27,12 +27,11 @@ av_status av_tx_sighash(const av_tx_desc *tx, uint8_t out_hash[32], av_err *e);
 
 /* Encode signed transaction: 0x02 || rlp([... yParity, r, s]) */
 av_status av_tx_encode_signed(const av_tx_desc *tx, uint8_t v_parity, const uint8_t r[32],
-                             const uint8_t s[32], av_arena *arena, uint8_t **out_raw,
-                             size_t *out_len, uint8_t out_tx_hash[32], av_err *e);
+                              const uint8_t s[32], av_arena *arena, uint8_t **out_raw, size_t *out_len,
+                              uint8_t out_tx_hash[32], av_err *e);
 
 /* Convenience: sign and encode transaction in one call */
 av_status av_tx_sign_and_encode(const av_tx_desc *tx, const av_signer *signer, av_arena *arena,
-                                uint8_t **out_raw, size_t *out_len, uint8_t out_tx_hash[32],
-                                av_err *e);
+                                uint8_t **out_raw, size_t *out_len, uint8_t out_tx_hash[32], av_err *e);
 
 #endif /* AV_ARKIV_TX_H */

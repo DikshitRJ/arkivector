@@ -36,8 +36,8 @@ struct av_writer {
     av_nonce_tracker *nonce_tracker;
 };
 
-av_writer *av_writer_create(const av_writer_config *cfg, av_signer *signer, av_rpc *rpc,
-                            av_store *store, av_registry *reg, av_err *e)
+av_writer *av_writer_create(const av_writer_config *cfg, av_signer *signer, av_rpc *rpc, av_store *store,
+                            av_registry *reg, av_err *e)
 {
     (void) e;
     av_writer *w = calloc(1, sizeof(*w));
@@ -91,6 +91,89 @@ const uint8_t *av_writer_get_address(const av_writer *w)
     return (w != NULL && w->signer != NULL) ? av_signer_get_address(w->signer) : NULL;
 }
 
+/* One user attribute from JSON: {"type","value"} or a shorthand scalar typed from the schema
+ * (string -> str, boolean -> bool, integer -> i32 when the schema has no entry). Values are
+ * encoded as Arkiv wire bytes: 32-byte words for numeric/bool/addr/key, raw UTF-8 for str,
+ * base64-decoded bytes for bytes. */
+static av_status build_user_attr(const av_coldef *def, const char *name, yyjson_val *jv, av_arena *arena,
+                                 av_attr *out, av_err *e)
+{
+    memset(out, 0, sizeof(*out));
+    if (name == NULL || jv == NULL || strlen(name) > AV_ATTR_NAME_MAX) {
+        av_err_set(e, "invalid_argument", "invalid attribute name");
+        return AV_ERR;
+    }
+    strncpy(out->name, name, sizeof(out->name) - 1);
+
+    av_attr_type t = AV_AT_TOMBSTONE;
+    yyjson_val *vnode = jv;
+    if (yyjson_is_obj(jv)) {
+        const char *ts = yyjson_get_str(yyjson_obj_get(jv, "type"));
+        if (ts == NULL || !av_type_from_name(ts, strlen(ts), &t)) {
+            av_err_set(e, "invalid_argument", "attribute '%s': unknown type", name);
+            return AV_ERR;
+        }
+        vnode = yyjson_obj_get(jv, "value");
+    } else {
+        bool in_schema = false;
+        for (size_t i = 0; i < def->n_attrs && !in_schema; i++) {
+            if (strcmp(def->attrs[i].name, name) == 0) {
+                t = def->attrs[i].type;
+                in_schema = true;
+            }
+        }
+        if (!in_schema)
+            t = yyjson_is_bool(jv) ? AV_AT_BOOL : yyjson_is_int(jv) ? AV_AT_I32 : AV_AT_STR;
+    }
+    out->type = (uint8_t) t;
+    out->indexed = t != AV_AT_BYTES;
+
+    if (t == AV_AT_BYTES) {
+        const char *b64 = yyjson_get_str(vnode);
+        uint8_t *raw = NULL;
+        size_t rl = 0;
+        if (b64 == NULL || av_base64_decode(b64, strlen(b64), arena, &raw, &rl, e) != AV_OK) {
+            av_err_set(e, "invalid_argument", "attribute '%s': bytes must be base64", name);
+            return AV_ERR;
+        }
+        out->val = raw;
+        out->len = rl;
+        return AV_OK;
+    }
+
+    av_value v;
+    const char *why = "invalid value";
+    bool ok = false;
+    if (yyjson_is_str(vnode)) {
+        const char *vs = yyjson_get_str(vnode);
+        ok = av_value_parse(t, vs, strlen(vs), &v, &why);
+    } else if (yyjson_is_bool(vnode) && t == AV_AT_BOOL) {
+        av_value_bool(&v, yyjson_get_bool(vnode));
+        ok = true;
+    } else if (yyjson_is_int(vnode) &&
+               (t == AV_AT_I32 || t == AV_AT_U64 || t == AV_AT_U256 || t == AV_AT_DEC)) {
+        char buf[32];
+        if (yyjson_is_sint(vnode))
+            snprintf(buf, sizeof(buf), "%lld", (long long) yyjson_get_sint(vnode));
+        else
+            snprintf(buf, sizeof(buf), "%llu", (unsigned long long) yyjson_get_uint(vnode));
+        ok = av_value_parse(t, buf, strlen(buf), &v, &why);
+    }
+    if (!ok) {
+        av_err_set(e, "invalid_argument", "attribute '%s' (%s): %s", name, av_type_name(t), why);
+        return AV_ERR;
+    }
+    uint8_t *copy = av_arena_alloc(arena, v.len > 0 ? v.len : 1, 0);
+    if (copy == NULL) {
+        av_err_set(e, "internal", "out of memory");
+        return AV_ERR;
+    }
+    memcpy(copy, v.b, v.len);
+    out->val = copy;
+    out->len = v.len;
+    return AV_OK;
+}
+
 /* Parse TTL object */
 static bool parse_ttl_obj(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *min_lifetime, av_err *e)
 {
@@ -106,7 +189,8 @@ static bool parse_ttl_obj(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *m
 
     int fields_set = (blocks != NULL) + (seconds != NULL) + (days != NULL) + (exp_block != NULL);
     if (fields_set != 1) {
-        av_err_set(e, "invalid_argument", "ttl must have exactly one of blocks, seconds, days, expires_at_block");
+        av_err_set(e, "invalid_argument",
+                   "ttl must have exactly one of blocks, seconds, days, expires_at_block");
         return false;
     }
 
@@ -146,14 +230,35 @@ static bool parse_ttl_obj(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *m
     return true;
 }
 
+/* Collection default_ttl for creates without `ttl` (collections.md: if null, the upsert MUST carry ttl). */
+static bool apply_default_ttl(const av_coldef *def, uint64_t *expires_at, uint64_t *min_lifetime, av_err *e)
+{
+    switch (def->default_ttl.kind) {
+    case AV_TTL_BLOCKS:
+        *min_lifetime = (uint64_t) def->default_ttl.value;
+        return true;
+    case AV_TTL_SECONDS:
+        *min_lifetime = (uint64_t) (def->default_ttl.value / 2.0);
+        return true;
+    case AV_TTL_DAYS:
+        *min_lifetime = (uint64_t) round(def->default_ttl.value * 43200.0);
+        return true;
+    case AV_TTL_EXPIRES_AT:
+        *expires_at = (uint64_t) def->default_ttl.value;
+        return true;
+    default:
+        av_err_set(e, "invalid_argument", "ttl is required: collection '%s' has no default_ttl", def->name);
+        return false;
+    }
+}
+
 bool av_writer_parse_ttl(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *min_lifetime, av_err *e)
 {
     return parse_ttl_obj(ttl_val, expires_at, min_lifetime, e);
 }
 
-static av_status parse_entity_vector(yyjson_val *vec_val, yyjson_val *vb_val,
-                                     const av_coldef *coldef, av_arena *arena,
-                                     uint8_t **out_vecbytes, size_t *out_len, av_err *e)
+static av_status parse_entity_vector(yyjson_val *vec_val, yyjson_val *vb_val, const av_coldef *coldef,
+                                     av_arena *arena, uint8_t **out_vecbytes, size_t *out_len, av_err *e)
 {
     *out_vecbytes = NULL;
     *out_len = 0;
@@ -181,8 +286,9 @@ static av_status parse_entity_vector(yyjson_val *vec_val, yyjson_val *vb_val,
     if (vec_val != NULL && yyjson_is_arr(vec_val)) {
         size_t vdim = yyjson_arr_size(vec_val);
         if (vdim != (size_t) coldef->dimensions) {
-            av_err_set(e, "dimension_mismatch", "vector dimension %zu does not match collection dimension %ld",
-                       vdim, (long) coldef->dimensions);
+            av_err_set(e, "dimension_mismatch",
+                       "vector dimension %zu does not match collection dimension %ld", vdim,
+                       (long) coldef->dimensions);
             return AV_ERR;
         }
         size_t cap = vdim * 32 + 16;
@@ -227,11 +333,10 @@ static av_status parse_entity_vector(yyjson_val *vec_val, yyjson_val *vb_val,
 }
 
 /* Helper to broadcast a batch of transactions and wait for receipts */
-static av_status broadcast_and_wait(av_writer *w, av_collection *col,
-                                    av_op_batch *batches, size_t n_batches,
-                                    av_write_wait_mode wait_mode, int timeout_ms,
-                                    av_arena *arena, char (**out_hashes)[67], size_t *out_n_hashes,
-                                    uint64_t *out_block_number, bool *has_block, av_err *e)
+static av_status broadcast_and_wait(av_writer *w, av_collection *col, av_op_batch *batches, size_t n_batches,
+                                    av_write_wait_mode wait_mode, int timeout_ms, av_arena *arena,
+                                    char (**out_hashes)[67], size_t *out_n_hashes, uint64_t *out_block_number,
+                                    bool *has_block, av_err *e)
 {
     *out_n_hashes = 0;
     *has_block = false;
@@ -282,7 +387,7 @@ static av_status broadcast_and_wait(av_writer *w, av_collection *col,
             raw_hex[1] = 'x';
             static const char hex_digits[] = "0123456789abcdef";
             for (size_t b = 0; b < raw_len; b++) {
-                raw_hex[2 + b * 2]     = hex_digits[(raw_tx[b] >> 4) & 0x0f];
+                raw_hex[2 + b * 2] = hex_digits[(raw_tx[b] >> 4) & 0x0f];
                 raw_hex[2 + b * 2 + 1] = hex_digits[raw_tx[b] & 0x0f];
             }
             raw_hex[2 + raw_len * 2] = '\0';
@@ -293,7 +398,8 @@ static av_status broadcast_and_wait(av_writer *w, av_collection *col,
             yyjson_doc *resp_doc = NULL;
             yyjson_val *resp_val = NULL;
             int rpc_code = 0;
-            av_status st = av_rpc_call(w->rpc, "eth_sendRawTransaction", params_json, &resp_doc, &resp_val, &rpc_code, e);
+            av_status st = av_rpc_call(w->rpc, "eth_sendRawTransaction", params_json, &resp_doc, &resp_val,
+                                       &rpc_code, e);
             if (st != AV_OK)
                 return AV_ERR;
 
@@ -323,7 +429,9 @@ static av_status broadcast_and_wait(av_writer *w, av_collection *col,
                     yyjson_doc *rc_doc = NULL;
                     yyjson_val *rc_val = NULL;
                     int rc_code = 0;
-                    if (av_rpc_call(w->rpc, "eth_getTransactionReceipt", qparams, &rc_doc, &rc_val, &rc_code, e) == AV_OK && rc_doc != NULL) {
+                    if (av_rpc_call(w->rpc, "eth_getTransactionReceipt", qparams, &rc_doc, &rc_val, &rc_code,
+                                    e) == AV_OK &&
+                        rc_doc != NULL) {
                         if (rc_val != NULL && !yyjson_is_null(rc_val)) {
                             yyjson_val *status_val = yyjson_obj_get(rc_val, "status");
                             const char *st_str = yyjson_get_str(status_val);
@@ -376,8 +484,8 @@ static av_status broadcast_and_wait(av_writer *w, av_collection *col,
 }
 
 av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entities_arr,
-                           av_write_wait_mode wait_mode, int timeout_ms,
-                           av_arena *arena, av_upsert_batch_result *out, av_err *e)
+                           av_write_wait_mode wait_mode, int timeout_ms, av_arena *arena,
+                           av_upsert_batch_result *out, av_err *e)
 {
     memset(out, 0, sizeof(*out));
     if (w == NULL || w->signer == NULL) {
@@ -427,8 +535,11 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
         bool has_existing = false;
         av_row existing_row;
         if (id_str != NULL && w->store != NULL) {
-            if (av_store_get_id(w->store, coldef->name, id_str, strlen(id_str), existing_key, &has_existing, e) == AV_OK && has_existing) {
-                (void) av_store_get_entity(w->store, coldef->name, existing_key, arena, &existing_row, &has_existing, e);
+            if (av_store_get_id(w->store, coldef->name, id_str, strlen(id_str), existing_key, &has_existing,
+                                e) == AV_OK &&
+                has_existing) {
+                (void) av_store_get_entity(w->store, coldef->name, existing_key, arena, &existing_row,
+                                           &has_existing, e);
             }
         }
 
@@ -443,6 +554,7 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
         /* Parse TTL */
         uint64_t exp_at = 0, min_life = 0;
         yyjson_val *ttl_val = yyjson_obj_get(ent_val, "ttl");
+        bool has_ttl = ttl_val != NULL;
         if (ttl_val != NULL) {
             if (!parse_ttl_obj(ttl_val, &exp_at, &min_life, e))
                 return AV_ERR;
@@ -459,7 +571,8 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
 
         /* Parse user attributes */
         yyjson_val *attrs_obj = yyjson_obj_get(ent_val, "attributes");
-        size_t n_user_attrs = (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) ? yyjson_obj_size(attrs_obj) : 0;
+        size_t n_user_attrs =
+            (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) ? yyjson_obj_size(attrs_obj) : 0;
         size_t total_attrs = n_user_attrs + 4; /* schema, id, vec, doc */
 
         av_attr *attr_list = av_arena_alloc(arena, total_attrs * sizeof(av_attr), 0);
@@ -505,35 +618,18 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
             a_idx++;
         }
 
-        /* User attributes */
+        /* User attributes (TypedValue or shorthand typed from the collection schema) */
         if (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) {
             yyjson_obj_iter iter;
             yyjson_obj_iter_init(attrs_obj, &iter);
             yyjson_val *key_node = NULL;
             while ((key_node = yyjson_obj_iter_next(&iter)) != NULL) {
-                const char *at_name = yyjson_get_str(key_node);
-                yyjson_val *at_val = yyjson_obj_iter_get_val(key_node);
-                if (at_name != NULL && at_val != NULL && yyjson_is_obj(at_val)) {
-                    strncpy(attr_list[a_idx].name, at_name, sizeof(attr_list[a_idx].name) - 1);
-                    const char *tstr = yyjson_get_str(yyjson_obj_get(at_val, "type"));
-                    attr_list[a_idx].type = AV_AT_STR;
-                    if (tstr != NULL) {
-                        if (strcmp(tstr, "i32") == 0) attr_list[a_idx].type = AV_AT_I32;
-                        else if (strcmp(tstr, "bool") == 0) attr_list[a_idx].type = AV_AT_BOOL;
-                        else if (strcmp(tstr, "u64") == 0) attr_list[a_idx].type = AV_AT_U64;
-                        else if (strcmp(tstr, "u256") == 0) attr_list[a_idx].type = AV_AT_U256;
-                        else if (strcmp(tstr, "dec") == 0) attr_list[a_idx].type = AV_AT_DEC;
-                        else if (strcmp(tstr, "bytes") == 0) attr_list[a_idx].type = AV_AT_BYTES;
-                    }
-                    attr_list[a_idx].indexed = (attr_list[a_idx].type != AV_AT_BYTES);
-                    yyjson_val *vnode = yyjson_obj_get(at_val, "value");
-                    if (yyjson_is_str(vnode)) {
-                        const char *vs = yyjson_get_str(vnode);
-                        attr_list[a_idx].val = (const uint8_t *) vs;
-                        attr_list[a_idx].len = strlen(vs);
-                    }
-                    a_idx++;
-                }
+                if (a_idx >= total_attrs)
+                    break;
+                if (build_user_attr(coldef, yyjson_get_str(key_node), yyjson_obj_iter_get_val(key_node),
+                                    arena, &attr_list[a_idx], e) != AV_OK)
+                    return AV_ERR;
+                a_idx++;
             }
         }
 
@@ -557,14 +653,16 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
             }
         } else {
             /* CREATE */
+            if (!has_ttl && !apply_default_ttl(coldef, &exp_at, &min_life, e))
+                return AV_ERR;
             results[i].op = "create";
             uint8_t salt[16];
             for (int s = 0; s < 16; s++) {
                 salt[s] = (uint8_t) (rand() & 0xff);
             }
 
-            av_abi_predict_entity_key(w->cfg.chain_id, w->cfg.contract_addr, signer_addr,
-                                      create_counter, salt, results[i].key);
+            av_abi_predict_entity_key(w->cfg.chain_id, w->cfg.contract_addr, signer_addr, create_counter,
+                                      salt, results[i].key);
             create_counter++;
 
             ops[n_ops].type = AV_OP_CREATE;
@@ -594,8 +692,8 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
     uint64_t block_number = 0;
     bool has_block = false;
 
-    if (broadcast_and_wait(w, col, batches, n_batches, wait_mode, timeout_ms, arena,
-                           &tx_hashes, &n_tx_hashes, &block_number, &has_block, e) != AV_OK) {
+    if (broadcast_and_wait(w, col, batches, n_batches, wait_mode, timeout_ms, arena, &tx_hashes, &n_tx_hashes,
+                           &block_number, &has_block, e) != AV_OK) {
         return AV_ERR;
     }
 
@@ -632,7 +730,8 @@ av_status av_writer_delete_refs(av_writer *w, av_collection *col, const char *co
         uint8_t key[32];
         if (!av_key_from_hex(refs[i], key)) {
             bool found = false;
-            if (av_store_get_id(w->store, def->name, refs[i], strlen(refs[i]), key, &found, e) != AV_OK || !found) {
+            if (av_store_get_id(w->store, def->name, refs[i], strlen(refs[i]), key, &found, e) != AV_OK ||
+                !found) {
                 av_err_set(e, "entity_not_found", "entity not found: %s", refs[i]);
                 return AV_ERR;
             }
@@ -664,8 +763,8 @@ av_status av_writer_delete_refs(av_writer *w, av_collection *col, const char *co
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena,
-                           &tx_hashes, &n_hashes, &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
+                           &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -691,6 +790,8 @@ av_status av_writer_delete_filter(av_writer *w, av_collection *col, const roarin
         av_err_set(e, "invalid_argument", "filter matches %" PRIu64 " entities, exceeding 10000 cap", card);
         return AV_ERR;
     }
+    if (card == 0)
+        return AV_OK;
 
     const uint8_t *signer_addr = av_signer_get_address(w->signer);
     const av_coldef *def = av_collection_def(col);
@@ -731,8 +832,8 @@ av_status av_writer_delete_filter(av_writer *w, av_collection *col, const roarin
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena,
-                           &tx_hashes, &n_hashes, &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
+                           &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -743,8 +844,8 @@ av_status av_writer_delete_filter(av_writer *w, av_collection *col, const roarin
 }
 
 av_status av_writer_extend_refs(av_writer *w, av_collection *col, const char *const *refs, size_t n_refs,
-                                uint64_t expires_at, uint64_t min_lifetime,
-                                av_arena *arena, av_tx_response *out, av_err *e)
+                                uint64_t expires_at, uint64_t min_lifetime, av_arena *arena,
+                                av_tx_response *out, av_err *e)
 {
     memset(out, 0, sizeof(*out));
     if (w == NULL || w->signer == NULL) {
@@ -768,7 +869,8 @@ av_status av_writer_extend_refs(av_writer *w, av_collection *col, const char *co
         uint8_t key[32];
         if (!av_key_from_hex(refs[i], key)) {
             bool found = false;
-            if (av_store_get_id(w->store, def->name, refs[i], strlen(refs[i]), key, &found, e) != AV_OK || !found) {
+            if (av_store_get_id(w->store, def->name, refs[i], strlen(refs[i]), key, &found, e) != AV_OK ||
+                !found) {
                 av_err_set(e, "entity_not_found", "entity not found: %s", refs[i]);
                 return AV_ERR;
             }
@@ -802,8 +904,8 @@ av_status av_writer_extend_refs(av_writer *w, av_collection *col, const char *co
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena,
-                           &tx_hashes, &n_hashes, &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
+                           &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -814,8 +916,8 @@ av_status av_writer_extend_refs(av_writer *w, av_collection *col, const char *co
 }
 
 av_status av_writer_extend_filter(av_writer *w, av_collection *col, const roaring_bitmap_t *matching,
-                                  uint64_t expires_at, uint64_t min_lifetime,
-                                  av_arena *arena, av_tx_response *out, av_err *e)
+                                  uint64_t expires_at, uint64_t min_lifetime, av_arena *arena,
+                                  av_tx_response *out, av_err *e)
 {
     memset(out, 0, sizeof(*out));
     if (w == NULL || w->signer == NULL) {
@@ -830,6 +932,8 @@ av_status av_writer_extend_filter(av_writer *w, av_collection *col, const roarin
         av_err_set(e, "invalid_argument", "filter matches %" PRIu64 " entities, exceeding 10000 cap", card);
         return AV_ERR;
     }
+    if (card == 0)
+        return AV_OK;
 
     const uint8_t *signer_addr = av_signer_get_address(w->signer);
     const av_coldef *def = av_collection_def(col);
@@ -872,8 +976,8 @@ av_status av_writer_extend_filter(av_writer *w, av_collection *col, const roarin
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena,
-                           &tx_hashes, &n_hashes, &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
+                           &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -884,8 +988,7 @@ av_status av_writer_extend_filter(av_writer *w, av_collection *col, const roarin
 }
 
 av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entities_arr,
-                            const uint8_t from_addr[20], av_arena *arena,
-                            av_prepare_result *out, av_err *e)
+                            const uint8_t from_addr[20], av_arena *arena, av_prepare_result *out, av_err *e)
 {
     memset(out, 0, sizeof(*out));
     if (col == NULL || entities_arr == NULL || !yyjson_is_arr(entities_arr)) {
@@ -927,8 +1030,11 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
         bool has_existing = false;
         av_row existing_row;
         if (id_str != NULL && w->store != NULL) {
-            if (av_store_get_id(w->store, coldef->name, id_str, strlen(id_str), existing_key, &has_existing, e) == AV_OK && has_existing) {
-                (void) av_store_get_entity(w->store, coldef->name, existing_key, arena, &existing_row, &has_existing, e);
+            if (av_store_get_id(w->store, coldef->name, id_str, strlen(id_str), existing_key, &has_existing,
+                                e) == AV_OK &&
+                has_existing) {
+                (void) av_store_get_entity(w->store, coldef->name, existing_key, arena, &existing_row,
+                                           &has_existing, e);
             }
         }
 
@@ -939,6 +1045,7 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
 
         uint64_t exp_at = 0, min_life = 0;
         yyjson_val *ttl_val = yyjson_obj_get(ent_val, "ttl");
+        bool has_ttl = ttl_val != NULL;
         if (ttl_val != NULL) {
             if (!parse_ttl_obj(ttl_val, &exp_at, &min_life, e))
                 return AV_ERR;
@@ -954,7 +1061,8 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
 
         /* Parse user attributes */
         yyjson_val *attrs_obj = yyjson_obj_get(ent_val, "attributes");
-        size_t n_user_attrs = (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) ? yyjson_obj_size(attrs_obj) : 0;
+        size_t n_user_attrs =
+            (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) ? yyjson_obj_size(attrs_obj) : 0;
         size_t total_attrs = n_user_attrs + 4; /* schema, id, vec, doc */
 
         av_attr *attr_list = av_arena_alloc(arena, total_attrs * sizeof(av_attr), 0);
@@ -1000,35 +1108,18 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
             a_idx++;
         }
 
-        /* User attributes */
+        /* User attributes (TypedValue or shorthand typed from the collection schema) */
         if (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) {
             yyjson_obj_iter iter;
             yyjson_obj_iter_init(attrs_obj, &iter);
             yyjson_val *key_node = NULL;
             while ((key_node = yyjson_obj_iter_next(&iter)) != NULL) {
-                const char *at_name = yyjson_get_str(key_node);
-                yyjson_val *at_val = yyjson_obj_iter_get_val(key_node);
-                if (at_name != NULL && at_val != NULL && yyjson_is_obj(at_val)) {
-                    strncpy(attr_list[a_idx].name, at_name, sizeof(attr_list[a_idx].name) - 1);
-                    const char *tstr = yyjson_get_str(yyjson_obj_get(at_val, "type"));
-                    attr_list[a_idx].type = AV_AT_STR;
-                    if (tstr != NULL) {
-                        if (strcmp(tstr, "i32") == 0) attr_list[a_idx].type = AV_AT_I32;
-                        else if (strcmp(tstr, "bool") == 0) attr_list[a_idx].type = AV_AT_BOOL;
-                        else if (strcmp(tstr, "u64") == 0) attr_list[a_idx].type = AV_AT_U64;
-                        else if (strcmp(tstr, "u256") == 0) attr_list[a_idx].type = AV_AT_U256;
-                        else if (strcmp(tstr, "dec") == 0) attr_list[a_idx].type = AV_AT_DEC;
-                        else if (strcmp(tstr, "bytes") == 0) attr_list[a_idx].type = AV_AT_BYTES;
-                    }
-                    attr_list[a_idx].indexed = (attr_list[a_idx].type != AV_AT_BYTES);
-                    yyjson_val *vnode = yyjson_obj_get(at_val, "value");
-                    if (yyjson_is_str(vnode)) {
-                        const char *vs = yyjson_get_str(vnode);
-                        attr_list[a_idx].val = (const uint8_t *) vs;
-                        attr_list[a_idx].len = strlen(vs);
-                    }
-                    a_idx++;
-                }
+                if (a_idx >= total_attrs)
+                    break;
+                if (build_user_attr(coldef, yyjson_get_str(key_node), yyjson_obj_iter_get_val(key_node),
+                                    arena, &attr_list[a_idx], e) != AV_OK)
+                    return AV_ERR;
+                a_idx++;
             }
         }
 
@@ -1050,14 +1141,16 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
                 n_ops++;
             }
         } else {
+            if (!has_ttl && !apply_default_ttl(coldef, &exp_at, &min_life, e))
+                return AV_ERR;
             results[i].op = "create";
             uint8_t salt[16];
             for (int s = 0; s < 16; s++) {
                 salt[s] = (uint8_t) (rand() & 0xff);
             }
 
-            av_abi_predict_entity_key(w->cfg.chain_id, w->cfg.contract_addr, from_addr,
-                                      create_counter, salt, results[i].key);
+            av_abi_predict_entity_key(w->cfg.chain_id, w->cfg.contract_addr, from_addr, create_counter, salt,
+                                      results[i].key);
             create_counter++;
 
             ops[n_ops].type = AV_OP_CREATE;
@@ -1101,7 +1194,7 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
         hex_str[1] = 'x';
         static const char hex_chars[] = "0123456789abcdef";
         for (size_t j = 0; j < c_len; j++) {
-            hex_str[2 + j * 2]     = hex_chars[(batches[b].calldata[j] >> 4) & 0x0f];
+            hex_str[2 + j * 2] = hex_chars[(batches[b].calldata[j] >> 4) & 0x0f];
             hex_str[2 + j * 2 + 1] = hex_chars[batches[b].calldata[j] & 0x0f];
         }
         hex_str[2 + c_len * 2] = '\0';
