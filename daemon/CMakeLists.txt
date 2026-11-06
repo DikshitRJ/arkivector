@@ -21,6 +21,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 option(AV_NATIVE "Compile kernels once with -march=native (pgvector default)" OFF)
 option(AV_BUILD_TESTS "Build unit tests" ON)
+option(AV_BUILD_BENCH "Build micro-benchmarks (av_kernels_bench)" ON)
 
 include(Warnings)
 include(Sanitizers)
@@ -165,6 +166,11 @@ av_strict(av_core)
 # ---------------------------------------------------------------------------
 # arkivectord
 # ---------------------------------------------------------------------------
+if(AV_BUILD_BENCH)
+  add_executable(av_kernels_bench bench/kernels_bench.c)
+  target_link_libraries(av_kernels_bench PRIVATE av_core)
+endif()
+
 add_executable(arkivectord src/main.c)
 target_link_libraries(arkivectord PRIVATE av_core)
 av_strict(arkivectord)
