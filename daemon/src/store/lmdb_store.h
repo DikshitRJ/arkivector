@@ -80,6 +80,14 @@ typedef struct {
     uint64_t block;
     uint8_t hash[32];
 } av_cursor;
+
+typedef struct {
+    uint64_t block;
+    uint8_t hash[32];
+    uint8_t (*keys)[32];
+    size_t n_keys;
+} av_ring_entry;
+
 av_status av_store_put_cursor(av_txn *t, const char *coll, const av_cursor *c, av_err *e);
 av_status av_store_get_cursor(av_store *s, const char *coll, av_cursor *c, bool *found, av_err *e);
 av_status av_store_ring_put(av_txn *t, const char *coll, uint64_t block, const uint8_t hash[32],
@@ -87,6 +95,9 @@ av_status av_store_ring_put(av_txn *t, const char *coll, uint64_t block, const u
 /* *keys is arena memory (n_keys entries). found=false when the block is not in the ring. */
 av_status av_store_ring_get(av_store *s, const char *coll, uint64_t block, uint8_t hash[32], av_arena *a,
                             uint8_t (**keys)[32], size_t *n_keys, bool *found, av_err *e);
+/* Lists ring entries newest-first. entries and their keys are allocated in arena a. */
+av_status av_store_ring_list(av_store *s, const char *coll, av_arena *a, av_ring_entry **out, size_t *n_out,
+                            av_err *e);
 /* Keep only the newest keep_last blocks. */
 av_status av_store_ring_trim(av_txn *t, const char *coll, size_t keep_last, av_err *e);
 /* Delete all ring entries with block > from_block (after a reorg reset). */

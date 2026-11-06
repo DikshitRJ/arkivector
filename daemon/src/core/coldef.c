@@ -270,7 +270,7 @@ static av_status parse_index(yyjson_val *ix, av_coldef *d, av_err *e)
     return AV_OK;
 }
 
-static av_status parse_ttl(yyjson_val *t, av_ttl *out, av_err *e)
+static av_status parse_ttl(yyjson_val *t, av_col_ttl *out, av_err *e)
 {
     if (yyjson_is_null(t)) {
         out->kind = AV_TTL_NONE;

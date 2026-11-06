@@ -22,6 +22,7 @@
 #include "index/live.h"
 #include "store/checkpoint.h"
 #include "store/schema.h"
+#include "sync/ttl.h"
 
 typedef enum { ST_ASSIGN, ST_UNMAP, ST_META, ST_ATTR_ADD, ST_ATTR_DEL } st_kind;
 
@@ -62,6 +63,7 @@ struct av_collection {
     av_attr_index *ix;
     av_live *live;
     av_segment *seg;
+    av_ttl *ttl;
 
     /* applier-private */
     uint32_t next_docid;
@@ -286,6 +288,8 @@ static bool load_row(const av_loaded_row *r, void *p)
         s->st = AV_ERR;
         return false;
     }
+    if (r->row.expires_at > 0)
+        (void) av_ttl_set(c->ttl, id, r->row.expires_at);
     roaring_bitmap_add(av_live_working(c->live), id);
     ixa *l;
     size_t n;
@@ -331,9 +335,10 @@ av_collection *av_collection_create_opts(const av_coldef *def, av_store *store, 
     c->docmap = av_docmap_create();
     c->ix = av_attr_index_create();
     c->live = av_live_create();
+    c->ttl = av_ttl_create();
     c->scratch = av_arena_create("coll-scratch", (size_t) 1 << 20, 0);
     c->pend = av_arena_create("coll-pend", (size_t) 1 << 16, 0);
-    if (c->docmap == NULL || c->ix == NULL || c->live == NULL || c->scratch == NULL || c->pend == NULL) {
+    if (c->docmap == NULL || c->ix == NULL || c->live == NULL || c->ttl == NULL || c->scratch == NULL || c->pend == NULL) {
         (void) oom(e);
         goto fail;
     }
@@ -398,6 +403,7 @@ void av_collection_release(av_collection *c)
     av_docmap_destroy(c->docmap);
     av_attr_index_destroy(c->ix);
     av_live_destroy(c->live);
+    av_ttl_destroy(c->ttl);
     av_arena_destroy(c->scratch);
     av_arena_destroy(c->pend);
     free(c->ops);
@@ -426,6 +432,14 @@ const av_coldef *av_collection_def(const av_collection *c)
 uint64_t av_collection_as_of(const av_collection *c)
 {
     return atomic_load_explicit(&c->as_of, memory_order_acquire);
+}
+
+bool av_collection_has_key(const av_collection *c, const uint8_t key[32])
+{
+    if (c == NULL || c->docmap == NULL)
+        return false;
+    av_docid id = 0;
+    return av_docmap_lookup(c->docmap, key, &id);
 }
 
 void av_collection_read_lock(av_collection *c)
@@ -671,6 +685,8 @@ static av_status remove_row(av_collection *c, av_txn *t, const uint8_t key[32], 
     if (w == NULL)
         return oom(e);
     roaring_bitmap_remove(w, old->docid);
+    if (c->ttl != NULL)
+        av_ttl_remove(c->ttl, old->docid);
     if (av_store_del_entity(t, c->def.name, key, e) != AV_OK ||
         sync_id(c, t, find_attr(oattrs, on, AV_ATTR_ID), NULL, key, e) != AV_OK)
         return AV_ERR;
@@ -798,6 +814,12 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
         op.expires = ent->expires_at;
         if (stage_push(c, &op, e) != AV_OK)
             return AV_ERR;
+        if (c->ttl != NULL) {
+            if (ent->expires_at > 0)
+                (void) av_ttl_set(c->ttl, old.docid, ent->expires_at);
+            else
+                av_ttl_remove(c->ttl, old.docid);
+        }
         *outcome = AV_UP_ATTRS_ONLY;
         return AV_OK;
     }
@@ -813,9 +835,14 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
     roaring_bitmap_t *w = av_live_working(c->live);
     if (w == NULL)
         return oom(e);
-    if (have_old)
+    if (have_old) {
         roaring_bitmap_remove(w, old.docid);
+        if (c->ttl != NULL)
+            av_ttl_remove(c->ttl, old.docid);
+    }
     roaring_bitmap_add(w, id);
+    if (c->ttl != NULL && ent->expires_at > 0)
+        (void) av_ttl_set(c->ttl, id, ent->expires_at);
     fill_row(&row, id, ent, hash, blob, blob_len);
     if (stage_diff(c, ol, no, have_old ? old.docid : 0, nl, nn, id, false, e) != AV_OK ||
         av_store_put_entity(t, coll, ent->key, &row, e) != AV_OK ||
@@ -892,6 +919,12 @@ av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32
     op.id = row.docid;
     op.updated = row.updated_at;
     op.expires = expires_at;
+    if (c->ttl != NULL) {
+        if (expires_at > 0)
+            (void) av_ttl_set(c->ttl, row.docid, expires_at);
+        else
+            av_ttl_remove(c->ttl, row.docid);
+    }
     return stage_push(c, &op, e);
 }
 
@@ -915,4 +948,31 @@ av_status av_collection_transfer(av_collection *c, av_txn *t, const uint8_t key[
     if (av_store_put_entity(t, c->def.name, key, &row, e) != AV_OK)
         return AV_ERR;
     return same ? AV_OK : restage_sys(c, row.docid, "$owner", AV_AT_ADDR, ow, nw, e);
+}
+
+av_status av_collection_expire(av_collection *c, av_txn *t, uint64_t block, size_t budget, av_err *e)
+{
+    if (c == NULL || c->ttl == NULL)
+        return AV_OK;
+    if (budget == 0)
+        budget = 10000;
+    uint32_t docids[256];
+    size_t total = 0;
+    while (total < budget) {
+        size_t batch = budget - total < 256 ? budget - total : 256;
+        size_t popped = av_ttl_pop_expired(c->ttl, block, docids, batch);
+        if (popped == 0)
+            break;
+        for (size_t i = 0; i < popped; i++) {
+            const uint8_t *k = av_docmap_key(c->docmap, docids[i]);
+            if (k != NULL) {
+                if (av_collection_delete(c, t, k, e) != AV_OK)
+                    return AV_ERR;
+            }
+        }
+        total += popped;
+        if (popped < batch)
+            break;
+    }
+    return AV_OK;
 }

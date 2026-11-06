@@ -62,6 +62,7 @@ void av_collection_mark_dropped(av_collection *c);
 
 const av_coldef *av_collection_def(const av_collection *c);
 uint64_t av_collection_as_of(const av_collection *c);
+bool av_collection_has_key(const av_collection *c, const uint8_t key[32]);
 void av_collection_read_lock(av_collection *c);
 void av_collection_read_unlock(av_collection *c);
 /* Block until as_of_block >= min_block; consistency_timeout (e->as_of_block set) after timeout_ms. */
@@ -87,6 +88,8 @@ av_status av_collection_upsert(av_collection *c, av_txn *t, const av_entity *ent
 /* Unknown keys are ignored (idempotent). Also clears the quarantine entry. */
 av_status av_collection_delete(av_collection *c, av_txn *t, const uint8_t key[32], av_err *e);
 av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32], uint64_t expires_at, av_err *e);
+/* Reclaim up to budget entities whose expires_at <= block. budget 0 = default (10000). */
+av_status av_collection_expire(av_collection *c, av_txn *t, uint64_t block, size_t budget, av_err *e);
 /* Under membership=owner a transfer to a non-writer removes the entity. */
 av_status av_collection_transfer(av_collection *c, av_txn *t, const uint8_t key[32], const uint8_t new_owner[20],
                                  av_err *e);

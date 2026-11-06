@@ -33,7 +33,7 @@ typedef enum { AV_TTL_NONE = 0, AV_TTL_BLOCKS, AV_TTL_SECONDS, AV_TTL_DAYS, AV_T
 typedef struct {
     av_ttl_kind kind;
     double value; /* blocks / seconds / days / absolute block */
-} av_ttl;
+} av_col_ttl;
 
 typedef struct {
     char name[AV_COLL_NAME_MAX + 1];
@@ -49,7 +49,7 @@ typedef struct {
     av_membership membership;
     av_schema_attr *attrs;
     size_t n_attrs;
-    av_ttl default_ttl;
+    av_col_ttl default_ttl;
     bool publish_manifest;
     char model[129];
     av_coll_mode mode;

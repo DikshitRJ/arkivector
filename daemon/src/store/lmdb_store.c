@@ -86,6 +86,14 @@ static void put_be64(uint8_t *p, uint64_t v)
         p[i] = (uint8_t) (v >> (56 - 8 * i));
 }
 
+static uint64_t get_be64(const uint8_t *p)
+{
+    uint64_t v = 0;
+    for (int i = 0; i < 8; i++)
+        v = (v << 8) | (uint64_t) p[i];
+    return v;
+}
+
 static bool name_ok(const char *name, av_err *e)
 {
     if (name == NULL || name[0] == '\0' || strlen(name) + 1 > NAME_CAP) {
@@ -923,6 +931,83 @@ av_status av_store_ring_get(av_store *s, const char *coll, uint64_t block, uint8
     }
     mdb_txn_abort(txn);
     return st;
+}
+
+av_status av_store_ring_list(av_store *s, const char *coll, av_arena *a, av_ring_entry **out, size_t *n_out,
+                            av_err *e)
+{
+    coll_dbs d;
+    if (get_dbs(s, NULL, coll, &d, e) != AV_OK)
+        return AV_ERR;
+    MDB_txn *txn;
+    int rc = mdb_txn_begin(s->env, NULL, MDB_RDONLY, &txn);
+    if (rc != 0)
+        return mdb_fail(e, "txn_begin", rc);
+    MDB_stat stt;
+    rc = mdb_stat(txn, d.dbi[DB_RING], &stt);
+    if (rc != 0) {
+        mdb_txn_abort(txn);
+        return mdb_fail(e, "stat", rc);
+    }
+    if (stt.ms_entries == 0) {
+        mdb_txn_abort(txn);
+        *out = NULL;
+        *n_out = 0;
+        return AV_OK;
+    }
+    av_ring_entry *entries = av_arena_alloc(a, sizeof(av_ring_entry) * stt.ms_entries, _Alignof(av_ring_entry));
+    if (entries == NULL) {
+        mdb_txn_abort(txn);
+        av_err_set(e, "internal", "arena exhausted");
+        return AV_ERR;
+    }
+    MDB_cursor *cur;
+    rc = mdb_cursor_open(txn, d.dbi[DB_RING], &cur);
+    if (rc != 0) {
+        mdb_txn_abort(txn);
+        return mdb_fail(e, "cursor_open", rc);
+    }
+    MDB_val k, v;
+    size_t count = 0;
+    rc = mdb_cursor_get(cur, &k, &v, MDB_LAST);
+    while (rc == 0 && count < stt.ms_entries) {
+        if (k.mv_size != 8 || v.mv_size < 36) {
+            mdb_cursor_close(cur);
+            mdb_txn_abort(txn);
+            return corrupt(e, "ring entry format");
+        }
+        uint64_t blk = get_be64(k.mv_data);
+        const uint8_t *b = v.mv_data;
+        size_t nk = get_le32(b + 32);
+        if (v.mv_size != 36 + nk * 32) {
+            mdb_cursor_close(cur);
+            mdb_txn_abort(txn);
+            return corrupt(e, "ring entry key length");
+        }
+        entries[count].block = blk;
+        memcpy(entries[count].hash, b, 32);
+        entries[count].n_keys = nk;
+        if (nk > 0) {
+            uint8_t (*ks)[32] = av_arena_alloc(a, nk * 32, 8);
+            if (ks == NULL) {
+                mdb_cursor_close(cur);
+                mdb_txn_abort(txn);
+                av_err_set(e, "internal", "arena exhausted");
+                return AV_ERR;
+            }
+            memcpy(ks, b + 36, nk * 32);
+            entries[count].keys = ks;
+        } else {
+            entries[count].keys = NULL;
+        }
+        count++;
+        rc = mdb_cursor_get(cur, &k, &v, MDB_PREV);
+    }
+    mdb_cursor_close(cur);
+    mdb_txn_abort(txn);
+    *out = entries;
+    *n_out = count;
+    return AV_OK;
 }
 
 av_status av_store_ring_trim(av_txn *t, const char *coll, size_t keep_last, av_err *e)

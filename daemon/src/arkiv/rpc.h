@@ -92,6 +92,9 @@ typedef struct {
 av_status av_rpc_query(av_rpc *r, const char *query, const char *cursor, int limit, bool key_only,
                        av_arena *a, av_query_page *out, int *rpc_code, av_err *e);
 
+/* arkiv_query with select.count: true (headless count). */
+av_status av_rpc_count(av_rpc *r, const char *query, uint64_t as_of, uint64_t *out_count, av_err *e);
+
 /* arkiv_getEntity. *found = false (AV_OK) when the node returns null (absent or expired). */
 av_status av_rpc_get_entity(av_rpc *r, const uint8_t key[32], av_arena *a, av_entity *out, bool *found,
                             av_err *e);

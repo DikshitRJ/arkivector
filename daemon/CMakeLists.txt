@@ -157,6 +157,7 @@ set(AV_CORE_SOURCES
     src/codec/hex.c
     src/codec/base64.c
     src/sync/ttl.c
+    src/sync/syncer.c
     src/arkiv/rlp.c
     src/arkiv/keccak.c
     src/arkiv/entity.c

@@ -709,3 +709,61 @@ av_status av_rpc_get_logs(av_rpc *r, uint64_t from, uint64_t to, const char *top
     yyjson_doc_free(d);
     return st;
 }
+
+av_status av_rpc_count(av_rpc *r, const char *query, uint64_t as_of, uint64_t *out_count, av_err *e)
+{
+    (void) as_of;
+    if (r == NULL || out_count == NULL) {
+        av_err_set(e, "invalid_argument", "null rpc or out_count pointer");
+        return AV_ERR;
+    }
+    yyjson_mut_doc *md = yyjson_mut_doc_new(NULL);
+    if (md == NULL)
+        return oom(e);
+    yyjson_mut_val *params = yyjson_mut_arr(md);
+    yyjson_mut_doc_set_root(md, params);
+    if (!yyjson_mut_arr_add_strcpy(md, params, query != NULL ? query : "")) {
+        yyjson_mut_doc_free(md);
+        return oom(e);
+    }
+    yyjson_mut_val *opts = yyjson_mut_obj(md);
+    yyjson_mut_val *sel = yyjson_mut_obj(md);
+    if (!opts || !sel || !yyjson_mut_obj_add_bool(md, sel, "count", true) ||
+        !yyjson_mut_obj_add_val(md, opts, "select", sel) ||
+        !yyjson_mut_arr_add_val(params, opts)) {
+        yyjson_mut_doc_free(md);
+        return oom(e);
+    }
+    char *pj = mut_json(md);
+    if (pj == NULL)
+        return oom(e);
+
+    yyjson_doc *d = NULL;
+    yyjson_val *res = NULL;
+    int rpc_code = 0;
+    av_status st = av_rpc_call(r, "arkiv_query", pj, &d, &res, &rpc_code, e);
+    free(pj);
+    if (st != AV_OK)
+        return AV_ERR;
+
+    yyjson_val *cnt_val = yyjson_obj_get(res, "count");
+    if (cnt_val == NULL) {
+        yyjson_doc_free(d);
+        av_err_set(e, "arkiv_rpc_error", "missing count field in arkiv_query response");
+        return AV_ERR;
+    }
+
+    uint64_t count = 0;
+    if (yyjson_is_str(cnt_val)) {
+        const char *s = yyjson_get_str(cnt_val);
+        if (strncmp(s, "0x", 2) == 0 || strncmp(s, "0X", 2) == 0)
+            count = strtoull(s + 2, NULL, 16);
+        else
+            count = strtoull(s, NULL, 10);
+    } else if (yyjson_is_uint(cnt_val)) {
+        count = yyjson_get_uint(cnt_val);
+    }
+    yyjson_doc_free(d);
+    *out_count = count;
+    return AV_OK;
+}

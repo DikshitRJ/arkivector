@@ -23,6 +23,12 @@
 #include "server/rest.h"
 #include "server/router.h"
 #include "version.h"
+#include "arkiv/rpc.h"
+#include "core/coldef.h"
+#include "core/collection.h"
+#include "core/registry.h"
+#include "store/lmdb_store.h"
+#include "sync/syncer.h"
 
 typedef struct {
     const char *config_path;
@@ -98,22 +104,99 @@ static int parse_args(int argc, char **argv, cli_opts *o)
 
 /* ---- hooks for Lane D (store, registry, sync) ---- */
 
-/*
- * TODO(Lane D): open the LMDB store in cfg->storage.data_dir, load the registry (stored
- * collections plus cfg->collections_json), start the sync engine, call av_rest_set_sync_provider,
- * av_rest_set_ready, av_rest_set_info (writes_enabled) and av_rest_add_registrar for the routes
- * of each module. When cfg->resync is set, discard the stored cursors first.
- */
+static av_store *g_store = NULL;
+static av_registry *g_registry = NULL;
+static av_rpc *g_rpc = NULL;
+static av_sync *g_sync = NULL;
+
 static av_status services_start(const av_config *cfg, av_err *e)
 {
-    (void) e;
     av_rest_set_info(cfg->arkiv.chain_id, false);
+
+    /* 1. Open LMDB store */
+    size_t map_size = cfg->storage.map_size > 0 ? (size_t) cfg->storage.map_size : 0;
+    if (av_store_open(cfg->storage.data_dir, map_size, &g_store, e) != AV_OK)
+        return AV_ERR;
+
+    /* 2. Load registry */
+    g_registry = av_registry_create(g_store, cfg->storage.data_dir, e);
+    if (g_registry == NULL)
+        return AV_ERR;
+
+    /* 3. Register configured static collections if any */
+    av_arena *parse_arena = av_arena_create("coldef_parse", 64 * 1024, 0);
+    for (size_t i = 0; i < cfg->n_collections; i++) {
+        av_coldef def;
+        memset(&def, 0, sizeof(def));
+        if (av_coldef_from_text(cfg->collections_json[i], strlen(cfg->collections_json[i]), parse_arena, false, &def, e) == AV_OK) {
+            av_collection *c = NULL;
+            av_err ign;
+            av_err_clear(&ign);
+            (void) av_registry_add(g_registry, &def, &c, &ign);
+            if (c != NULL)
+                av_collection_release(c);
+        }
+        av_arena_reset(parse_arena);
+    }
+    av_arena_destroy(parse_arena);
+
+    /* 4. Create RPC client */
+    av_rpc_config rpc_cfg = {
+        .urls = (const char *const *) cfg->arkiv.rpc_urls,
+        .n_urls = cfg->arkiv.n_rpc_urls,
+        .access_key = cfg->arkiv.access_key,
+        .timeout_ms = (int) cfg->arkiv.timeout_ms,
+        .budget_per_sec = cfg->arkiv.rpc_budget_per_sec,
+        .chain_id = (uint64_t) cfg->arkiv.chain_id,
+        .contract = NULL,
+    };
+    g_rpc = av_rpc_create(&rpc_cfg, e);
+    if (g_rpc == NULL)
+        return AV_ERR;
+
+    /* 5. Start syncer */
+    av_sync_config sync_cfg = {
+        .rpc = g_rpc,
+        .store = g_store,
+        .registry = g_registry,
+        .ws_url = cfg->arkiv.ws_url,
+        .access_key = cfg->arkiv.access_key,
+        .confirmations = (uint64_t) (cfg->arkiv.confirmations > 0 ? cfg->arkiv.confirmations : 0),
+        .max_log_range = (uint64_t) (cfg->arkiv.max_log_range > 0 ? cfg->arkiv.max_log_range : 2000),
+        .poll_interval_ms = (int) (cfg->sync.poll_interval_ms > 0 ? cfg->sync.poll_interval_ms : 1000),
+        .reconcile_interval_s = (int) (cfg->sync.reconcile_interval_s > 0 ? cfg->sync.reconcile_interval_s : 60),
+        .sweep_interval_s = 21600,
+        .ring_size = (size_t) (cfg->sync.ring_size > 0 ? cfg->sync.ring_size : 32),
+        .live_lag_blocks = 2,
+        .ttl_budget = 10000,
+        .fetch_chunk = 32,
+        .resync = cfg->resync,
+    };
+    if (av_sync_start(&sync_cfg, &g_sync, e) != AV_OK)
+        return AV_ERR;
+
+    av_rest_set_sync_provider(av_sync_rest_provider, g_sync);
     return AV_OK;
 }
 
-/* TODO(Lane D): stop sync at a block boundary, stop the applier, close the registry and LMDB. */
 static void services_stop(void)
 {
+    if (g_sync != NULL) {
+        av_sync_stop(g_sync);
+        g_sync = NULL;
+    }
+    if (g_rpc != NULL) {
+        av_rpc_destroy(g_rpc);
+        g_rpc = NULL;
+    }
+    if (g_registry != NULL) {
+        av_registry_destroy(g_registry);
+        g_registry = NULL;
+    }
+    if (g_store != NULL) {
+        av_store_close(g_store);
+        g_store = NULL;
+    }
 }
 
 /* ---- startup helpers ---- */
