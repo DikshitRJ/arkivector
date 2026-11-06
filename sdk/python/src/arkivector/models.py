@@ -2,7 +2,12 @@
 
 import base64
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+
+from arkivector.vectorbytes import vectorbytes_decode_any
+
+if TYPE_CHECKING:
+    from arkivector.types import AnyVector
 
 _bool = bool
 _int = int
@@ -486,3 +491,326 @@ class Collection:
         if self.model is not None:
             res["model"] = self.model
         return res
+
+
+@dataclass
+class Consistency:
+    """Read-your-writes consistency specification (min_block and timeout_ms)."""
+
+    min_block: Optional[int] = None
+    timeout_ms: Optional[int] = None
+
+    def to_json(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {}
+        if self.min_block is not None:
+            d["min_block"] = int(self.min_block)
+        if self.timeout_ms is not None:
+            d["timeout_ms"] = int(self.timeout_ms)
+        return d
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "Consistency":
+        return cls(
+            min_block=int(d["min_block"]) if d.get("min_block") is not None else None,
+            timeout_ms=int(d["timeout_ms"]) if d.get("timeout_ms") is not None else None,
+        )
+
+
+@dataclass
+class Entity:
+    """Arkivector collection entity."""
+
+    key: str
+    id: Optional[str] = None
+    owner: str = ""
+    creator: str = ""
+    created_at_block: int = 0
+    updated_at_block: int = 0
+    expires_at_block: int = 0
+    attributes: Dict[str, TypedValue] = field(default_factory=dict)
+    document: Optional[str] = None
+    vector_bytes: Optional[str] = None
+    vector: Optional["AnyVector"] = None
+
+    def __post_init__(self) -> None:
+        if self.vector is None and self.vector_bytes:
+            try:
+                self.vector = vectorbytes_decode_any(base64.b64decode(self.vector_bytes))
+            except Exception:
+                pass
+
+    def plain_attributes(self) -> Dict[str, Any]:
+        """Return a mapping of attribute names to native Python scalars."""
+        return {
+            k: v.plain() if isinstance(v, TypedValue) else v for k, v in self.attributes.items()
+        }
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "Entity":
+        raw_attrs = d.get("attributes", {})
+        attributes: Dict[str, TypedValue] = {}
+        if isinstance(raw_attrs, dict):
+            for k, v in raw_attrs.items():
+                if isinstance(v, TypedValue):
+                    attributes[str(k)] = v
+                elif isinstance(v, dict) and "type" in v and "value" in v:
+                    attributes[str(k)] = TypedValue.from_json(v)
+                elif isinstance(v, bool):
+                    attributes[str(k)] = T.bool(v)
+                elif isinstance(v, int):
+                    attributes[str(k)] = T.i32(v)
+                elif isinstance(v, str):
+                    attributes[str(k)] = T.str(v)
+                else:
+                    attributes[str(k)] = TypedValue("str", str(v))
+        return cls(
+            key=str(d.get("key", "")),
+            id=str(d["id"]) if d.get("id") is not None else None,
+            owner=str(d.get("owner", "")),
+            creator=str(d.get("creator", "")),
+            created_at_block=int(d.get("created_at_block", 0)),
+            updated_at_block=int(d.get("updated_at_block", 0)),
+            expires_at_block=int(d.get("expires_at_block", 0)),
+            attributes=attributes,
+            document=str(d["document"]) if d.get("document") is not None else None,
+            vector_bytes=str(d["vector_bytes"]) if d.get("vector_bytes") is not None else None,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        res: Dict[str, Any] = {
+            "key": self.key,
+            "id": self.id,
+            "owner": self.owner,
+            "creator": self.creator,
+            "created_at_block": self.created_at_block,
+            "updated_at_block": self.updated_at_block,
+            "expires_at_block": self.expires_at_block,
+            "attributes": {k: v.to_json() for k, v in self.attributes.items()},
+        }
+        if self.document is not None:
+            res["document"] = self.document
+        if self.vector_bytes is not None:
+            res["vector_bytes"] = self.vector_bytes
+        return res
+
+
+@dataclass
+class SearchHit:
+    """A single vector similarity search result hit."""
+
+    key: str
+    id: Optional[str]
+    distance: float
+    score: float
+    owner: str
+    creator: str
+    expires_at_block: int
+    attributes: Dict[str, TypedValue] = field(default_factory=dict)
+    document: Optional[str] = None
+    vector_bytes: Optional[str] = None
+    vector: Optional["AnyVector"] = None
+
+    def __post_init__(self) -> None:
+        if self.vector is None and self.vector_bytes:
+            try:
+                self.vector = vectorbytes_decode_any(base64.b64decode(self.vector_bytes))
+            except Exception:
+                pass
+
+    def plain_attributes(self) -> Dict[str, Any]:
+        """Return a mapping of attribute names to native Python scalars."""
+        return {
+            k: v.plain() if isinstance(v, TypedValue) else v for k, v in self.attributes.items()
+        }
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "SearchHit":
+        raw_attrs = d.get("attributes", {})
+        attributes: Dict[str, TypedValue] = {}
+        if isinstance(raw_attrs, dict):
+            for k, v in raw_attrs.items():
+                if isinstance(v, TypedValue):
+                    attributes[str(k)] = v
+                elif isinstance(v, dict) and "type" in v and "value" in v:
+                    attributes[str(k)] = TypedValue.from_json(v)
+                elif isinstance(v, bool):
+                    attributes[str(k)] = T.bool(v)
+                elif isinstance(v, int):
+                    attributes[str(k)] = T.i32(v)
+                elif isinstance(v, str):
+                    attributes[str(k)] = T.str(v)
+                else:
+                    attributes[str(k)] = TypedValue("str", str(v))
+        return cls(
+            key=str(d.get("key", "")),
+            id=str(d["id"]) if d.get("id") is not None else None,
+            distance=float(d.get("distance", 0.0)),
+            score=float(d.get("score", 0.0)),
+            owner=str(d.get("owner", "")),
+            creator=str(d.get("creator", "")),
+            expires_at_block=int(d.get("expires_at_block", 0)),
+            attributes=attributes,
+            document=str(d["document"]) if d.get("document") is not None else None,
+            vector_bytes=str(d["vector_bytes"]) if d.get("vector_bytes") is not None else None,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        res: Dict[str, Any] = {
+            "key": self.key,
+            "id": self.id,
+            "distance": self.distance,
+            "score": self.score,
+            "owner": self.owner,
+            "creator": self.creator,
+            "expires_at_block": self.expires_at_block,
+            "attributes": {k: v.to_json() for k, v in self.attributes.items()},
+        }
+        if self.document is not None:
+            res["document"] = self.document
+        if self.vector_bytes is not None:
+            res["vector_bytes"] = self.vector_bytes
+        return res
+
+
+@dataclass
+class SearchResult:
+    """Vector similarity search response."""
+
+    as_of_block: int
+    sync_state: str
+    open_collection: bool
+    hits: List[SearchHit]
+    plan: Optional[Dict[str, Any]] = None
+
+    @property
+    def results(self) -> List[SearchHit]:
+        """Alias for hits matching wire schema."""
+        return self.hits
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "SearchResult":
+        as_of_block = int(d.get("as_of_block", 0))
+        sync_state = str(d.get("sync_state", "live"))
+        open_collection = bool(d.get("open_collection", False))
+        raw_hits = d.get("results") if "results" in d else d.get("hits", [])
+        hits = [SearchHit.from_json(h) for h in (raw_hits or [])]
+        plan = d.get("plan")
+        return cls(
+            as_of_block=as_of_block,
+            sync_state=sync_state,
+            open_collection=open_collection,
+            hits=hits,
+            plan=plan if isinstance(plan, dict) else None,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        res: Dict[str, Any] = {
+            "as_of_block": self.as_of_block,
+            "sync_state": self.sync_state,
+            "open_collection": self.open_collection,
+            "results": [h.to_json() for h in self.hits],
+        }
+        if self.plan is not None:
+            res["plan"] = self.plan
+        return res
+
+
+@dataclass
+class BatchResult:
+    """Batch search response containing multiple search results."""
+
+    as_of_block: int
+    sync_state: str
+    results: List[SearchResult]
+
+    @property
+    def responses(self) -> List[SearchResult]:
+        """Alias for results matching wire schema."""
+        return self.results
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "BatchResult":
+        as_of_block = int(d.get("as_of_block", 0))
+        sync_state = str(d.get("sync_state", "live"))
+        raw_items = d.get("responses") if "responses" in d else d.get("results", [])
+        results: List[SearchResult] = []
+        for item in raw_items or []:
+            if isinstance(item, SearchResult):
+                results.append(item)
+            elif isinstance(item, dict):
+                raw_hits = item.get("results") if "results" in item else item.get("hits", [])
+                hits = [SearchHit.from_json(h) for h in (raw_hits or [])]
+                plan = item.get("plan")
+                results.append(
+                    SearchResult(
+                        as_of_block=as_of_block,
+                        sync_state=sync_state,
+                        open_collection=bool(item.get("open_collection", False)),
+                        hits=hits,
+                        plan=plan if isinstance(plan, dict) else None,
+                    )
+                )
+        return cls(
+            as_of_block=as_of_block,
+            sync_state=sync_state,
+            results=results,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "as_of_block": self.as_of_block,
+            "sync_state": self.sync_state,
+            "responses": [
+                {"results": [h.to_json() for h in r.hits], **({"plan": r.plan} if r.plan else {})}
+                for r in self.results
+            ],
+        }
+
+
+@dataclass
+class ScrollPage:
+    """A page of entities returned by scroll."""
+
+    entities: List[Entity]
+    next_cursor: Optional[str]
+    as_of_block: int
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "ScrollPage":
+        as_of_block = int(d.get("as_of_block", 0))
+        raw_entities = d.get("entities", [])
+        entities = [Entity.from_json(e) for e in (raw_entities or [])]
+        next_cursor = d.get("next_cursor")
+        return cls(
+            entities=entities,
+            next_cursor=str(next_cursor) if next_cursor is not None else None,
+            as_of_block=as_of_block,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "as_of_block": self.as_of_block,
+            "entities": [e.to_json() for e in self.entities],
+            "next_cursor": self.next_cursor,
+        }
+
+
+@dataclass
+class CountResult:
+    """Count response of matching live entities."""
+
+    count: int
+    as_of_block: int
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "CountResult":
+        return cls(
+            count=int(d.get("count", 0)),
+            as_of_block=int(d.get("as_of_block", 0)),
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "as_of_block": self.as_of_block,
+            "count": self.count,
+        }
