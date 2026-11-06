@@ -381,6 +381,8 @@ void		AvHnswInitGraph(HnswGraph * graph, char *base, Size memoryTotal);
 void		AvHnswInitAllocator(HnswAllocator * allocator, void *(*alloc) (Size size, void *state), void *state);
 void		AvHnswInsertTupleInMemory(HnswMemBuildState * buildstate, HnswElement element);
 void	   *AvHnswArenaAlloc(Size size, void *state);
+const HnswTypeInfo *AvHnswGetTypeInfo(int vtype);
+
 
 #endif
 typedef struct HnswMetaPageData
@@ -407,6 +409,11 @@ typedef struct HnswPageOpaqueData
 
 typedef HnswPageOpaqueData * HnswPageOpaque;
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
 typedef struct HnswElementTupleData
 {
 	uint8		type;
@@ -418,6 +425,10 @@ typedef struct HnswElementTupleData
 	uint16		unused;
 	Vector		data;
 }			HnswElementTupleData;
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 typedef HnswElementTupleData * HnswElementTuple;
 

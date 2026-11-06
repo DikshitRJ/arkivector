@@ -1725,6 +1725,61 @@ HnswGetTypeInfo(Relation index)
 	else
 		return (const HnswTypeInfo *) DatumGetPointer(FunctionCall0Coll(procinfo, InvalidOid));
 }
+#else
+#include "codec/vtype.h"
+#include "utils/varbit.h"
+
+PGDLLEXPORT Datum
+bitlength(PG_FUNCTION_ARGS)
+{
+	VarBit *arg = PG_GETARG_VARBIT_P(0);
+	PG_RETURN_INT32(VARBITLEN(arg));
+}
+
+const HnswTypeInfo *
+AvHnswGetTypeInfo(int vtype)
+{
+	static const HnswTypeInfo vectorTypeInfo = {
+		.maxDimensions = HNSW_MAX_DIM,
+		.dimensions = vector_dims,
+		.normalize = l2_normalize,
+		.checkValue = NULL,
+		.useFsm = false
+	};
+	static const HnswTypeInfo halfvecTypeInfo = {
+		.maxDimensions = HNSW_MAX_DIM * 2,
+		.dimensions = halfvec_vector_dims,
+		.normalize = halfvec_l2_normalize,
+		.checkValue = NULL,
+		.useFsm = false
+	};
+	static const HnswTypeInfo bitTypeInfo = {
+		.maxDimensions = HNSW_MAX_DIM * 32,
+		.dimensions = bitlength,
+		.normalize = NULL,
+		.checkValue = NULL,
+		.useFsm = false
+	};
+	static const HnswTypeInfo sparsevecTypeInfo = {
+		.maxDimensions = SPARSEVEC_MAX_DIM,
+		.dimensions = sparsevec_vector_dims,
+		.normalize = sparsevec_l2_normalize,
+		.checkValue = SparsevecCheckValue,
+		.useFsm = true
+	};
+
+	switch ((av_vtype) vtype) {
+	case AV_VT_VECTOR:
+		return &vectorTypeInfo;
+	case AV_VT_HALFVEC:
+		return &halfvecTypeInfo;
+	case AV_VT_BIT:
+		return &bitTypeInfo;
+	case AV_VT_SPARSEVEC:
+		return &sparsevecTypeInfo;
+	}
+	return &vectorTypeInfo;
+}
 #endif							/* ARKIVECTOR */
 
 #ifndef ARKIVECTOR				/* ARKIVECTOR: disk-only, compiled out */
