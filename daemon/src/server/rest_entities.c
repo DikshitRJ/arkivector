@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "arkiv/entity.h"
+#include "arkiv/rpc.h"
 #include "codec/base64.h"
 #include "codec/hex.h"
 #include "core/collection.h"
@@ -147,13 +148,6 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
     bool do_verify = false;
     if (get_query_param(req->query, "verify", buf, sizeof(buf))) {
         if (strcmp(buf, "true") == 0 || strcmp(buf, "1") == 0) {
-            if (av_rest_get_rpc() == NULL) {
-                av_collection_release(c);
-                av_err e;
-                av_err_set(&e, "not_implemented", "entity verify cross-check arrives in Phase D6");
-                av_problem_from_err(&e, resp, req->path);
-                return;
-            }
             do_verify = true;
         }
     }
@@ -303,7 +297,23 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
     }
 
     if (do_verify) {
-        yyjson_mut_obj_add_bool(doc, root, "verified", true);
+        bool verified = false;
+        av_rpc *rpc = av_rest_get_rpc();
+        if (rpc != NULL) {
+            av_entity onchain_ent;
+            memset(&onchain_ent, 0, sizeof(onchain_ent));
+            bool found = false;
+            av_err rpc_err;
+            av_err_clear(&rpc_err);
+            if (av_rpc_get_entity(rpc, key, req->arena, &onchain_ent, &found, &rpc_err) == AV_OK && found) {
+                if (memcmp(onchain_ent.key, key, 32) == 0 &&
+                    memcmp(onchain_ent.owner, row.owner, 20) == 0 &&
+                    onchain_ent.updated_at == row.updated_at) {
+                    verified = true;
+                }
+            }
+        }
+        yyjson_mut_obj_add_bool(doc, root, "verified", verified);
     }
 
     char addr_hex[43];
