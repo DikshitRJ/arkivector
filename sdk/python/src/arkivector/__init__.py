@@ -1,5 +1,6 @@
 """Arkivector Python SDK."""
 
+from arkivector.client import Client
 from arkivector.errors import (
     ApiError,
     AuthError,
@@ -12,7 +13,18 @@ from arkivector.errors import (
     VectorBytesError,
     error_from_problem,
 )
-from arkivector.models import T, Ttl, TypedValue
+from arkivector.models import (
+    Collection,
+    Column,
+    ColumnDef,
+    IndexDef,
+    Readiness,
+    SyncStatus,
+    T,
+    Ttl,
+    TypedValue,
+    VersionInfo,
+)
 from arkivector.types import (
     AnyVector,
     Bit,
@@ -32,11 +44,18 @@ __all__ = [
     "ApiError",
     "AuthError",
     "Bit",
+    "Client",
+    "Collection",
+    "Column",
+    "ColumnDef",
     "ConflictError",
     "HalfVector",
+    "IndexDef",
     "NotFoundError",
     "NotImplementedByDaemon",
+    "Readiness",
     "SparseVector",
+    "SyncStatus",
     "T",
     "TransportError",
     "Ttl",
@@ -45,6 +64,7 @@ __all__ = [
     "ValidationError",
     "Vector",
     "VectorBytesError",
+    "VersionInfo",
     "error_from_problem",
     "vectorbytes_decode_any",
 ]
