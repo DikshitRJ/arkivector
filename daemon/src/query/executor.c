@@ -28,7 +28,7 @@ static yyjson_mut_val *format_typed_val(yyjson_mut_doc *doc, const av_attr *at, 
     yyjson_mut_obj_add_str(doc, obj, "type", tname);
 
     if (at->type == AV_AT_BOOL) {
-        bool val = (at->val[31] != 0);
+        bool val = (at->len >= 32 ? (at->val[31] != 0) : (at->len > 0 ? (at->val[0] != 0) : false));
         yyjson_mut_obj_add_bool(doc, obj, "value", val);
     } else if (at->type == AV_AT_I32) {
         av_value v;
@@ -40,13 +40,7 @@ static yyjson_mut_val *format_typed_val(yyjson_mut_doc *doc, const av_attr *at, 
             yyjson_mut_obj_add_int(doc, obj, "value", 0);
         }
     } else if (at->type == AV_AT_STR) {
-        char *str = malloc(at->len + 1);
-        if (str != NULL) {
-            memcpy(str, at->val, at->len);
-            str[at->len] = '\0';
-            yyjson_mut_obj_add_strncpy(doc, obj, "value", str, at->len);
-            free(str);
-        }
+        yyjson_mut_obj_add_strncpy(doc, obj, "value", (const char *) at->val, at->len);
     } else if (at->type == AV_AT_BYTES) {
         char *b64 = NULL;
         size_t b64_len = 0;
@@ -88,10 +82,40 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
         return AV_ERR;
     }
 
+    av_query_plan plan;
+    (void) av_plan_query(col, params->query_vec, params->oc, params->exact, cand,
+                         av_collection_live_count(col), &plan, e);
+
     size_t n_raw = 0;
-    if (av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw, e) != AV_OK) {
-        free(raw_hits);
-        return AV_ERR;
+    if ((plan.strategy == AV_STRAT_HNSW || plan.strategy == AV_STRAT_HNSW_ITERATIVE) &&
+        seg != NULL && av_segment_kind(seg) == AV_SEG_HNSW) {
+        int ef_search = params->ef_search > 0 ? params->ef_search : 40;
+        if (plan.strategy == AV_STRAT_HNSW_ITERATIVE && plan.selectivity > 0.0) {
+            int bumped = (int) ceil(1.5 * (double) k / plan.selectivity);
+            if (bumped > ef_search) ef_search = bumped;
+            if (ef_search > 1000) ef_search = 1000;
+        }
+        int iter_mode = 1; /* relaxed_order */
+        if (params->iterative_scan != NULL) {
+            if (strcmp(params->iterative_scan, "off") == 0)
+                iter_mode = 0;
+            else if (strcmp(params->iterative_scan, "strict_order") == 0)
+                iter_mode = 2;
+        }
+        if (av_segment_search_hnsw(seg, params->query_vec, ef_search, iter_mode,
+                                   (int) params->max_scan_tuples, cand, offset, k, raw_hits, &n_raw, e) != AV_OK) {
+            n_raw = 0;
+        }
+        /* S2 -> S1 fallback when < k */
+        if (n_raw < k && (cand == NULL || roaring_bitmap_get_cardinality(cand) > n_raw)) {
+            n_raw = 0;
+            (void) av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw, e);
+        }
+    } else {
+        if (av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw, e) != AV_OK) {
+            free(raw_hits);
+            return AV_ERR;
+        }
     }
 
     yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
@@ -191,13 +215,12 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
 
     out->n_hits = retained;
     out->as_of_block = av_collection_as_of(col);
-    out->sync_state = "live";
+    out->sync_state = (out->as_of_block == 0 ? "bootstrap" : "live");
     out->open_collection = (def->membership == AV_MEMBERSHIP_OPEN);
     out->explain = params->explain;
 
     double t1 = current_time_ms();
-    (void) av_plan_query(col, params->query_vec, params->oc, params->exact, cand,
-                         av_collection_live_count(col), &out->plan, e);
+    out->plan = plan;
     out->plan.elapsed_ms = t1 - t0;
 
     return AV_OK;
