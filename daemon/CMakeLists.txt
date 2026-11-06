@@ -197,7 +197,19 @@ set(AV_CORE_SOURCES
     src/query/executor.c
     src/server/rest_collections.c
     src/server/rest_entities.c
-    src/server/rest_search.c)
+    src/server/rest_search.c
+    src/pgvector/hnswscan_mem.c
+    src/index/compact.c
+    src/query/calibrate.c
+    src/arkiv/abi.c
+    src/arkiv/tx.c
+    src/arkiv/signer.c
+    src/write/nonce.c
+    src/write/batcher.c
+    src/write/writer.c
+    src/server/idempotency.c
+    src/server/auth.c
+    src/server/ratelimit.c)
 
 # Build-time generated headers (no runtime JSON reading, no runtime licence file lookup).
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -222,9 +234,10 @@ add_custom_command(
 
 add_library(av_core STATIC ${AV_CORE_SOURCES} ${AV_GEN_DIR}/av_error_table.h)
 target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src ${AV_GEN_DIR})
-target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat av3p_curl av3p_keccak av3p_yyjson av3p_lmdb av3p_roaring av3p_uv av3p_llhttp av3p_tomlc99 Threads::Threads m)
+target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat av3p_curl av3p_keccak av3p_yyjson av3p_lmdb av3p_roaring av3p_uv av3p_llhttp av3p_tomlc99 av3p_secp256k1 av3p_openssl Threads::Threads m)
 target_compile_definitions(av_core PUBLIC AV_REPO_ROOT="${AV_REPO_ROOT}")
 av_strict(av_core)
+av_upstream_sources(src/pgvector/hnswscan_mem.c)
 
 # ---------------------------------------------------------------------------
 # arkivectord

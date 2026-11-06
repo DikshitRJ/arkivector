@@ -68,12 +68,18 @@ struct av_registry;
 struct av_store;
 struct av_rpc;
 struct av_sync;
+struct av_writer;
+struct av_idempotency_store;
 
 void av_rest_set_services(struct av_registry *reg, struct av_store *store, struct av_rpc *rpc, struct av_sync *sync);
 struct av_registry *av_rest_get_registry(void);
 struct av_store *av_rest_get_store(void);
 struct av_rpc *av_rest_get_rpc(void);
 struct av_sync *av_rest_get_sync(void);
+
+void av_rest_set_writer(struct av_writer *writer, struct av_idempotency_store *idem);
+struct av_writer *av_rest_get_writer(void);
+struct av_idempotency_store *av_rest_get_idempotency(void);
 
 /* ---- route registrars for phases D3+ ---- */
 void av_rest_register_collections(av_router *r, bool debug_routes, void *ctx);

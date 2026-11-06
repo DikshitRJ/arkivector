@@ -18,7 +18,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef enum { AV_OK = 0, AV_ERR = 1 } av_status;
+typedef enum { AV_OK = 0, AV_ERR = 1, AV_SEAL_NEEDED = 2 } av_status;
 
 typedef struct {
     char code[40];     /* spec/error-codes.json code, "" when unset */

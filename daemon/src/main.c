@@ -29,6 +29,9 @@
 #include "core/registry.h"
 #include "store/lmdb_store.h"
 #include "sync/syncer.h"
+#include "arkiv/signer.h"
+#include "server/idempotency.h"
+#include "write/writer.h"
 
 typedef struct {
     const char *config_path;
@@ -108,11 +111,12 @@ static av_store *g_store = NULL;
 static av_registry *g_registry = NULL;
 static av_rpc *g_rpc = NULL;
 static av_sync *g_sync = NULL;
+static av_writer *g_writer = NULL;
+static av_idempotency_store *g_idem = NULL;
+static av_signer *g_signer = NULL;
 
 static av_status services_start(const av_config *cfg, av_err *e)
 {
-    av_rest_set_info(cfg->arkiv.chain_id, false);
-
     /* 1. Open LMDB store */
     size_t map_size = cfg->storage.map_size > 0 ? (size_t) cfg->storage.map_size : 0;
     if (av_store_open(cfg->storage.data_dir, map_size, &g_store, e) != AV_OK)
@@ -176,11 +180,49 @@ static av_status services_start(const av_config *cfg, av_err *e)
         return AV_ERR;
 
     av_rest_set_sync_provider(av_sync_rest_provider, g_sync);
+
+    /* 6. Idempotency store */
+    g_idem = av_idempotency_store_create(g_store);
+
+    /* 7. Signer and Writer */
+    g_signer = NULL;
+    const char *pk_env = getenv("ARKIV_PRIVATE_KEY");
+    if (pk_env == NULL || pk_env[0] == '\0') {
+        pk_env = getenv("ARKIVECTOR_SIGNER_KEY");
+    }
+    if (pk_env != NULL && pk_env[0] != '\0') {
+        av_err s_err;
+        av_err_clear(&s_err);
+        if (av_signer_create_env("ARKIV_PRIVATE_KEY", &g_signer, &s_err) != AV_OK) {
+            av_err_clear(&s_err);
+            (void) av_signer_create_env("ARKIVECTOR_SIGNER_KEY", &g_signer, &s_err);
+        }
+    }
+
+    av_writer_config wcfg;
+    memset(&wcfg, 0, sizeof(wcfg));
+    wcfg.chain_id = (uint64_t) cfg->arkiv.chain_id;
+    g_writer = av_writer_create(&wcfg, g_signer, g_rpc, g_store, g_registry, e);
+    av_rest_set_writer(g_writer, g_idem);
+    av_rest_set_info(cfg->arkiv.chain_id, g_signer != NULL);
+
     return AV_OK;
 }
 
 static void services_stop(void)
 {
+    if (g_writer != NULL) {
+        av_writer_destroy(g_writer);
+        g_writer = NULL;
+    }
+    if (g_signer != NULL) {
+        av_signer_destroy(g_signer);
+        g_signer = NULL;
+    }
+    if (g_idem != NULL) {
+        av_idempotency_store_destroy(g_idem);
+        g_idem = NULL;
+    }
     if (g_sync != NULL) {
         av_sync_stop(g_sync);
         g_sync = NULL;

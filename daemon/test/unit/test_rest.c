@@ -122,7 +122,7 @@ TEST test_collections_crud(void)
     ASSERT(strstr(resp.body, "{\"collections\":[]}") != NULL);
     free(resp.body);
 
-    /* 2. POST /v1/collections with publish_manifest=true -> 501 */
+    /* 2. POST /v1/collections with publish_manifest=true -> 403 when signer absent */
     const char *create_pm =
         "{"
         "  \"name\": \"demo.pm\","
@@ -132,8 +132,8 @@ TEST test_collections_crud(void)
         "  \"publish_manifest\": true"
         "}";
     dispatch_req("POST", "/v1/collections", NULL, create_pm, &resp);
-    ASSERT_EQ(501, resp.status);
-    ASSERT(strstr(resp.body, "publish_manifest is supported in Phase D5") != NULL);
+    ASSERT_EQ(403, resp.status);
+    ASSERT(strstr(resp.body, "write_disabled") != NULL);
     free(resp.body);
 
     /* 3. POST /v1/collections valid -> 201 */
@@ -245,25 +245,31 @@ TEST test_entities_endpoint(void)
     ASSERT(strstr(resp.body, "Phase D6") != NULL);
     free(resp.body);
 
-    /* 501 write endpoints */
+    /* D5 write endpoints (signer not configured -> 403 write_disabled) */
     dispatch_req("POST", "/v1/collections/ent.col/entities", NULL, "{}", &resp);
-    ASSERT_EQ(501, resp.status);
+    ASSERT_EQ(403, resp.status);
+    ASSERT(strstr(resp.body, "write_disabled") != NULL);
     free(resp.body);
 
     dispatch_req("DELETE", "/v1/collections/ent.col/entities/0x01", NULL, NULL, &resp);
-    ASSERT_EQ(501, resp.status);
+    ASSERT_EQ(403, resp.status);
+    ASSERT(strstr(resp.body, "write_disabled") != NULL);
     free(resp.body);
 
     dispatch_req("POST", "/v1/collections/ent.col/entities:delete", NULL, "{}", &resp);
-    ASSERT_EQ(501, resp.status);
+    ASSERT_EQ(403, resp.status);
+    ASSERT(strstr(resp.body, "write_disabled") != NULL);
     free(resp.body);
 
     dispatch_req("POST", "/v1/collections/ent.col/entities:extend", NULL, "{}", &resp);
-    ASSERT_EQ(501, resp.status);
+    ASSERT_EQ(403, resp.status);
+    ASSERT(strstr(resp.body, "write_disabled") != NULL);
     free(resp.body);
 
+    /* prepare endpoint (does not require signer, but rejects empty body) */
     dispatch_req("POST", "/v1/collections/ent.col/entities:prepare", NULL, "{}", &resp);
-    ASSERT_EQ(501, resp.status);
+    ASSERT_EQ(422, resp.status);
+    ASSERT(strstr(resp.body, "invalid_argument") != NULL);
     free(resp.body);
 
     dispatch_req("DELETE", "/v1/collections/ent.col", NULL, NULL, &resp);
@@ -321,10 +327,10 @@ TEST test_search_and_count(void)
     ASSERT(strstr(resp.body, "dimension_mismatch") != NULL);
     free(resp.body);
 
-    /* POST search:batch -> 501 */
-    dispatch_req("POST", "/v1/collections/search.col/search:batch", NULL, "{}", &resp);
-    ASSERT_EQ(501, resp.status);
-    ASSERT(strstr(resp.body, "Phase D4") != NULL);
+    /* POST search:batch (implemented in D4) */
+    dispatch_req("POST", "/v1/collections/search.col/search:batch", NULL, "{\"searches\":[{\"vector\":[0.1,0.2,0.3,0.4]}]}", &resp);
+    ASSERT_EQ(200, resp.status);
+    ASSERT(strstr(resp.body, "\"responses\":") != NULL);
     free(resp.body);
 
     /* POST scroll */

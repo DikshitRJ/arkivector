@@ -37,6 +37,8 @@ static struct av_registry *g_reg_svc = NULL;
 static struct av_store *g_store_svc = NULL;
 static struct av_rpc *g_rpc_svc = NULL;
 static struct av_sync *g_sync_svc = NULL;
+static struct av_writer *g_writer_svc = NULL;
+static struct av_idempotency_store *g_idem_svc = NULL;
 
 void av_rest_set_services(struct av_registry *reg, struct av_store *store, struct av_rpc *rpc, struct av_sync *sync)
 {
@@ -45,6 +47,14 @@ void av_rest_set_services(struct av_registry *reg, struct av_store *store, struc
     g_store_svc = store;
     g_rpc_svc = rpc;
     g_sync_svc = sync;
+    pthread_mutex_unlock(&g_mu);
+}
+
+void av_rest_set_writer(struct av_writer *writer, struct av_idempotency_store *idem)
+{
+    pthread_mutex_lock(&g_mu);
+    g_writer_svc = writer;
+    g_idem_svc = idem;
     pthread_mutex_unlock(&g_mu);
 }
 
@@ -78,6 +88,22 @@ struct av_sync *av_rest_get_sync(void)
     struct av_sync *s = g_sync_svc;
     pthread_mutex_unlock(&g_mu);
     return s;
+}
+
+struct av_writer *av_rest_get_writer(void)
+{
+    pthread_mutex_lock(&g_mu);
+    struct av_writer *w = g_writer_svc;
+    pthread_mutex_unlock(&g_mu);
+    return w;
+}
+
+struct av_idempotency_store *av_rest_get_idempotency(void)
+{
+    pthread_mutex_lock(&g_mu);
+    struct av_idempotency_store *i = g_idem_svc;
+    pthread_mutex_unlock(&g_mu);
+    return i;
 }
 
 av_status av_rest_add_registrar(av_rest_registrar fn, void *ctx, av_err *e)
@@ -349,12 +375,22 @@ av_status av_rest_register_all(av_router *r, bool debug_routes, av_err *e)
         "collections.follow",
         "entities.read",
         "search.exact",
+        "search.hnsw",
         "search.filter.json",
         "search.filter.where",
+        "search.batch",
         "search.explain",
         "scroll",
         "count",
-        "consistency.min_block"
+        "consistency.min_block",
+        "collections.manifest",
+        "entities.write",
+        "entities.prepare",
+        "entities.verify",
+        "idempotency",
+        "auth.api_keys",
+        "qdrant",
+        "mcp"
     };
     for (size_t i = 0; i < sizeof(initial_caps) / sizeof(initial_caps[0]); i++) {
         if (av_rest_add_capability(initial_caps[i], e) != AV_OK) {

@@ -17,6 +17,9 @@ extern SUITE(filter_parser);
 extern SUITE(filter_eval);
 extern SUITE(planner);
 extern SUITE(rest_suite);
+extern SUITE(abi);
+extern SUITE(signer);
+extern SUITE(segment_suite);
 #ifdef AV_HAVE_HNSW_TEST
 extern SUITE(hnsw);
 #endif
@@ -40,6 +43,9 @@ int main(int argc, char **argv)
     RUN_SUITE(filter_eval);
     RUN_SUITE(planner);
     RUN_SUITE(rest_suite);
+    RUN_SUITE(abi);
+    RUN_SUITE(signer);
+    RUN_SUITE(segment_suite);
 #ifdef AV_HAVE_HNSW_TEST
     RUN_SUITE(hnsw);
 #endif

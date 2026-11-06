@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arkiv/abi.h"
 #include "arkiv/entity.h"
 #include "arkiv/rpc.h"
 #include "codec/hex.h"
@@ -17,6 +18,7 @@
 #include "server/problem.h"
 #include "server/rest.h"
 #include "sync/syncer.h"
+#include "write/writer.h"
 #include "yyjson.h"
 
 static void fail_internal(av_http_resp *resp, const char *msg, const char *instance)
@@ -265,9 +267,21 @@ static void h_create_collection(const av_http_req *req, const char *const *param
     yyjson_doc_free(req_doc);
 
     if (def.publish_manifest) {
-        av_err_set(&e, "not_implemented", "publish_manifest is supported in Phase D5");
-        av_problem_from_err(&e, resp, req->path);
-        return;
+        av_writer *w = av_rest_get_writer();
+        if (w == NULL || av_writer_get_signer(w) == NULL) {
+            av_err_set(&e, "write_disabled", "publishing a manifest requires a configured signer");
+            av_problem_from_err(&e, resp, req->path);
+            return;
+        }
+        const uint8_t *addr = av_writer_get_address(w);
+        uint8_t salt[16] = {0};
+        for (int i = 0; i < 16; i++) {
+            salt[i] = (uint8_t) (rand() & 0xff);
+        }
+        uint8_t contract_addr[20];
+        av_addr_from_hex(AV_ARKIV_CONTRACT_ADDR, contract_addr);
+        av_abi_predict_entity_key(7794095, contract_addr, addr, 0, salt, def.manifest_key);
+        def.has_manifest_key = true;
     }
 
     av_collection *c = NULL;
@@ -586,10 +600,22 @@ static void h_follow_collection(const av_http_req *req, const char *const *param
             return;
         }
         if (def.publish_manifest) {
-            yyjson_doc_free(req_doc);
-            av_err_set(&e, "not_implemented", "publish_manifest is supported in Phase D5");
-            av_problem_from_err(&e, resp, req->path);
-            return;
+            av_writer *w = av_rest_get_writer();
+            if (w == NULL || av_writer_get_signer(w) == NULL) {
+                yyjson_doc_free(req_doc);
+                av_err_set(&e, "write_disabled", "publishing a manifest requires a configured signer");
+                av_problem_from_err(&e, resp, req->path);
+                return;
+            }
+            const uint8_t *addr = av_writer_get_address(w);
+            uint8_t salt[16] = {0};
+            for (int i = 0; i < 16; i++) {
+                salt[i] = (uint8_t) (rand() & 0xff);
+            }
+            uint8_t contract_addr[20];
+            av_addr_from_hex(AV_ARKIV_CONTRACT_ADDR, contract_addr);
+            av_abi_predict_entity_key(7794095, contract_addr, addr, 0, salt, def.manifest_key);
+            def.has_manifest_key = true;
         }
     } else {
         /* Follow by manifest key */
