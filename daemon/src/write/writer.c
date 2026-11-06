@@ -91,6 +91,93 @@ const uint8_t *av_writer_get_address(const av_writer *w)
     return (w != NULL && w->signer != NULL) ? av_signer_get_address(w->signer) : NULL;
 }
 
+/* One user attribute from JSON: {"type","value"} or a shorthand scalar typed from the schema
+ * (string -> str, boolean -> bool, integer -> i32 when the schema has no entry). Values are
+ * encoded as Arkiv wire bytes: 32-byte words for numeric/bool/addr/key, raw UTF-8 for str,
+ * base64-decoded bytes for bytes. */
+static av_status build_user_attr(const av_coldef *def, const char *name, yyjson_val *jv, av_arena *arena,
+                                 av_attr *out, av_err *e)
+{
+    memset(out, 0, sizeof(*out));
+    if (name == NULL || jv == NULL || strlen(name) > AV_ATTR_NAME_MAX) {
+        av_err_set(e, "invalid_argument", "invalid attribute name");
+        return AV_ERR;
+    }
+    strncpy(out->name, name, sizeof(out->name) - 1);
+
+    av_attr_type t = AV_AT_TOMBSTONE;
+    bool have_type = false;
+    yyjson_val *vnode = jv;
+    if (yyjson_is_obj(jv)) {
+        const char *ts = yyjson_get_str(yyjson_obj_get(jv, "type"));
+        if (ts == NULL || !av_type_from_name(ts, strlen(ts), &t)) {
+            av_err_set(e, "invalid_argument", "attribute '%s': unknown type", name);
+            return AV_ERR;
+        }
+        have_type = true;
+        vnode = yyjson_obj_get(jv, "value");
+    } else {
+        for (size_t i = 0; i < def->n_attrs; i++) {
+            if (strcmp(def->attrs[i].name, name) == 0) {
+                t = def->attrs[i].type;
+                have_type = true;
+                break;
+            }
+        }
+        if (!have_type) {
+            t = yyjson_is_bool(jv) ? AV_AT_BOOL : yyjson_is_int(jv) ? AV_AT_I32 : AV_AT_STR;
+            have_type = true;
+        }
+    }
+    out->type = (uint8_t) t;
+    out->indexed = t != AV_AT_BYTES;
+
+    if (t == AV_AT_BYTES) {
+        const char *b64 = yyjson_get_str(vnode);
+        uint8_t *raw = NULL;
+        size_t rl = 0;
+        if (b64 == NULL || av_base64_decode(b64, strlen(b64), arena, &raw, &rl, e) != AV_OK) {
+            av_err_set(e, "invalid_argument", "attribute '%s': bytes must be base64", name);
+            return AV_ERR;
+        }
+        out->val = raw;
+        out->len = rl;
+        return AV_OK;
+    }
+
+    av_value v;
+    const char *why = "invalid value";
+    bool ok = false;
+    if (yyjson_is_str(vnode)) {
+        const char *vs = yyjson_get_str(vnode);
+        ok = av_value_parse(t, vs, strlen(vs), &v, &why);
+    } else if (yyjson_is_bool(vnode) && t == AV_AT_BOOL) {
+        av_value_bool(&v, yyjson_get_bool(vnode));
+        ok = true;
+    } else if (yyjson_is_int(vnode) &&
+               (t == AV_AT_I32 || t == AV_AT_U64 || t == AV_AT_U256 || t == AV_AT_DEC)) {
+        char buf[32];
+        if (yyjson_is_sint(vnode))
+            snprintf(buf, sizeof(buf), "%lld", (long long) yyjson_get_sint(vnode));
+        else
+            snprintf(buf, sizeof(buf), "%llu", (unsigned long long) yyjson_get_uint(vnode));
+        ok = av_value_parse(t, buf, strlen(buf), &v, &why);
+    }
+    if (!ok) {
+        av_err_set(e, "invalid_argument", "attribute '%s' (%s): %s", name, av_type_name(t), why);
+        return AV_ERR;
+    }
+    uint8_t *copy = av_arena_alloc(arena, v.len > 0 ? v.len : 1, 0);
+    if (copy == NULL) {
+        av_err_set(e, "internal", "out of memory");
+        return AV_ERR;
+    }
+    memcpy(copy, v.b, v.len);
+    out->val = copy;
+    out->len = v.len;
+    return AV_OK;
+}
+
 /* Parse TTL object */
 static bool parse_ttl_obj(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *min_lifetime, av_err *e)
 {
@@ -145,6 +232,28 @@ static bool parse_ttl_obj(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *m
     }
 
     return true;
+}
+
+/* Collection default_ttl for creates without `ttl` (collections.md: if null, the upsert MUST carry ttl). */
+static bool apply_default_ttl(const av_coldef *def, uint64_t *expires_at, uint64_t *min_lifetime, av_err *e)
+{
+    switch (def->default_ttl.kind) {
+    case AV_TTL_BLOCKS:
+        *min_lifetime = (uint64_t) def->default_ttl.value;
+        return true;
+    case AV_TTL_SECONDS:
+        *min_lifetime = (uint64_t) (def->default_ttl.value / 2.0);
+        return true;
+    case AV_TTL_DAYS:
+        *min_lifetime = (uint64_t) round(def->default_ttl.value * 43200.0);
+        return true;
+    case AV_TTL_EXPIRES_AT:
+        *expires_at = (uint64_t) def->default_ttl.value;
+        return true;
+    default:
+        av_err_set(e, "invalid_argument", "ttl is required: collection '%s' has no default_ttl", def->name);
+        return false;
+    }
 }
 
 bool av_writer_parse_ttl(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *min_lifetime, av_err *e)
@@ -449,6 +558,7 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
         /* Parse TTL */
         uint64_t exp_at = 0, min_life = 0;
         yyjson_val *ttl_val = yyjson_obj_get(ent_val, "ttl");
+        bool has_ttl = ttl_val != NULL;
         if (ttl_val != NULL) {
             if (!parse_ttl_obj(ttl_val, &exp_at, &min_life, e))
                 return AV_ERR;
@@ -512,41 +622,18 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
             a_idx++;
         }
 
-        /* User attributes */
+        /* User attributes (TypedValue or shorthand typed from the collection schema) */
         if (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) {
             yyjson_obj_iter iter;
             yyjson_obj_iter_init(attrs_obj, &iter);
             yyjson_val *key_node = NULL;
             while ((key_node = yyjson_obj_iter_next(&iter)) != NULL) {
-                const char *at_name = yyjson_get_str(key_node);
-                yyjson_val *at_val = yyjson_obj_iter_get_val(key_node);
-                if (at_name != NULL && at_val != NULL && yyjson_is_obj(at_val)) {
-                    strncpy(attr_list[a_idx].name, at_name, sizeof(attr_list[a_idx].name) - 1);
-                    const char *tstr = yyjson_get_str(yyjson_obj_get(at_val, "type"));
-                    attr_list[a_idx].type = AV_AT_STR;
-                    if (tstr != NULL) {
-                        if (strcmp(tstr, "i32") == 0)
-                            attr_list[a_idx].type = AV_AT_I32;
-                        else if (strcmp(tstr, "bool") == 0)
-                            attr_list[a_idx].type = AV_AT_BOOL;
-                        else if (strcmp(tstr, "u64") == 0)
-                            attr_list[a_idx].type = AV_AT_U64;
-                        else if (strcmp(tstr, "u256") == 0)
-                            attr_list[a_idx].type = AV_AT_U256;
-                        else if (strcmp(tstr, "dec") == 0)
-                            attr_list[a_idx].type = AV_AT_DEC;
-                        else if (strcmp(tstr, "bytes") == 0)
-                            attr_list[a_idx].type = AV_AT_BYTES;
-                    }
-                    attr_list[a_idx].indexed = (attr_list[a_idx].type != AV_AT_BYTES);
-                    yyjson_val *vnode = yyjson_obj_get(at_val, "value");
-                    if (yyjson_is_str(vnode)) {
-                        const char *vs = yyjson_get_str(vnode);
-                        attr_list[a_idx].val = (const uint8_t *) vs;
-                        attr_list[a_idx].len = strlen(vs);
-                    }
-                    a_idx++;
-                }
+                if (a_idx >= total_attrs)
+                    break;
+                if (build_user_attr(coldef, yyjson_get_str(key_node), yyjson_obj_iter_get_val(key_node),
+                                    arena, &attr_list[a_idx], e) != AV_OK)
+                    return AV_ERR;
+                a_idx++;
             }
         }
 
@@ -570,6 +657,8 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
             }
         } else {
             /* CREATE */
+            if (!has_ttl && !apply_default_ttl(coldef, &exp_at, &min_life, e))
+                return AV_ERR;
             results[i].op = "create";
             uint8_t salt[16];
             for (int s = 0; s < 16; s++) {
@@ -960,6 +1049,7 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
 
         uint64_t exp_at = 0, min_life = 0;
         yyjson_val *ttl_val = yyjson_obj_get(ent_val, "ttl");
+        bool has_ttl = ttl_val != NULL;
         if (ttl_val != NULL) {
             if (!parse_ttl_obj(ttl_val, &exp_at, &min_life, e))
                 return AV_ERR;
@@ -1022,41 +1112,18 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
             a_idx++;
         }
 
-        /* User attributes */
+        /* User attributes (TypedValue or shorthand typed from the collection schema) */
         if (attrs_obj != NULL && yyjson_is_obj(attrs_obj)) {
             yyjson_obj_iter iter;
             yyjson_obj_iter_init(attrs_obj, &iter);
             yyjson_val *key_node = NULL;
             while ((key_node = yyjson_obj_iter_next(&iter)) != NULL) {
-                const char *at_name = yyjson_get_str(key_node);
-                yyjson_val *at_val = yyjson_obj_iter_get_val(key_node);
-                if (at_name != NULL && at_val != NULL && yyjson_is_obj(at_val)) {
-                    strncpy(attr_list[a_idx].name, at_name, sizeof(attr_list[a_idx].name) - 1);
-                    const char *tstr = yyjson_get_str(yyjson_obj_get(at_val, "type"));
-                    attr_list[a_idx].type = AV_AT_STR;
-                    if (tstr != NULL) {
-                        if (strcmp(tstr, "i32") == 0)
-                            attr_list[a_idx].type = AV_AT_I32;
-                        else if (strcmp(tstr, "bool") == 0)
-                            attr_list[a_idx].type = AV_AT_BOOL;
-                        else if (strcmp(tstr, "u64") == 0)
-                            attr_list[a_idx].type = AV_AT_U64;
-                        else if (strcmp(tstr, "u256") == 0)
-                            attr_list[a_idx].type = AV_AT_U256;
-                        else if (strcmp(tstr, "dec") == 0)
-                            attr_list[a_idx].type = AV_AT_DEC;
-                        else if (strcmp(tstr, "bytes") == 0)
-                            attr_list[a_idx].type = AV_AT_BYTES;
-                    }
-                    attr_list[a_idx].indexed = (attr_list[a_idx].type != AV_AT_BYTES);
-                    yyjson_val *vnode = yyjson_obj_get(at_val, "value");
-                    if (yyjson_is_str(vnode)) {
-                        const char *vs = yyjson_get_str(vnode);
-                        attr_list[a_idx].val = (const uint8_t *) vs;
-                        attr_list[a_idx].len = strlen(vs);
-                    }
-                    a_idx++;
-                }
+                if (a_idx >= total_attrs)
+                    break;
+                if (build_user_attr(coldef, yyjson_get_str(key_node), yyjson_obj_iter_get_val(key_node),
+                                    arena, &attr_list[a_idx], e) != AV_OK)
+                    return AV_ERR;
+                a_idx++;
             }
         }
 
@@ -1078,6 +1145,8 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
                 n_ops++;
             }
         } else {
+            if (!has_ttl && !apply_default_ttl(coldef, &exp_at, &min_life, e))
+                return AV_ERR;
             results[i].op = "create";
             uint8_t salt[16];
             for (int s = 0; s < 16; s++) {

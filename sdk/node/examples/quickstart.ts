@@ -234,6 +234,9 @@ async function main(): Promise<void> {
       `Search returned ${searchAfterWrite.hits.length} hit(s) at asOfBlock=${searchAfterWrite.asOfBlock}`,
     );
 
+    // Session consistency: this read waits until the daemon has synced our write block.
+    const written = await writeClient.get("demo.docs", "quickstart-doc-1");
+    console.log(`Read back ${written.id}`);
     console.log("Deleting written entities...");
     const delRes = await writeClient.delete("demo.docs", {
       refs: ["quickstart-doc-1", "quickstart-doc-2", "quickstart-doc-3"],
@@ -243,7 +246,7 @@ async function main(): Promise<void> {
     );
 
     console.log("Demonstrating prepare for client-side signing...");
-    const prepRes = await writeClient.prepare("demo.docs", [writeEntities[0]], {
+    const prepRes = await writeClient.prepare("demo.docs", [{ ...writeEntities[0], id: "quickstart-prepare-1" }], {
       from: "0x1111111111111111111111111111111111111111",
     });
     console.log(

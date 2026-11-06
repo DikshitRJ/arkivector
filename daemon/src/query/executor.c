@@ -3,6 +3,7 @@
  */
 #include "query/executor.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -107,6 +108,8 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
         double score =
             (params->oc != NULL && strcmp(params->oc->op, "<=>") == 0) ? (1.0 - distance) : (-distance);
 
+        if (isnan(distance))
+            continue; /* zero-norm cosine operands: JSON cannot carry NaN */
         if (params->has_max_distance && distance > params->max_distance)
             continue;
         if (params->has_min_score && score < params->min_score)

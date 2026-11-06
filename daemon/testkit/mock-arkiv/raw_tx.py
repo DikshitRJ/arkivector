@@ -133,7 +133,7 @@ def decode_attribute(b: bytes) -> Attr:
     tid = int.from_bytes(b[32:64], "big")
     indexed = bool(tid & 0x80)
     type_code = tid & 0x7F
-    type_map = {1: "bool", 2: "i32", 3: "u64", 4: "u256", 5: "dec", 6: "str", 7: "bytes", 8: "addr", 9: "key"}
+    type_map = {1: "bool", 2: "i32", 3: "u64", 4: "u256", 5: "dec", 7: "bytes", 8: "str", 9: "addr", 10: "key"}  # attributes-and-types.md
     typ = type_map.get(type_code, "bytes")
     val_off = int.from_bytes(b[64:96], "big")
     val_len = int.from_bytes(b[val_off : val_off + 32], "big")
@@ -175,8 +175,8 @@ def decode_execute(calldata: bytes) -> list[Op]:
         data_len = int.from_bytes(item[data_off : data_off + 32], "big")
         op_data = item[data_off + 32 : data_off + 32 + data_len]
         if opcode == 1:  # CREATE
-            head_off = int.from_bytes(op_data[:32], "big")
-            body = op_data[head_off:]
+            # encodeAbiParameters(uint128, uint64, uint64, uint8, Attribute[]): a parameter list, no leading offset
+            body = op_data
             salt = int.from_bytes(body[:32], "big")
             expires_at = int.from_bytes(body[32:64], "big")
             min_lifetime = int.from_bytes(body[64:96], "big")
@@ -185,8 +185,7 @@ def decode_execute(calldata: bytes) -> list[Op]:
             attrs = decode_attrs_array(body[attrs_off:])
             ops.append(Op("create", salt=salt, expires_at=expires_at, min_lifetime=min_lifetime, flags=flags, attrs=attrs))
         elif opcode == 2:  # PATCH
-            head_off = int.from_bytes(op_data[:32], "big")
-            body = op_data[head_off:]
+            body = op_data  # encodeAbiParameters(bytes32, Attribute[])
             key = body[:32]
             attrs_off = int.from_bytes(body[32:64], "big")
             attrs = decode_attrs_array(body[attrs_off:])
