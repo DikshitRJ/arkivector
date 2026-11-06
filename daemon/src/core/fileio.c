@@ -64,7 +64,13 @@ char *av_read_file(const char *path, const char *what, size_t max_bytes, size_t 
         av_err_set(e, "invalid_argument", "%s: %s is larger than %zu bytes", what, path, max_bytes);
         return NULL;
     }
-    buf[len] = '\0';
+    if (len >= cap) { /* unreachable: the read loop always leaves room for the NUL */
+        free(buf);
+        av_err_set(e, "internal", "%s: read overflow on %s", what, path);
+        return NULL;
+    }
+    /* len < cap == allocated size (checked above); the analyzer cannot track cap through realloc. */
+    buf[len] = '\0'; // NOLINT(clang-analyzer-security.ArrayBound)
     *out_len = len;
     return buf;
 }

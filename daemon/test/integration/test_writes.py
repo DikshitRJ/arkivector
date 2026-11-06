@@ -68,6 +68,7 @@ def test_entities_prepare(daemon: DaemonClient, collection_name: str, demo_fixtu
         "entities": [
             {
                 "id": "doc-prepare-1",
+                "ttl": {"days": 1},  # demo.docs has no default_ttl (collections.md)
                 "vector": first_vec,
                 "attributes": {
                     "title": {"type": "str", "value": "Test Document Prepare"}
@@ -115,6 +116,7 @@ def test_write_idempotency_key(daemon: DaemonClient, collection_name: str, demo_
         "entities": [
             {
                 "id": "doc-idem-1",
+                "ttl": {"days": 1},  # demo.docs has no default_ttl (collections.md)
                 "vector": first_vec,
                 "attributes": {
                     "tag": {"type": "str", "value": "idempotent-write"}
@@ -142,6 +144,7 @@ def test_write_idempotency_key(daemon: DaemonClient, collection_name: str, demo_
         "entities": [
             {
                 "id": "doc-idem-2-conflicting",
+                "ttl": {"days": 1},  # demo.docs has no default_ttl (collections.md)
                 "vector": first_vec,
                 "attributes": {
                     "tag": {"type": "str", "value": "different-write"}

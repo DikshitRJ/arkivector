@@ -106,7 +106,6 @@ static av_status build_user_attr(const av_coldef *def, const char *name, yyjson_
     strncpy(out->name, name, sizeof(out->name) - 1);
 
     av_attr_type t = AV_AT_TOMBSTONE;
-    bool have_type = false;
     yyjson_val *vnode = jv;
     if (yyjson_is_obj(jv)) {
         const char *ts = yyjson_get_str(yyjson_obj_get(jv, "type"));
@@ -114,20 +113,17 @@ static av_status build_user_attr(const av_coldef *def, const char *name, yyjson_
             av_err_set(e, "invalid_argument", "attribute '%s': unknown type", name);
             return AV_ERR;
         }
-        have_type = true;
         vnode = yyjson_obj_get(jv, "value");
     } else {
-        for (size_t i = 0; i < def->n_attrs; i++) {
+        bool in_schema = false;
+        for (size_t i = 0; i < def->n_attrs && !in_schema; i++) {
             if (strcmp(def->attrs[i].name, name) == 0) {
                 t = def->attrs[i].type;
-                have_type = true;
-                break;
+                in_schema = true;
             }
         }
-        if (!have_type) {
+        if (!in_schema)
             t = yyjson_is_bool(jv) ? AV_AT_BOOL : yyjson_is_int(jv) ? AV_AT_I32 : AV_AT_STR;
-            have_type = true;
-        }
     }
     out->type = (uint8_t) t;
     out->indexed = t != AV_AT_BYTES;

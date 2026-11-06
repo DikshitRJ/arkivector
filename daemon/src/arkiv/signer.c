@@ -235,7 +235,8 @@ av_status av_signer_create_keystore(const char *path, const char *password, av_s
         int64_t c_pbkdf = yyjson_get_sint(yyjson_obj_get(kdfparams, "c"));
         uint64_t dklen = yyjson_get_uint(yyjson_obj_get(kdfparams, "dklen"));
         const char *prf = yyjson_get_str(yyjson_obj_get(kdfparams, "prf"));
-        if (c_pbkdf >= 1 && c_pbkdf <= 10000000 && dklen == 32 && prf != NULL && strcmp(prf, "hmac-sha256") == 0) {
+        if (c_pbkdf >= 1 && c_pbkdf <= 10000000 && dklen == 32 && prf != NULL &&
+            strcmp(prf, "hmac-sha256") == 0) {
             kdf_ok = PKCS5_PBKDF2_HMAC(password, (int) strlen(password), salt, (int) salt_len, (int) c_pbkdf,
                                        EVP_sha256(), (int) sizeof(derived), derived) == 1;
         }
@@ -267,7 +268,8 @@ av_status av_signer_create_keystore(const char *path, const char *password, av_s
     EVP_CIPHER_CTX *cctx = EVP_CIPHER_CTX_new();
     bool dec_ok = cctx != NULL && EVP_DecryptInit_ex(cctx, EVP_aes_128_ctr(), NULL, derived, iv) == 1 &&
                   EVP_DecryptUpdate(cctx, priv, &out_len1, ct, (int) sizeof(ct)) == 1 && out_len1 >= 0 &&
-                  out_len1 <= (int) sizeof(priv) && EVP_DecryptFinal_ex(cctx, priv + out_len1, &out_len2) == 1 &&
+                  out_len1 <= (int) sizeof(priv) &&
+                  EVP_DecryptFinal_ex(cctx, priv + out_len1, &out_len2) == 1 &&
                   out_len1 + out_len2 == (int) sizeof(priv);
     EVP_CIPHER_CTX_free(cctx);
     explicit_bzero(derived, sizeof(derived));
