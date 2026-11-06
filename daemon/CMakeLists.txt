@@ -209,7 +209,8 @@ set(AV_CORE_SOURCES
     src/write/writer.c
     src/server/idempotency.c
     src/server/auth.c
-    src/server/ratelimit.c)
+    src/server/ratelimit.c
+    src/sync/discovery.c)
 
 # Build-time generated headers (no runtime JSON reading, no runtime licence file lookup).
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
