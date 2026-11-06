@@ -1,0 +1,35 @@
+# arkivectord example configuration (Arkiv Rabdi testnet).
+#   arkivectord --config arkivector.example.toml
+# Every key can be overridden by an environment variable ARKIVECTOR_<SECTION>_<KEY>,
+# e.g. ARKIVECTOR_ARKIV_ACCESS_KEY=... or ARKIVECTOR_LOG_LEVEL=debug.
+#
+# Writes (managed upserts/deletes) need a signer: set ARKIV_PRIVATE_KEY (hex, 0x optional) in the
+# environment. Without it the daemon runs read-only (search, get, scroll, count, prepare).
+# Never put the private key in this file.
+
+[server]
+listen = "127.0.0.1:8080"     # bind to 127.0.0.1 unless you also configure api_keys_file
+# api_keys_file = "/etc/arkivector/api_keys.toml"
+# ratelimit_rps = 50
+# ratelimit_burst = 100
+
+[arkiv]
+rpc_urls = ["https://rpc.rabdi.db-chain.testnet.arkiv.network"]
+ws_url = ""                   # "" = HTTP polling; or "wss://rpc.rabdi.db-chain.testnet.arkiv.network"
+access_key = ""               # Arkiv Hub access key (https://hub.arkiv.network/access-keys); "" = throttled public pool
+chain_id = 7794095            # Rabdi
+confirmations = 2             # blocks behind head before data is applied (reorg safety)
+max_log_range = 2000          # eth_getLogs block range per request
+
+[storage]
+data_dir = "/var/lib/arkivector"
+map_size = 1073741824         # LMDB map size in bytes (1 GiB)
+
+[sync]
+poll_interval_ms = 2000       # Rabdi produces a block every 2 s
+
+[log]
+level = "info"                # debug | info | warn | error
+format = "text"               # text | json
+
+# Collections can also be created at runtime with POST /v1/collections (or the SDKs).
