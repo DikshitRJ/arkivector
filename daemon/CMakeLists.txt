@@ -84,7 +84,8 @@ set(AV_PGCOMPAT_VERBATIM
     src/pgcompat/src/pairingheap.c
     src/pgcompat/src/pg_prng.c
     src/pgcompat/src/pg_bitutils.c
-    src/pgcompat/src/f2s.c)
+    src/pgcompat/src/f2s.c
+    src/pgcompat/src/varbit_io.c)
 foreach(f ${AV_PGCOMPAT_VERBATIM})
   if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${f})
     list(REMOVE_ITEM AV_PGCOMPAT_VERBATIM ${f})
@@ -97,11 +98,12 @@ foreach(f ${AV_PGCOMPAT_OURS})
 endforeach()
 
 add_library(av_pgcompat STATIC ${AV_PGCOMPAT_OURS} ${AV_PGCOMPAT_VERBATIM})
-target_include_directories(av_pgcompat PUBLIC
+# Copied/shim headers are SYSTEM for consumers so our strict warnings skip them.
+target_include_directories(av_pgcompat SYSTEM PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pgcompat/include
     ${CMAKE_CURRENT_BINARY_DIR}/generated
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/pgvector
-    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pgvector)
+target_include_directories(av_pgcompat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(av_pgcompat PUBLIC ARKIVECTOR=1)
 target_link_libraries(av_pgcompat PUBLIC av_base Threads::Threads m)
 target_compile_options(av_pgcompat PRIVATE -Wall -Wextra -Wno-unused-parameter)
@@ -121,9 +123,6 @@ set(AV_PGVECTOR_SOURCES
     src/pgvector/sparsevec_io.c
     src/pgvector/sparsevec_funcs.c)
 set(AV_PGVECTOR_OPTIONAL
-    src/pgvector/vector_kernels.c
-    src/pgvector/halfvec_kernels.c
-    src/pgvector/sparsevec_kernels.c
     src/pgvector/hnswutils.c
     src/pgvector/hnswbuild_mem.c
     src/pgvector/av_hnsw_glue.c)
@@ -137,6 +136,8 @@ endforeach()
 add_library(av_pgvector STATIC ${AV_PGVECTOR_SOURCES})
 target_link_libraries(av_pgvector PUBLIC av_pgcompat)
 av_upstream(av_pgvector)
+include(KernelTiers)
+av_add_kernel_tiers(av_pgvector)
 if(AV_NATIVE)
   target_compile_options(av_pgvector PRIVATE -march=native)
 endif()
@@ -146,7 +147,11 @@ endif()
 # ---------------------------------------------------------------------------
 set(AV_CORE_SOURCES
     src/version.c
-    src/log.c)
+    src/log.c
+    src/codec/vtype.c
+    src/kernels/dispatch.c
+    src/kernels/opclass.c
+    src/codec/text.c)
 
 add_library(av_core STATIC ${AV_CORE_SOURCES})
 target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
