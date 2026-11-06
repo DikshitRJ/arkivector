@@ -1,0 +1,117 @@
+name: SDK CI
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'sdk/**'
+      - 'spec/**'
+      - '.github/workflows/sdk.yml'
+  pull_request:
+    branches: ['**']
+    paths:
+      - 'sdk/**'
+      - 'spec/**'
+      - '.github/workflows/sdk.yml'
+
+jobs:
+  phase-1-code-quality:
+    name: "Phase 1: Code Quality & Compilation (${{ matrix.lang }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lang: python
+            python-version: "3.11"
+          - lang: node
+            node-version: "20"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.lang == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Python lint & typecheck
+        if: matrix.lang == 'python'
+        run: |
+          cd sdk/python
+          pip install ruff mypy hatchling
+          ruff check .
+          ruff format --check .
+          mypy --strict src
+
+      - name: Set up Node.js
+        if: matrix.lang == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Node.js lint & build
+        if: matrix.lang == 'node'
+        run: |
+          cd sdk/node
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm run build
+
+  phase-2-offline-contract:
+    name: "Phase 2: Offline Contract & Golden Check (${{ matrix.lang }})"
+    needs: phase-1-code-quality
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lang: python
+            python-version: "3.11"
+          - lang: node
+            node-version: "20"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.lang == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Python golden check
+        if: matrix.lang == 'python'
+        run: |
+          cd sdk/python
+          python examples/golden_check.py
+
+      - name: Set up Node.js
+        if: matrix.lang == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Node.js golden check
+        if: matrix.lang == 'node'
+        run: |
+          cd sdk/node
+          npm ci
+          npm run build
+          node dist/examples/golden_check.js
+
+  sdk-ci-gate:
+    name: "SDK Verification Gate"
+    needs: [phase-1-code-quality, phase-2-offline-contract]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Verify All Phases Passed
+        run: |
+          if [ "${{ needs.phase-1-code-quality.result }}" != "success" ] || [ "${{ needs.phase-2-offline-contract.result }}" != "success" ]; then
+            echo "CI quality gates failed."
+            exit 1
+          fi
+          echo "All SDK CI quality gates passed successfully!"
