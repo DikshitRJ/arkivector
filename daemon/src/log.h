@@ -3,14 +3,19 @@
  *
  * av_err carries an error code from spec/error-codes.json ("invalid_vector", ...),
  * an optional VectorBytes sub-code (VB_*), the JSON field it refers to, a byte
- * position (filters) and the block for consistency errors. Logging (av_log) is
- * completed in D2: until then it writes text lines to stderr.
+ * position (filters) and the block for consistency errors.
+ *
+ * Logging: av_log(level, module, fmt, ...) writes one line per call to stderr, as text
+ * (`ts=... level=info module=http msg="..."`) or JSON. Secrets are scrubbed from every
+ * message (av_log_redact). Thread safety: all functions are thread-safe (one fwrite per
+ * line; level and format are atomics).
  */
 #ifndef AV_LOG_H
 #define AV_LOG_H
 
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef enum { AV_OK = 0, AV_ERR = 1 } av_status;
@@ -45,5 +50,20 @@ void av_vlog(av_log_level level, const char *module, const char *fmt, va_list ap
     __attribute__((format(printf, 3, 0)));
 void av_log_set_level(av_log_level level);
 bool av_log_enabled(av_log_level level);
+
+typedef enum { AV_LOG_TEXT = 0, AV_LOG_JSON = 1 } av_log_format;
+void av_log_set_format(av_log_format format);
+
+/* Parse "debug|info|warn|error" / "text|json". Return false on an unknown name. */
+bool av_log_parse_level(const char *name, av_log_level *out);
+bool av_log_parse_format(const char *name, av_log_format *out);
+
+/*
+ * Copy in to out (capacity cap, always NUL-terminated, truncated if needed) with secret
+ * values replaced by [REDACTED]. Names matched (case-insensitive, at a word start, followed
+ * by ':' '=' or space): X-API-KEY, Authorization (and a Bearer/Basic scheme word after it),
+ * Bearer, access_key, api_key, private_key, secret, password, token.
+ */
+void av_log_redact(const char *in, char *out, size_t cap);
 
 #endif /* AV_LOG_H */
