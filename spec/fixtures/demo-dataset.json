@@ -1,0 +1,7596 @@
+{
+ "spec_version": "1.0.0",
+ "seed": 4,
+ "collection": {
+  "name": "demo.docs",
+  "schema_tag": "arkivector.v1.demo.docs",
+  "column": {
+   "type": "halfvec",
+   "dimensions": 8
+  },
+  "index": {
+   "method": "hnsw",
+   "opclass": "halfvec_cosine_ops",
+   "with": {
+    "m": 16,
+    "ef_construction": 64
+   }
+  },
+  "writers": [
+   "0x1111111111111111111111111111111111111111"
+  ],
+  "membership": "creator",
+  "attributes": {
+   "category": "str",
+   "score": "dec",
+   "published": "bool",
+   "rank": "i32"
+  }
+ },
+ "entities": [
+  {
+   "id": "doc-000",
+   "key": "0x3033fe987218e8e7ad6012223da12d365d196d4fc543a1881f5de548ce0ec1b7",
+   "vector": [
+    -0.52490234375,
+    0.28271484375,
+    0.11676025390625,
+    0.6318359375,
+    -0.89990234375,
+    0.225341796875,
+    -0.8642578125,
+    -0.390625
+   ],
+   "vector_bytes": "QVYSAAgAAAAzuIY0eS8OOTO7NjPqukC2",
+   "document": "Demo document 0 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.06"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -24
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-001",
+   "key": "0x371b3c2889b76b22f6c761ba74534c451f5d7226673eab6e363a11a61e2af6f6",
+   "vector": [
+    0.04254150390625,
+    0.384765625,
+    0.84033203125,
+    -0.24169921875,
+    -0.359375,
+    -0.255126953125,
+    0.15673828125,
+    -0.6162109375
+   ],
+   "vector_bytes": "QVYSAAgAAAByKSg2uTq8s8C1FbQEMe64",
+   "document": "Demo document 1 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.97"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 34
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-002",
+   "key": "0x7d48afc36d7f8c235b0c533846d0bbf45d88beda1d0caf9ae4a4f64b3b7be65d",
+   "vector": [
+    -0.035980224609375,
+    -0.9345703125,
+    -0.23828125,
+    0.361083984375,
+    0.385009765625,
+    0.2056884765625,
+    0.386962890625,
+    0.285400390625
+   ],
+   "vector_bytes": "QVYSAAgAAACbqHq7oLPHNSk2lTIxNpE0",
+   "document": "Demo document 2 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.02"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -184
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-003",
+   "key": "0x856dc18a9eb8e4ff28c4844ad6e663880b4b6bf29dac435d1bb278cf747483a5",
+   "vector": [
+    -0.92822265625,
+    -0.07928466796875,
+    0.1407470703125,
+    -0.6982421875,
+    -0.689453125,
+    0.287841796875,
+    0.66748046875,
+    -0.916015625
+   ],
+   "vector_bytes": "QVYSAAgAAABtuxOtgTCWuYS5mzRXOVS7",
+   "document": "Demo document 3 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.80"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -101
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-004",
+   "key": "0xe6721f7cf32c765a7c529b8b4f5752ac2f1f3cf8c33314150010d9b8437802d0",
+   "vector": [
+    -0.028564453125,
+    0.8681640625,
+    0.8154296875,
+    0.1973876953125,
+    -0.79541015625,
+    0.1514892578125,
+    -0.58056640625,
+    -0.4814453125
+   ],
+   "vector_bytes": "QVYSAAgAAABQp/I6hjpRMl262TCluLS3",
+   "document": "Demo document 4 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.70"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -434
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-005",
+   "key": "0x974549804125c2da2374355890f00f737762d32a1fb96f1c49dc2a3721182a13",
+   "vector": [
+    0.50146484375,
+    -0.83203125,
+    -0.7080078125,
+    -0.84619140625,
+    0.5361328125,
+    0.81591796875,
+    -0.61767578125,
+    0.437255859375
+   ],
+   "vector_bytes": "QVYSAAgAAAADOKi6qrnFuko4hzrxuP82",
+   "document": "Demo document 5 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.08"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 436
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-006",
+   "key": "0x1aa85ce9d6ec1b50a928b30fddf78d4f5ea2ed7ec8176a67b9e21fcf79ac841f",
+   "vector": [
+    0.45751953125,
+    0.92236328125,
+    0.058074951171875,
+    -0.626953125,
+    0.62255859375,
+    0.42333984375,
+    0.8515625,
+    -0.5380859375
+   ],
+   "vector_bytes": "QVYSAAgAAABSN2E7bysEufs4xjbQOk64",
+   "document": "Demo document 6 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.08"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 439
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-007",
+   "key": "0x6086a4cb0b9259e3930fcb0f73ae427cc0e389a48860ef24436fbd2e8dd8ab4d",
+   "vector": [
+    0.181396484375,
+    -0.22607421875,
+    -0.54443359375,
+    0.0927734375,
+    0.1944580078125,
+    -0.39599609375,
+    0.263427734375,
+    -0.85302734375
+   ],
+   "vector_bytes": "QVYSAAgAAADOMTyzW7jwLTkyVrY3NNO6",
+   "document": "Demo document 7 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.09"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 360
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-008",
+   "key": "0xf5fae31b6c5c9d731e48a913e642384e164b08721c010350ae7bc98db59cb0bd",
+   "vector": [
+    -0.8974609375,
+    0.017547607421875,
+    0.9658203125,
+    -0.1634521484375,
+    0.94091796875,
+    0.66845703125,
+    -0.53271484375,
+    -0.8984375
+   ],
+   "vector_bytes": "QVYSAAgAAAAuu34kujs7sYc7WTlDuDC7",
+   "document": "Demo document 8 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.64"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 450
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-009",
+   "key": "0xbf365775263585eeb5d5de3edba8ce4754f7e8d7957fd451408a851c952c4d73",
+   "vector": [
+    0.82958984375,
+    -0.151123046875,
+    -0.755859375,
+    0.43798828125,
+    0.1407470703125,
+    -0.164794921875,
+    -0.4638671875,
+    0.044708251953125
+   ],
+   "vector_bytes": "QVYSAAgAAACjOtawDLoCN4EwRrFst7kp",
+   "document": "Demo document 9 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.29"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -177
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-010",
+   "key": "0x4a8949917dab2ed18fe017c29aa0c6ebc1cfcccf9e9cf4fe122c4031c6a41134",
+   "vector": [
+    -0.11676025390625,
+    0.9658203125,
+    -0.248779296875,
+    0.8095703125,
+    0.9619140625,
+    0.2230224609375,
+    -0.55419921875,
+    0.256103515625
+   ],
+   "vector_bytes": "QVYSAAgAAAB5r7o79rN6OrI7IzNvuBk0",
+   "document": "Demo document 10 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.79"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -362
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-011",
+   "key": "0xa1ff90153254f050860fa72091a97549f615cad7e635e23400e2d89bf16df828",
+   "vector": [
+    -0.332763671875,
+    -0.75732421875,
+    -0.67529296875,
+    -0.07763671875,
+    -0.466796875,
+    -0.1820068359375,
+    0.484619140625,
+    -0.59814453125
+   ],
+   "vector_bytes": "QVYSAAgAAABTtQ+6Z7n4rHi307HBN8m4",
+   "document": "Demo document 11 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.66"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 288
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-012",
+   "key": "0xc381c7a579883e14bb2f5ee55e30d50f1159eccd09ebbb843d805588369ca34a",
+   "vector": [
+    -0.2310791015625,
+    -0.306884765625,
+    -0.467529296875,
+    0.97119140625,
+    0.374267578125,
+    -0.85986328125,
+    -0.2822265625,
+    -0.8056640625
+   ],
+   "vector_bytes": "QVYSAAgAAABls+m0e7fFO/014bqEtHK6",
+   "document": "Demo document 12 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.76"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 92
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-013",
+   "key": "0xedef68a4e44970785905c81c2644117f75fa030a923e036a78ae84a323d67092",
+   "vector": [
+    -0.818359375,
+    -0.552734375,
+    -0.84765625,
+    -0.81298828125,
+    0.281982421875,
+    -0.1748046875,
+    0.368408203125,
+    0.8603515625
+   ],
+   "vector_bytes": "QVYSAAgAAACMumy4yLqBuoM0mLHlNeI6",
+   "document": "Demo document 13 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.69"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 213
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-014",
+   "key": "0x9a2e57749ef23d5bb3b242b702f881a56fb069f5e8bb993ebbcc08feeb66cc5a",
+   "vector": [
+    0.54833984375,
+    0.9521484375,
+    0.62646484375,
+    0.2685546875,
+    -0.734375,
+    -0.1588134765625,
+    -0.55517578125,
+    -0.11651611328125
+   ],
+   "vector_bytes": "QVYSAAgAAABjOJ47AzlMNOC5FbFxuHWv",
+   "document": "Demo document 14 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.05"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -206
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-015",
+   "key": "0xd2cba8aeabce1fcce91e20cf07ff53c744c955f8b734b30802c28b789bda6d13",
+   "vector": [
+    -0.9873046875,
+    0.12451171875,
+    -0.1768798828125,
+    0.90380859375,
+    -0.376220703125,
+    -0.441162109375,
+    -0.5341796875,
+    0.99267578125
+   ],
+   "vector_bytes": "QVYSAAgAAADmu/gvqbE7OwW2D7dGuPE7",
+   "document": "Demo document 15 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.83"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -452
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-016",
+   "key": "0x3aac32c2b367f8359772b8e89fef10043d5fca071fd2c7b02606681d940ccb08",
+   "vector": [
+    -0.2220458984375,
+    0.6640625,
+    0.96533203125,
+    -0.6533203125,
+    0.7587890625,
+    -0.60595703125,
+    -0.3740234375,
+    0.8603515625
+   ],
+   "vector_bytes": "QVYSAAgAAAAbs1A5uTs6uRI62bj8teI6",
+   "document": "Demo document 16 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.51"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 274
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-017",
+   "key": "0x6aa9e9e7367c77d561417e04edc04bd425278b47a849fed5d5577dcd6fa95f12",
+   "vector": [
+    0.9638671875,
+    0.2578125,
+    -0.9453125,
+    0.51904296875,
+    -0.1795654296875,
+    0.2403564453125,
+    0.241943359375,
+    0.4853515625
+   ],
+   "vector_bytes": "QVYSAAgAAAC2OyA0kLsnOL+xsTO+M8Q3",
+   "document": "Demo document 17 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.62"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 50
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-018",
+   "key": "0xe92eacd0d4e78cc0e0f16aba948bd2539bec277388a53cc3968b40994364640a",
+   "vector": [
+    0.85546875,
+    0.8818359375,
+    0.642578125,
+    0.609375,
+    0.77392578125,
+    0.414306640625,
+    0.828125,
+    -0.2744140625
+   ],
+   "vector_bytes": "QVYSAAgAAADYOg47JDngODE6oTagOmS0",
+   "document": "Demo document 18 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.90"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 75
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-019",
+   "key": "0xc9005068a31f01e27c839ab9ca7ab8e6a879db8d9ed65fbd060746828d1a2d97",
+   "vector": [
+    -0.85986328125,
+    -0.0697021484375,
+    0.29296875,
+    0.62841796875,
+    0.98388671875,
+    -0.6748046875,
+    0.64111328125,
+    0.94775390625
+   ],
+   "vector_bytes": "QVYSAAgAAADhunassDQHOd87ZrkhOZU7",
+   "document": "Demo document 19 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.25"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 400
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-020",
+   "key": "0x46acdc8bdd89d446a975d5a32605e2ab896bea090f97a280cb10bea208e742bb",
+   "vector": [
+    0.220947265625,
+    -0.61865234375,
+    0.57666015625,
+    0.9033203125,
+    0.9140625,
+    0.5947265625,
+    -0.95947265625,
+    -0.732421875
+   ],
+   "vector_bytes": "QVYSAAgAAAASM/O4nTg6O1A7wjitu9y5",
+   "document": "Demo document 20 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.07"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 33
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-021",
+   "key": "0x902c2320a4b091a9ef70949ba5bfb3f42e2bd2724735f2c28653811fd2cfa17c",
+   "vector": [
+    -0.791015625,
+    0.72607421875,
+    -0.05810546875,
+    0.96826171875,
+    -0.974609375,
+    -0.15771484375,
+    -0.49462890625,
+    -0.6552734375
+   ],
+   "vector_bytes": "QVYSAAgAAABUus85cKu/O8y7DLHqtz65",
+   "document": "Demo document 21 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.81"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 145
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-022",
+   "key": "0x6ebb53306f7255269e77dfccecf074d22d59d2259358c01200af98be758404c1",
+   "vector": [
+    -0.321533203125,
+    -0.12548828125,
+    -0.6923828125,
+    -0.1749267578125,
+    0.478515625,
+    0.8544921875,
+    -0.343994140625,
+    -0.794921875
+   ],
+   "vector_bytes": "QVYSAAgAAAAltQSwirmZsag31jqBtVy6",
+   "document": "Demo document 22 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.70"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 371
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-023",
+   "key": "0x51fd71a6883f3da0d210f9d8e2d4e77aaabe56cdcd39697b6354275956029f63",
+   "vector": [
+    0.78662109375,
+    0.7587890625,
+    0.71923828125,
+    0.04119873046875,
+    0.7275390625,
+    0.359619140625,
+    0.11761474609375,
+    0.0556640625
+   ],
+   "vector_bytes": "QVYSAAgAAABLOhI6wTlGKdI5wTWHLyAr",
+   "document": "Demo document 23 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.03"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 438
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-024",
+   "key": "0x1361925460958f5d968053ee7de6d5078c8b4de4c31d301ff83d20b0501ab504",
+   "vector": [
+    -0.1527099609375,
+    0.8515625,
+    -0.08648681640625,
+    -0.34423828125,
+    -0.4013671875,
+    0.12030029296875,
+    -0.42333984375,
+    -0.43798828125
+   ],
+   "vector_bytes": "QVYSAAgAAADjsNA6ia2CtWy2sy/GtgK3",
+   "document": "Demo document 24 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.54"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -402
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-025",
+   "key": "0x080f883caf56b33934c76d102be361c299ed07fae38c008eb3b08efe64cafde9",
+   "vector": [
+    0.95166015625,
+    0.322509765625,
+    -0.86376953125,
+    0.359130859375,
+    -0.051849365234375,
+    -0.426513671875,
+    -0.131103515625,
+    0.55908203125
+   ],
+   "vector_bytes": "QVYSAAgAAACdOyk16bq/NaOq07YysHk4",
+   "document": "Demo document 25 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.60"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -392
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-026",
+   "key": "0x7297574276d072c1c28caa5bf16247974aee9d21a2739e237d5916de5ccce5b6",
+   "vector": [
+    0.73583984375,
+    -0.95654296875,
+    -0.94677734375,
+    0.9189453125,
+    -0.5009765625,
+    0.724609375,
+    -0.55615234375,
+    -0.33935546875
+   ],
+   "vector_bytes": "QVYSAAgAAADjOae7k7taOwK4zDlzuG61",
+   "document": "Demo document 26 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.33"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 234
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-027",
+   "key": "0x43c496c7b2fa228db6edac8c40db3d7c6d94b773706bf7464869782fa71163e6",
+   "vector": [
+    0.87939453125,
+    0.1708984375,
+    -0.8955078125,
+    -0.68408203125,
+    0.93896484375,
+    -0.476318359375,
+    0.0518798828125,
+    0.7392578125
+   ],
+   "vector_bytes": "QVYSAAgAAAAJO3gxKrt5uYM7n7ekKuo5",
+   "document": "Demo document 27 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.02"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -475
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-028",
+   "key": "0x18e343ca00d53a262f2c629e855ff3bfd0707963538e59fd51ae1394d898174f",
+   "vector": [
+    -0.560546875,
+    -0.486083984375,
+    0.1356201171875,
+    -0.43505859375,
+    -0.11456298828125,
+    0.4365234375,
+    -0.0064849853515625,
+    0.74365234375
+   ],
+   "vector_bytes": "QVYSAAgAAAB8uMe3VzD2tlWv/DaknvM5",
+   "document": "Demo document 28 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.13"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 329
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-029",
+   "key": "0x2b9060d7210da8868c2481908f01eda9baf7aae00322e87c25fbbd5181907725",
+   "vector": [
+    -0.3955078125,
+    0.41796875,
+    -0.33544921875,
+    -0.317138671875,
+    0.7998046875,
+    -0.56640625,
+    -0.2213134765625,
+    -0.1778564453125
+   ],
+   "vector_bytes": "QVYSAAgAAABUtrA2XrUTtWY6iLgVs7Gx",
+   "document": "Demo document 29 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.09"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -210
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-030",
+   "key": "0xa12e55fa956030ac4c737896f6583ba2bbdf30d67a6f2cbc63d7df61722b3c91",
+   "vector": [
+    0.96728515625,
+    0.372314453125,
+    0.6103515625,
+    -0.22119140625,
+    -0.5439453125,
+    -0.8876953125,
+    0.537109375,
+    0.2215576171875
+   ],
+   "vector_bytes": "QVYSAAgAAAC9O/U14jgUs1q4GrtMOBcz",
+   "document": "Demo document 30 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.38"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -186
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-031",
+   "key": "0x273eb7993ac25e02ea87fd73bd0c3e90d9f6472804265023916a796a20edf8bc",
+   "vector": [
+    0.90869140625,
+    0.0665283203125,
+    0.84375,
+    -0.270263671875,
+    -0.95166015625,
+    0.173828125,
+    0.0239715576171875,
+    0.931640625
+   ],
+   "vector_bytes": "QVYSAAgAAABFO0IswDpTtJ27kDEjJnQ7",
+   "document": "Demo document 31 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.89"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -268
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-032",
+   "key": "0xc70adaa9cf3cb5712f7c62ecc62b40c7a8d6fe22695d0f64f9e083a64e86eae8",
+   "vector": [
+    0.1883544921875,
+    0.1142578125,
+    -0.611328125,
+    0.414306640625,
+    -0.462646484375,
+    -0.027618408203125,
+    -0.433349609375,
+    -0.458984375
+   ],
+   "vector_bytes": "QVYSAAgAAAAHMlAv5LihNme3Eqfvtli3",
+   "document": "Demo document 32 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.37"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -350
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-033",
+   "key": "0x4863c3d4ef6efeba7227fabded01f13cdf846047b8386eb0f9d588fe52ffc3b5",
+   "vector": [
+    -0.6689453125,
+    -0.8408203125,
+    -0.365966796875,
+    0.97119140625,
+    0.3232421875,
+    -0.646484375,
+    -0.2073974609375,
+    -0.72509765625
+   ],
+   "vector_bytes": "QVYSAAgAAABaubq627XFOyw1LLmjss25",
+   "document": "Demo document 33 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.36"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 218
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-034",
+   "key": "0x8ea432cf785b1147475ff2a313162e6a17bb47e800279247b7470053fabeef01",
+   "vector": [
+    0.90869140625,
+    -0.41259765625,
+    0.38330078125,
+    -0.94775390625,
+    0.84716796875,
+    -0.49462890625,
+    -0.51416015625,
+    -0.31640625
+   ],
+   "vector_bytes": "QVYSAAgAAABFO5q2IjaVu8c66rcduBC1",
+   "document": "Demo document 34 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.34"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -202
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-035",
+   "key": "0x082c6f622c824fafc2361ed9b66bd7d978f963eb197f7722afe0b9d8796dc231",
+   "vector": [
+    -0.6943359375,
+    -0.442138671875,
+    0.099609375,
+    -0.4619140625,
+    0.2060546875,
+    -0.96533203125,
+    0.412841796875,
+    -0.049835205078125
+   ],
+   "vector_bytes": "QVYSAAgAAACOuRO3YC5kt5gyububNmGq",
+   "document": "Demo document 35 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.42"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 277
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-036",
+   "key": "0x61eb748a6db4aa7de03f601851a0aaffdb82727c90e203acf777c9c98e7285a7",
+   "vector": [
+    0.06787109375,
+    0.57958984375,
+    0.1793212890625,
+    -0.3154296875,
+    -0.619140625,
+    -0.0059356689453125,
+    -0.53515625,
+    0.285400390625
+   ],
+   "vector_bytes": "QVYSAAgAAABYLKM4vTEMtfS4FJ5IuJE0",
+   "document": "Demo document 36 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.22"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -5
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-037",
+   "key": "0xe74451547fb87dcf6138ee6b8c906996864df01a5e1c818c5abc0a6ccc734d1f",
+   "vector": [
+    -0.57763671875,
+    0.34326171875,
+    -0.3935546875,
+    -0.82763671875,
+    0.1707763671875,
+    0.07159423828125,
+    -0.045379638671875,
+    -0.61962890625
+   ],
+   "vector_bytes": "QVYSAAgAAACfuH41TLafuncxlSzPqfW4",
+   "document": "Demo document 37 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.66"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -466
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-038",
+   "key": "0x25df684fee51ce69fa2643d2463fbfa59d4cf06043a954cbb4b8c37abdc5f48b",
+   "vector": [
+    -0.93408203125,
+    -0.96484375,
+    -0.1749267578125,
+    0.022064208984375,
+    -0.5771484375,
+    0.66796875,
+    0.420654296875,
+    0.383544921875
+   ],
+   "vector_bytes": "QVYSAAgAAAB5u7i7mbGmJZ64WDm7NiM2",
+   "document": "Demo document 38 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.76"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 347
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-039",
+   "key": "0xd84bbb193f855d267f291bc6e5fb79431efbc5270359ab8012079beba6bb1f4a",
+   "vector": [
+    -0.1851806640625,
+    -0.155029296875,
+    -0.822265625,
+    -0.150146484375,
+    -0.34130859375,
+    -0.92431640625,
+    -0.2283935546875,
+    0.372314453125
+   ],
+   "vector_bytes": "QVYSAAgAAADtsfawlLrOsHa1ZbtPs/U1",
+   "document": "Demo document 39 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.63"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 460
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-040",
+   "key": "0xfa579bc36e961b3b8151e2a328c7df394d3f59514a8d5fef66dd9c23a3383b25",
+   "vector": [
+    0.210205078125,
+    0.8935546875,
+    0.7509765625,
+    0.4287109375,
+    -0.31689453125,
+    -0.51904296875,
+    0.12371826171875,
+    0.787109375
+   ],
+   "vector_bytes": "QVYSAAgAAAC6MiY7AjrcNhK1J7jrL0w6",
+   "document": "Demo document 40 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.37"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -265
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-041",
+   "key": "0xa0a6d087c6724beea55d3085fde887fef5c45922a9d0e74881722e09d5c1b4f9",
+   "vector": [
+    0.6708984375,
+    0.2919921875,
+    -0.025726318359375,
+    0.0251312255859375,
+    -0.72314453125,
+    0.00664520263671875,
+    -0.830078125,
+    0.798828125
+   ],
+   "vector_bytes": "QVYSAAgAAABeOaw0lqZvJsm5zh6kumQ6",
+   "document": "Demo document 41 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.59"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 431
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-042",
+   "key": "0x58bb9b200ead7345d7904503bfadba10fbe44607fb67217129bb34e71c515ecc",
+   "vector": [
+    0.291259765625,
+    0.5556640625,
+    0.8125,
+    0.480224609375,
+    0.5595703125,
+    -0.486083984375,
+    0.42724609375,
+    0.073974609375
+   ],
+   "vector_bytes": "QVYSAAgAAACpNHI4gDqvN3o4x7fWNrws",
+   "document": "Demo document 42 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.46"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 31
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-043",
+   "key": "0x5c6f321d86261f47d8330c84ea48110d5ad9feeae33eaf63f22f23c3e53ae030",
+   "vector": [
+    -0.1290283203125,
+    -0.9091796875,
+    -0.099365234375,
+    0.5029296875,
+    -0.876953125,
+    0.38525390625,
+    0.20166015625,
+    -0.09002685546875
+   ],
+   "vector_bytes": "QVYSAAgAAAAhsEa7XK4GOAS7KjZ0MsOt",
+   "document": "Demo document 43 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.95"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -399
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-044",
+   "key": "0xf4ed19a6b44c78be7b973ecdd3ac91bc4aa91bda945a63e6d8416dde0d1110a3",
+   "vector": [
+    -0.71923828125,
+    -0.02789306640625,
+    0.458251953125,
+    -0.85302734375,
+    0.5244140625,
+    0.0010223388671875,
+    0.62255859375,
+    0.2103271484375
+   ],
+   "vector_bytes": "QVYSAAgAAADBuSSnVTfTujI4MBT7OLsy",
+   "document": "Demo document 44 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.34"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 126
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-045",
+   "key": "0xe21ef978a1e29c278b83b133cc89b8ccb249ac6a5e4bbb13771f3262c75b51c4",
+   "vector": [
+    -0.2529296875,
+    0.72802734375,
+    0.334716796875,
+    -0.0654296875,
+    0.2347412109375,
+    0.1348876953125,
+    0.58056640625,
+    0.263427734375
+   ],
+   "vector_bytes": "QVYSAAgAAAAMtNM5WzUwrIMzUTClODc0",
+   "document": "Demo document 45 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.23"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -409
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-046",
+   "key": "0xf7a8df4c745435abceda8071c44a533ce31517dfb504eecf5eb7ef4921535a09",
+   "vector": [
+    0.156982421875,
+    0.35888671875,
+    -0.97802734375,
+    0.603515625,
+    -0.36376953125,
+    -0.0171356201171875,
+    0.9208984375,
+    -0.2015380859375
+   ],
+   "vector_bytes": "QVYSAAgAAAAGMb4107vUONK1Y6ReO3Oy",
+   "document": "Demo document 46 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.73"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -228
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-047",
+   "key": "0x2e10f92a7555e77faf6a9fbc6bbaad164c5ca4813f8cf822574d969e1466e711",
+   "vector": [
+    0.97265625,
+    -0.703125,
+    0.98388671875,
+    -0.0615234375,
+    -0.83740234375,
+    -0.95458984375,
+    0.728515625,
+    -0.71484375
+   ],
+   "vector_bytes": "QVYSAAgAAADIO6C53zvgq7O6o7vUObi5",
+   "document": "Demo document 47 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.49"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -20
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-048",
+   "key": "0x36d8ec259e86f80fe417bff535b07be16dbcb73464acbb07fe43da377d2695ca",
+   "vector": [
+    -0.14697265625,
+    0.537109375,
+    -0.85791015625,
+    -0.33837890625,
+    0.175537109375,
+    0.583984375,
+    0.057373046875,
+    0.94677734375
+   ],
+   "vector_bytes": "QVYSAAgAAAC0sEw43bpqtZ4xrDhYK5M7",
+   "document": "Demo document 48 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.72"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 237
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-049",
+   "key": "0x379b71297af85e871e2005268d46577df49776a309f22d4e4544daf123e045e3",
+   "vector": [
+    -0.427978515625,
+    -0.35009765625,
+    0.865234375,
+    -0.1533203125,
+    -0.329345703125,
+    0.8642578125,
+    0.939453125,
+    0.453369140625
+   ],
+   "vector_bytes": "QVYSAAgAAADZtpq17DrosEW16jqEO0E3",
+   "document": "Demo document 49 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.44"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -377
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-050",
+   "key": "0x1acb80e2316f44dcfcdea955c63a2043ede248ce8fba0999f9b0040f83e2983b",
+   "vector": [
+    -0.66845703125,
+    -0.10205078125,
+    -0.697265625,
+    0.8291015625,
+    0.408203125,
+    -0.08563232421875,
+    -0.9775390625,
+    -0.2332763671875
+   ],
+   "vector_bytes": "QVYSAAgAAABZuYiulLmiOog2e63Su3ez",
+   "document": "Demo document 50 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.49"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -226
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-051",
+   "key": "0x3d6bc465cc45b093059e1d60994b4be34978359cad059879146b108470a88c5e",
+   "vector": [
+    -0.94140625,
+    -0.82373046875,
+    -0.58935546875,
+    -0.923828125,
+    -0.439697265625,
+    0.00855255126953125,
+    0.67626953125,
+    0.10491943359375
+   ],
+   "vector_bytes": "QVYSAAgAAACIu5e6t7hkuwm3YSBpObcu",
+   "document": "Demo document 51 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.10"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -230
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-052",
+   "key": "0x8a00f0ed1017d4aa9e55788689111076e659b03591a98dc6ab26fb4d421ac8e8",
+   "vector": [
+    0.78369140625,
+    -0.007694244384765625,
+    0.50439453125,
+    0.99267578125,
+    -0.52880859375,
+    0.59765625,
+    0.9169921875,
+    0.492919921875
+   ],
+   "vector_bytes": "QVYSAAgAAABFOuGfCTjxOzu4yDhWO+M3",
+   "document": "Demo document 52 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.32"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -105
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-053",
+   "key": "0xb5503d071cf1d7de7515d4b7e6a41a59a72be47ea1da33c0d0fb77474c73b585",
+   "vector": [
+    -0.30517578125,
+    0.2052001953125,
+    -0.30224609375,
+    -0.87646484375,
+    0.619140625,
+    0.90869140625,
+    -0.0139923095703125,
+    -0.12890625
+   ],
+   "vector_bytes": "QVYSAAgAAADitJEy1rQDu/Q4RTsqoyCw",
+   "document": "Demo document 53 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.96"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 2
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-054",
+   "key": "0x75a1043912c71e64e7f7064af40aaf7857b13506563233ddd122dcc43aee1e3b",
+   "vector": [
+    -0.0460205078125,
+    0.74560546875,
+    -0.9462890625,
+    -0.272216796875,
+    -0.61669921875,
+    -0.0762939453125,
+    0.93310546875,
+    -0.7705078125
+   ],
+   "vector_bytes": "QVYSAAgAAADkqfc5krtbtO+44qx3Oyq6",
+   "document": "Demo document 54 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.47"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 468
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-055",
+   "key": "0x50112b37dae14b73fda88edc3bb5bc87e63e464eab82fcdd30fca357a5d0a24d",
+   "vector": [
+    0.880859375,
+    -0.96875,
+    -0.194091796875,
+    -0.8115234375,
+    -0.30419921875,
+    -0.0302276611328125,
+    -0.95654296875,
+    0.7353515625
+   ],
+   "vector_bytes": "QVYSAAgAAAAMO8C7NrJ+ut60vaenu+I5",
+   "document": "Demo document 55 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.71"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -21
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-056",
+   "key": "0xb07b2e772193093bdc71f33ae023b402427b77470ae439806a26e9e309b8e175",
+   "vector": [
+    -0.411865234375,
+    -0.70166015625,
+    -0.515625,
+    -0.76806640625,
+    0.1851806640625,
+    0.6240234375,
+    0.4580078125,
+    -0.677734375
+   ],
+   "vector_bytes": "QVYSAAgAAACXtp25ILgluu0x/jhUN2y5",
+   "document": "Demo document 56 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.35"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -383
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-057",
+   "key": "0xe60fdd0623de5660f447c34a9f773ece811882c3e90064885aea28d0b3b8da45",
+   "vector": [
+    0.66552734375,
+    -0.431640625,
+    0.295166015625,
+    -0.58154296875,
+    0.8984375,
+    0.1640625,
+    -0.179443359375,
+    0.71630859375
+   ],
+   "vector_bytes": "QVYSAAgAAABTOei2uTSnuDA7QDG+sbs5",
+   "document": "Demo document 57 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.63"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 1
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-058",
+   "key": "0x1929ba299bbf97698acaa967f65612ee6fe8f46178b33623a049544e946065d9",
+   "vector": [
+    0.00891876220703125,
+    -0.53076171875,
+    -0.40283203125,
+    -0.118408203125,
+    0.1966552734375,
+    0.276611328125,
+    -0.6923828125,
+    0.353759765625
+   ],
+   "vector_bytes": "QVYSAAgAAACRID+4craUr0sybTSKuak1",
+   "document": "Demo document 58 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.46"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 444
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-059",
+   "key": "0x0923d1aaeb803cdf8a9169e60eeb689f1cbbb5ab146560532e12e5f3707c350e",
+   "vector": [
+    0.382568359375,
+    -0.373779296875,
+    -0.1866455078125,
+    -0.2218017578125,
+    0.9189453125,
+    0.2442626953125,
+    -0.12286376953125,
+    0.17724609375
+   ],
+   "vector_bytes": "QVYSAAgAAAAfNvu1+bEZs1o70TPdr6wx",
+   "document": "Demo document 59 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.39"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 384
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-060",
+   "key": "0x6a69f9bdc3a358d761a3857d757d2645aa1ba65960bffa074f7a49ebcec6f8e9",
+   "vector": [
+    0.814453125,
+    -0.153076171875,
+    -0.368896484375,
+    -0.58154296875,
+    -0.59326171875,
+    -0.66845703125,
+    0.0794677734375,
+    0.763671875
+   ],
+   "vector_bytes": "QVYSAAgAAACEOuaw57WnuL+4WbkWLRw6",
+   "document": "Demo document 60 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.69"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -447
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-061",
+   "key": "0x6ba6ca5d59a071d8a232672630aedfdcb2b4d4bfdb97581d47b764d71731fc81",
+   "vector": [
+    0.412353515625,
+    -0.186767578125,
+    0.8251953125,
+    0.5498046875,
+    -0.5166015625,
+    0.58349609375,
+    0.280517578125,
+    0.76025390625
+   ],
+   "vector_bytes": "QVYSAAgAAACZNvqxmjpmOCK4qzh9NBU6",
+   "document": "Demo document 61 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.56"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -363
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-062",
+   "key": "0xec7435165e96755f7025216cc890b5341b2b46ccc4ab7e0315e6ef8dc7025092",
+   "vector": [
+    -0.298095703125,
+    0.50390625,
+    -0.446044921875,
+    -0.2437744140625,
+    -0.0159149169921875,
+    -0.2362060546875,
+    0.63330078125,
+    0.0966796875
+   ],
+   "vector_bytes": "QVYSAAgAAADFtAg4I7fNsxOkj7MROTAu",
+   "document": "Demo document 62 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.41"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 393
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-063",
+   "key": "0x525b779505b525f93d85eb15768f6f13c635aa7efdca5ba66331dcfecf3c21a8",
+   "vector": [
+    -0.93017578125,
+    -0.9365234375,
+    -0.53125,
+    0.44970703125,
+    0.92529296875,
+    -0.359130859375,
+    -0.352294921875,
+    -0.05780029296875
+   ],
+   "vector_bytes": "QVYSAAgAAABxu367QLgyN2c7v7WjtWar",
+   "document": "Demo document 63 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.58"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 470
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-064",
+   "key": "0xce8f95ebf8e03c66a1dca31125e1cdfb3245d92e69f53bd5f0b8934da5df2396",
+   "vector": [
+    0.41845703125,
+    0.3369140625,
+    0.4814453125,
+    -0.58544921875,
+    -0.08612060546875,
+    0.3515625,
+    0.69775390625,
+    0.87255859375
+   ],
+   "vector_bytes": "QVYSAAgAAACyNmQ1tDevuIOtoDWVOfs6",
+   "document": "Demo document 64 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.95"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 416
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-065",
+   "key": "0x42f4da94b10b1bb8d699448591431624778a06d591dd5b9274be86537c49ff2e",
+   "vector": [
+    0.61474609375,
+    0.78955078125,
+    -0.46484375,
+    0.3779296875,
+    0.88427734375,
+    -0.94921875,
+    0.313720703125,
+    -0.7783203125
+   ],
+   "vector_bytes": "QVYSAAgAAADrOFE6cLcMNhM7mLsFNTq6",
+   "document": "Demo document 65 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.35"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -400
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-066",
+   "key": "0xb039232f5b1251537096e2332923afe65901a44a4b03569700570d7fa868142a",
+   "vector": [
+    -0.166259765625,
+    -0.96923828125,
+    0.2193603515625,
+    -0.42236328125,
+    -0.2406005859375,
+    0.57666015625,
+    0.60009765625,
+    0.0823974609375
+   ],
+   "vector_bytes": "QVYSAAgAAABSscG7BTPCtrOznTjNOEYt",
+   "document": "Demo document 66 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.70"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 40
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-067",
+   "key": "0xfe3cc5459ce721811e982d517043cbf3fb7d092fcd4ab2666d1a24ca798d7067",
+   "vector": [
+    0.388916015625,
+    -0.341064453125,
+    0.5751953125,
+    0.787109375,
+    0.131103515625,
+    -0.66162109375,
+    0.625,
+    -0.0743408203125
+   ],
+   "vector_bytes": "QVYSAAgAAAA5NnW1mjhMOjIwS7kAOcKs",
+   "document": "Demo document 67 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.32"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 371
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-068",
+   "key": "0xb90ba9d50b49dfb8d6113dd350cc8aad5b61478080a551252a269e005d554133",
+   "vector": [
+    0.1402587890625,
+    -0.35107421875,
+    0.9326171875,
+    -0.2218017578125,
+    0.54931640625,
+    -0.845703125,
+    0.1221923828125,
+    0.3095703125
+   ],
+   "vector_bytes": "QVYSAAgAAAB9MJ61djsZs2U4xLrSL/Q0",
+   "document": "Demo document 68 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.78"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 428
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-069",
+   "key": "0xfbbe95c500fe7fa56b5d189a6cde784cd6e34857f02fb07dd820eefa81fb85b0",
+   "vector": [
+    -0.92138671875,
+    0.99755859375,
+    0.1279296875,
+    0.67919921875,
+    -0.482421875,
+    0.25732421875,
+    -0.64453125,
+    0.642578125
+   ],
+   "vector_bytes": "QVYSAAgAAABfu/s7GDBvObi3HjQouSQ5",
+   "document": "Demo document 69 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.24"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 195
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-070",
+   "key": "0xcce4ab37ea9ce78db600d708cbefee602f47850bdd632ab0d4cd6243f0006349",
+   "vector": [
+    0.1766357421875,
+    -0.151611328125,
+    0.9375,
+    -0.7939453125,
+    0.7880859375,
+    -0.8173828125,
+    -0.52001953125,
+    0.4755859375
+   ],
+   "vector_bytes": "QVYSAAgAAACnMdqwgDtauk46iropuJw3",
+   "document": "Demo document 70 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.27"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 84
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-071",
+   "key": "0xdc199ead4480ca025fc9435cddacd836a4f12ad2720963e94d29c1e5f788dd88",
+   "vector": [
+    0.10040283203125,
+    0.8154296875,
+    0.078369140625,
+    0.2275390625,
+    0.0487060546875,
+    -0.2418212890625,
+    0.252197265625,
+    0.283203125
+   ],
+   "vector_bytes": "QVYSAAgAAABtLoY6BC1IMzwqvbMJNIg0",
+   "document": "Demo document 71 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.38"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -202
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-072",
+   "key": "0x194afdf908ad7b123531b17ec65abbd52ef770798dec6717ea830e9b93f230a1",
+   "vector": [
+    -0.1224365234375,
+    -0.280517578125,
+    0.61865234375,
+    -0.35888671875,
+    0.5947265625,
+    -0.07794189453125,
+    0.429443359375,
+    0.21240234375
+   ],
+   "vector_bytes": "QVYSAAgAAADWr3208zi+tcI4/azfNswy",
+   "document": "Demo document 72 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.97"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 251
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-073",
+   "key": "0x8f874a950f68bfe0f758d0d0710a3ac32a0f68735e465de4bfcf0124486f4254",
+   "vector": [
+    0.11297607421875,
+    0.4619140625,
+    -0.86376953125,
+    -0.97900390625,
+    0.08404541015625,
+    -0.4248046875,
+    0.701171875,
+    0.76123046875
+   ],
+   "vector_bytes": "QVYSAAgAAAA7L2Q36brVu2EtzLacORc6",
+   "document": "Demo document 73 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.33"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 280
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-074",
+   "key": "0xf48df9b945313a04126c287d2e4a5b628fbe71acb4c05ba8d6313cef7843eba6",
+   "vector": [
+    -0.1522216796875,
+    0.25048828125,
+    0.475341796875,
+    0.01210784912109375,
+    0.962890625,
+    -0.80224609375,
+    -0.501953125,
+    -0.1429443359375
+   ],
+   "vector_bytes": "QVYSAAgAAADfsAI0mzczIrQ7a7oEuJOw",
+   "document": "Demo document 74 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.81"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 135
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-075",
+   "key": "0x4f9343332158ac38184462350ab0b8c49c42fdfef7784312a59c1ad95a47b17f",
+   "vector": [
+    0.654296875,
+    -0.10052490234375,
+    -0.5576171875,
+    -0.06341552734375,
+    -0.33935546875,
+    -0.5576171875,
+    0.52197265625,
+    -0.6953125
+   ],
+   "vector_bytes": "QVYSAAgAAAA8OW+udrgPrG61drgtOJC5",
+   "document": "Demo document 75 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.45"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -12
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-076",
+   "key": "0xf2c06693789254542a79ca0dbb77e5a7d7b791a571f16d60675cfe6d922af7cb",
+   "vector": [
+    0.061370849609375,
+    0.417724609375,
+    -0.71484375,
+    0.5810546875,
+    0.147216796875,
+    0.425537109375,
+    -0.6611328125,
+    0.07354736328125
+   ],
+   "vector_bytes": "QVYSAAgAAADbK682uLmmOLYwzzZKubUs",
+   "document": "Demo document 76 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.69"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -71
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-077",
+   "key": "0xa15f406e6f4d1fae118639decffefff171592453ca94998cac04cf07f21ae786",
+   "vector": [
+    0.9033203125,
+    -0.39111328125,
+    -0.70166015625,
+    0.6357421875,
+    -0.057373046875,
+    -0.06634521484375,
+    0.88330078125,
+    0.38818359375
+   ],
+   "vector_bytes": "QVYSAAgAAAA6O0K2nbkWOVirP6wROzY2",
+   "document": "Demo document 77 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.74"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 202
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-078",
+   "key": "0x5ce7b8a9066a760765c4208d3f346faccf313a6f6cd0132e0bf1610093e5ee20",
+   "vector": [
+    -0.314208984375,
+    0.89990234375,
+    0.399658203125,
+    0.7509765625,
+    -0.82275390625,
+    0.265380859375,
+    0.21142578125,
+    -0.9013671875
+   ],
+   "vector_bytes": "QVYSAAgAAAAHtTM7ZTYCOpW6PzTEMja7",
+   "document": "Demo document 78 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.00"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -346
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-079",
+   "key": "0xb01311d03bfedfd1bf154da79f7ffe168b30a850219d9310d0839fbc4454ad59",
+   "vector": [
+    -0.434814453125,
+    -0.88525390625,
+    0.022552490234375,
+    0.68359375,
+    -0.20458984375,
+    -0.0733642578125,
+    -0.64990234375,
+    -0.708984375
+   ],
+   "vector_bytes": "QVYSAAgAAAD1thW7xiV4OYyysqwzuay5",
+   "document": "Demo document 79 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.39"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -367
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-080",
+   "key": "0x44f0a8828f727829b6c26be0c8ef43b1a47b887803f63782d8f80ee9bbb39958",
+   "vector": [
+    0.030914306640625,
+    0.41845703125,
+    0.1627197265625,
+    0.4990234375,
+    0.492431640625,
+    0.89794921875,
+    -0.41259765625,
+    -0.386962890625
+   ],
+   "vector_bytes": "QVYSAAgAAADqJ7I2NTH8N+E3LzuatjG2",
+   "document": "Demo document 80 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.64"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -181
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-081",
+   "key": "0x449fcdaf4e337b9cd9bcae266ad652ab62d384eaea1ea5c47ec34b460c3b5406",
+   "vector": [
+    -0.11376953125,
+    0.1395263671875,
+    0.93115234375,
+    0.297607421875,
+    -0.51513671875,
+    0.693359375,
+    -0.9541015625,
+    -0.71826171875
+   ],
+   "vector_bytes": "QVYSAAgAAABIr3cwczvDNB+4jDmiu7+5",
+   "document": "Demo document 81 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.83"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -267
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-082",
+   "key": "0x0ba9a85e30c32a2bb386878e4c8de812d435e6358154178292501554cd926dc9",
+   "vector": [
+    0.6240234375,
+    0.70263671875,
+    0.451171875,
+    -0.56298828125,
+    -0.29638671875,
+    0.92822265625,
+    -0.118896484375,
+    -0.76220703125
+   ],
+   "vector_bytes": "QVYSAAgAAAD+OJ85ODeBuL60bTucrxm6",
+   "document": "Demo document 82 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.63"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -116
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-083",
+   "key": "0x617eab1177d908a50b6f0effd0b328166ad424379347bfab81365e26228d377f",
+   "vector": [
+    -0.212890625,
+    0.378662109375,
+    0.443115234375,
+    0.71630859375,
+    -0.497802734375,
+    0.615234375,
+    -0.0484619140625,
+    0.426025390625
+   ],
+   "vector_bytes": "QVYSAAgAAADQsg82Fze7Ofe37Dg0qtE2",
+   "document": "Demo document 83 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.35"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -180
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-084",
+   "key": "0x99467e2c154b7b171d8201f014854493cc2eaf2228ccc469e6eacd279c4033dc",
+   "vector": [
+    0.408447265625,
+    0.07861328125,
+    -0.6552734375,
+    -0.50732421875,
+    0.48095703125,
+    0.9111328125,
+    0.3046875,
+    0.6552734375
+   ],
+   "vector_bytes": "QVYSAAgAAACJNggtPrkPuLI3SjvgND45",
+   "document": "Demo document 84 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.27"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -461
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-085",
+   "key": "0x399ecb11e1be1a2f7863dc5894dcecaabdf00dca655cb885a0c3acc7837a3b13",
+   "vector": [
+    -0.873046875,
+    -0.0947265625,
+    -0.69091796875,
+    0.197265625,
+    0.51171875,
+    0.5224609375,
+    0.318603515625,
+    0.021575927734375
+   ],
+   "vector_bytes": "QVYSAAgAAAD8uhCuh7lQMhg4LjgZNYYl",
+   "document": "Demo document 85 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.33"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 12
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-086",
+   "key": "0xcb0fada1a51d752b3bca51913ec7fbafa13da062ef2878603eab52a8f16aa3c2",
+   "vector": [
+    0.0677490234375,
+    -0.31494140625,
+    -0.08123779296875,
+    -0.77978515625,
+    0.564453125,
+    -0.495361328125,
+    0.8486328125,
+    -0.64599609375
+   ],
+   "vector_bytes": "QVYSAAgAAABWLAq1M609uoQ47bfKOiu5",
+   "document": "Demo document 86 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.85"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -204
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-087",
+   "key": "0xbd8be5d0db23f3b6c209c15a591cd9afb30754427c7f8c08ae62983c57cb2f1e",
+   "vector": [
+    0.08831787109375,
+    0.19580078125,
+    -0.030181884765625,
+    -0.36376953125,
+    0.426025390625,
+    -0.34228515625,
+    0.21533203125,
+    0.65478515625
+   ],
+   "vector_bytes": "QVYSAAgAAACnLUQyuqfStdE2erXkMj05",
+   "document": "Demo document 87 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.96"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -28
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-088",
+   "key": "0x8cd3a3e2870d46d406f461d917f19bacbfb2de4d2e2607420c1dc0c7298868c8",
+   "vector": [
+    -0.52490234375,
+    0.31201171875,
+    -0.83935546875,
+    -0.267333984375,
+    0.90234375,
+    0.2481689453125,
+    0.387451171875,
+    -0.99755859375
+   ],
+   "vector_bytes": "QVYSAAgAAAAzuP40t7pHtDg78TMzNvu7",
+   "document": "Demo document 88 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.95"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -106
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-089",
+   "key": "0x35486e29135f049eb8d331fffc51a836fd1d0a8863474fbb4ac3adb41d869f7e",
+   "vector": [
+    0.69091796875,
+    -0.216796875,
+    0.034423828125,
+    -0.1844482421875,
+    0.60546875,
+    0.26904296875,
+    -0.80712890625,
+    -0.1141357421875
+   ],
+   "vector_bytes": "QVYSAAgAAACHOfCyaCjnsdg4TjR1uk6v",
+   "document": "Demo document 89 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.59"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 477
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-090",
+   "key": "0x375f8d3a60a7bd9582e182f079bed6b9981bb0fa92cd3b1575c0360d8857d3c1",
+   "vector": [
+    0.266845703125,
+    -0.133056640625,
+    -0.98486328125,
+    0.26025390625,
+    -0.08935546875,
+    0.96337890625,
+    0.91015625,
+    0.441650390625
+   ],
+   "vector_bytes": "QVYSAAgAAABFNEKw4bsqNLittTtIOxE3",
+   "document": "Demo document 90 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.30"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 18
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-091",
+   "key": "0x8360c5003638732a2daf304e116f4d8cabb08e1e231a2503835af498b5dcebb2",
+   "vector": [
+    -0.5732421875,
+    0.53369140625,
+    -0.11328125,
+    0.27294921875,
+    -0.81787109375,
+    0.82177734375,
+    0.07891845703125,
+    -0.443603515625
+   ],
+   "vector_bytes": "QVYSAAgAAACWuEU4QK9eNIu6kzoNLRm3",
+   "document": "Demo document 91 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.57"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -219
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-092",
+   "key": "0x77eaa96f862cc3e2140d0f21b7ef46f435a708aa6c63102901ec9d7a060c69b5",
+   "vector": [
+    -0.456298828125,
+    -0.5361328125,
+    -0.44921875,
+    -0.66455078125,
+    0.861328125,
+    -0.21826171875,
+    -0.12457275390625,
+    0.31005859375
+   ],
+   "vector_bytes": "QVYSAAgAAABNt0q4MLdRueQ6/LL5r/Y0",
+   "document": "Demo document 92 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.15"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -177
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-093",
+   "key": "0x95f765fd046b916631f651a6360e98f379e71699e65f038b9c9620f5e835448f",
+   "vector": [
+    -0.97802734375,
+    0.55029296875,
+    0.41552734375,
+    -0.2003173828125,
+    -0.491455078125,
+    -0.160400390625,
+    0.89599609375,
+    0.72412109375
+   ],
+   "vector_bytes": "QVYSAAgAAADTu2c4pjZpst23IrErO8s5",
+   "document": "Demo document 93 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.74"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -193
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-094",
+   "key": "0x0ac5e44ad93680b7d46edf2a2e73c8d5ba5970e25d0cc2b88113f6547a784440",
+   "vector": [
+    0.6923828125,
+    0.1375732421875,
+    0.252685546875,
+    -0.399169921875,
+    0.393798828125,
+    -0.2017822265625,
+    0.6923828125,
+    -0.71337890625
+   ],
+   "vector_bytes": "QVYSAAgAAACKOWcwCzRjtk02dbKKObW5",
+   "document": "Demo document 94 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.32"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -221
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-095",
+   "key": "0x635e129bfdbda18220e08120339bc4f6513772e1feda39634179f08904fc6b87",
+   "vector": [
+    -0.67578125,
+    -0.30126953125,
+    0.8701171875,
+    0.56005859375,
+    -0.267822265625,
+    0.369384765625,
+    0.90380859375,
+    0.22021484375
+   ],
+   "vector_bytes": "QVYSAAgAAABoudK09jp7OEm06TU7Owwz",
+   "document": "Demo document 95 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.40"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 145
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-096",
+   "key": "0x8880ef0da0e1c6e09de38282c802fc13fda4ca74e3f0a50794b50107a7314e2d",
+   "vector": [
+    -0.6630859375,
+    0.1854248046875,
+    -0.55810546875,
+    0.2415771484375,
+    0.151611328125,
+    0.346923828125,
+    -0.673828125,
+    -0.03662109375
+   ],
+   "vector_bytes": "QVYSAAgAAABOue8xd7i7M9owjTVkubCo",
+   "document": "Demo document 96 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.65"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 328
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-097",
+   "key": "0xdf0672e8a38154a14c6fc1212cc0eaa989f0eead4a4f787e8ef45b22802f008c",
+   "vector": [
+    -0.68505859375,
+    -0.2401123046875,
+    0.8408203125,
+    -0.162109375,
+    -0.5048828125,
+    -0.9287109375,
+    0.76708984375,
+    0.83349609375
+   ],
+   "vector_bytes": "QVYSAAgAAAB7ua+zujowsQq4brsjOqs6",
+   "document": "Demo document 97 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.89"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -142
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-098",
+   "key": "0xd54e79c87cf42b7d37dcbda1aa97624ed8bbfd2c3324c927729f5fc3d53f057a",
+   "vector": [
+    0.41162109375,
+    -0.86962890625,
+    -0.183349609375,
+    -0.9541015625,
+    -0.45654296875,
+    0.904296875,
+    -0.97265625,
+    0.341064453125
+   ],
+   "vector_bytes": "QVYSAAgAAACWNvW63rGiu063PDvIu3U1",
+   "document": "Demo document 98 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.17"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -155
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-099",
+   "key": "0xa490cf7b89571639bcd0c94d837c5939c18a6b29efbc85f79ca3b33ab62fcf01",
+   "vector": [
+    0.243408203125,
+    -0.79150390625,
+    0.364013671875,
+    -0.59130859375,
+    -0.2423095703125,
+    -0.06781005859375,
+    0.85009765625,
+    -0.88037109375
+   ],
+   "vector_bytes": "QVYSAAgAAADKM1W60zW7uMGzV6zNOgu7",
+   "document": "Demo document 99 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.71"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 110
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-100",
+   "key": "0xf792a361037f587089686d43820f3edac4b9c791c0662a792850ee4868f43187",
+   "vector": [
+    0.3603515625,
+    0.310791015625,
+    0.1220703125,
+    0.08758544921875,
+    -0.36865234375,
+    -0.3837890625,
+    -0.81103515625,
+    0.9501953125
+   ],
+   "vector_bytes": "QVYSAAgAAADENfk00C+bLea1JLZ9upo7",
+   "document": "Demo document 100 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.72"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 421
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-101",
+   "key": "0x7b554ce13d3b12e37939e996121744c55cbc17d10bc7328821c8d4a0cb428576",
+   "vector": [
+    -0.10809326171875,
+    0.6142578125,
+    0.1533203125,
+    0.53466796875,
+    -0.251708984375,
+    0.60791015625,
+    -0.368408203125,
+    0.83349609375
+   ],
+   "vector_bytes": "QVYSAAgAAADrruo46DBHOAe03Tjltas6",
+   "document": "Demo document 101 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.26"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -401
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-102",
+   "key": "0xb70b4dbf2c6ff902d32ab8834d51bd8c36d6ea616abfd12212f5e671c0e14cf3",
+   "vector": [
+    0.46142578125,
+    0.09710693359375,
+    0.94140625,
+    -0.96533203125,
+    0.140625,
+    0.450927734375,
+    0.326171875,
+    -0.402587890625
+   ],
+   "vector_bytes": "QVYSAAgAAABiNzcuiDu5u4AwNzc4NXG2",
+   "document": "Demo document 102 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.17"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 454
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-103",
+   "key": "0x129bf6b405dc58e3bb04e2c708f8ea4e16a54ba5f27ba0b7715cb2f11ae4c94a",
+   "vector": [
+    -0.040069580078125,
+    0.669921875,
+    -0.045257568359375,
+    0.5849609375,
+    -0.96337890625,
+    -0.61474609375,
+    0.251708984375,
+    -0.01111602783203125
+   ],
+   "vector_bytes": "QVYSAAgAAAAhqVw5y6muOLW767gHNLGh",
+   "document": "Demo document 103 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.05"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -195
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-104",
+   "key": "0x7d22930ce578e714fa0c34e0085b94312c162632e84df0ac59fc26953597fff3",
+   "vector": [
+    -0.7236328125,
+    -0.270263671875,
+    0.6162109375,
+    0.0826416015625,
+    -0.40185546875,
+    0.9755859375,
+    -0.818359375,
+    -0.263427734375
+   ],
+   "vector_bytes": "QVYSAAgAAADKuVO07jhKLW62zjuMuje0",
+   "document": "Demo document 104 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.27"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 53
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-105",
+   "key": "0x51763afb8c273aaabc5b108c037f914a7942944e82876a8bb1ad8cb5ce13a2d1",
+   "vector": [
+    0.5771484375,
+    0.8427734375,
+    -0.97314453125,
+    -0.71533203125,
+    0.734375,
+    0.775390625,
+    -0.82373046875,
+    -0.459228515625
+   ],
+   "vector_bytes": "QVYSAAgAAACeOL46ybu5ueA5NDqXulm3",
+   "document": "Demo document 105 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.50"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 51
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-106",
+   "key": "0x763520d6c479b1702b374df5118e59936df08d38b405d47015e9f0ec741cc0ab",
+   "vector": [
+    0.22509765625,
+    -0.215087890625,
+    -0.71435546875,
+    0.5146484375,
+    0.59326171875,
+    0.7587890625,
+    -0.044158935546875,
+    0.46484375
+   ],
+   "vector_bytes": "QVYSAAgAAAA0M+Kyt7keOL84EjqnqXA3",
+   "document": "Demo document 106 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.92"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 255
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-107",
+   "key": "0x17ca01f8c423a69caedf5cf40602c5871ca2a37f74b3cdaa698071e228953d19",
+   "vector": [
+    -0.060455322265625,
+    0.65234375,
+    0.74658203125,
+    0.58251953125,
+    -0.1824951171875,
+    -0.276123046875,
+    0.99169921875,
+    -0.30419921875
+   ],
+   "vector_bytes": "QVYSAAgAAAC9qzg5+TmpONexa7TvO960",
+   "document": "Demo document 107 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.38"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 378
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-108",
+   "key": "0x188c125c6385b6f8d8048c5016a3d1c374a61f4f04c8766d9d3ee084afaaac64",
+   "vector": [
+    0.28271484375,
+    -0.73583984375,
+    -0.9404296875,
+    0.88330078125,
+    0.164306640625,
+    0.398193359375,
+    -0.33642578125,
+    0.1431884765625
+   ],
+   "vector_bytes": "QVYSAAgAAACGNOO5hrsRO0IxXzZitZUw",
+   "document": "Demo document 108 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.12"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 54
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-109",
+   "key": "0x9351a28929c602f8f9e89638801fd961da7b0d506e6696d0a19e77230a3a1cf3",
+   "vector": [
+    -0.9287109375,
+    -0.42626953125,
+    -0.66015625,
+    0.1494140625,
+    0.57763671875,
+    0.45556640625,
+    -0.67626953125,
+    -0.156005859375
+   ],
+   "vector_bytes": "QVYSAAgAAABuu9K2SLnIMJ84Sjdpuf6w",
+   "document": "Demo document 109 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.71"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 226
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-110",
+   "key": "0xcf3986f431a5088954006829830ddaf0302ff3b4a0a7a29681d8082e6139670f",
+   "vector": [
+    -0.1934814453125,
+    -0.6904296875,
+    0.306396484375,
+    0.81982421875,
+    -0.68896484375,
+    -0.8271484375,
+    -0.38671875,
+    -0.356689453125
+   ],
+   "vector_bytes": "QVYSAAgAAAAxsoa55zSPOoO5nrowtrW1",
+   "document": "Demo document 110 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.45"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 246
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-111",
+   "key": "0x5f66150a980d9644c886f83eacce7588927ac2cb46156120e8ffe94ed5568467",
+   "vector": [
+    -0.28759765625,
+    -0.43701171875,
+    0.73583984375,
+    0.49853515625,
+    -0.8056640625,
+    -0.06378173828125,
+    -0.122802734375,
+    0.11871337890625
+   ],
+   "vector_bytes": "QVYSAAgAAACatP624zn6N3K6Fazcr5kv",
+   "document": "Demo document 111 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.29"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -64
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-112",
+   "key": "0x6663221e834f053f58060da7dccf187b6bb9ed91878a27c6bdc730437dc2f978",
+   "vector": [
+    -0.5166015625,
+    -0.45751953125,
+    0.0745849609375,
+    0.46826171875,
+    -0.36865234375,
+    -0.67919921875,
+    -0.98681640625,
+    -0.78173828125
+   ],
+   "vector_bytes": "QVYSAAgAAAAiuFK3xix+N+a1b7nlu0G6",
+   "document": "Demo document 112 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.09"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 75
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-113",
+   "key": "0xb16b5cd5a1d413b1733bf9a7f0f09c8e23debf4a365f17523b09a9738a6b1728",
+   "vector": [
+    -0.671875,
+    0.2113037109375,
+    -0.449462890625,
+    -0.2685546875,
+    -0.564453125,
+    -0.036956787109375,
+    -0.391845703125,
+    0.57958984375
+   ],
+   "vector_bytes": "QVYSAAgAAABgucMyMbdMtIS4u6hFtqM4",
+   "document": "Demo document 113 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.75"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 59
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-114",
+   "key": "0x5c082806a0f696c61d38bb4393ee1c9abbe10d37da9a3c68bc3a7288233134b8",
+   "vector": [
+    0.4052734375,
+    -0.9697265625,
+    0.63427734375,
+    -0.456787109375,
+    -0.91796875,
+    0.9404296875,
+    0.70068359375,
+    0.99853515625
+   ],
+   "vector_bytes": "QVYSAAgAAAB8NsK7EzlPt1i7hjubOf07",
+   "document": "Demo document 114 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.45"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -289
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-115",
+   "key": "0xab2b7d4ccfe6555d4680427c7b320c601d5298f4132273fabd7747357528ccfb",
+   "vector": [
+    -0.751953125,
+    0.521484375,
+    0.1875,
+    -0.09088134765625,
+    -0.5185546875,
+    -0.11981201171875,
+    0.0132904052734375,
+    0.02056884765625
+   ],
+   "vector_bytes": "QVYSAAgAAAAEuiw4ADLRrSa4q6/OIkQl",
+   "document": "Demo document 115 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.18"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 481
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-116",
+   "key": "0x32aa00422a26903cf2e1da072be75b28253366cdf4e2d03c692b3791a52710b0",
+   "vector": [
+    -0.73291015625,
+    -0.12548828125,
+    0.1448974609375,
+    0.01358795166015625,
+    0.86572265625,
+    -0.48193359375,
+    0.99951171875,
+    -0.88623046875
+   ],
+   "vector_bytes": "QVYSAAgAAADduQSwozD1Iu06trf/Oxe7",
+   "document": "Demo document 116 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.28"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -480
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-117",
+   "key": "0x77bb91e793e01b18927ccb233f237f9a32c53154e4cf46cfcc30561cea2e6d50",
+   "vector": [
+    -0.0732421875,
+    -0.689453125,
+    0.07281494140625,
+    -0.951171875,
+    -0.1260986328125,
+    -0.08197021484375,
+    0.55029296875,
+    0.4052734375
+   ],
+   "vector_bytes": "QVYSAAgAAACwrIS5qSycuwmwP61nOHw2",
+   "document": "Demo document 117 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.38"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 354
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-118",
+   "key": "0x0727f93a7c5edede2e99112dffb98bedea86aa43f33237bd35a848e173d1ce8a",
+   "vector": [
+    0.69140625,
+    -0.5732421875,
+    -0.55078125,
+    0.412109375,
+    -0.55615234375,
+    0.0816650390625,
+    -0.30029296875,
+    -0.56201171875
+   ],
+   "vector_bytes": "QVYSAAgAAACIOZa4aLiYNnO4Oi3OtH+4",
+   "document": "Demo document 118 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.43"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 159
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-119",
+   "key": "0xf3c98e5db9e4da012703b86742e761bcea4484c35d156e53f800fae05d7fb0c2",
+   "vector": [
+    -0.66943359375,
+    0.2364501953125,
+    -0.9921875,
+    0.74365234375,
+    0.58984375,
+    -0.841796875,
+    0.179443359375,
+    0.923828125
+   ],
+   "vector_bytes": "QVYSAAgAAABbuZEz8LvzObg4vLq+MWQ7",
+   "document": "Demo document 119 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.48"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -151
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-120",
+   "key": "0xb7a12c8a74ec89253dd67a1bfe909b3566bb51d4774c46a1e40f8051f9f264dd",
+   "vector": [
+    0.67919921875,
+    -0.873046875,
+    0.990234375,
+    -0.2325439453125,
+    -0.327880859375,
+    -0.023193359375,
+    0.161376953125,
+    0.9609375
+   ],
+   "vector_bytes": "QVYSAAgAAABvOfy67Dtxsz+18KUqMbA7",
+   "document": "Demo document 120 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.16"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 483
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-121",
+   "key": "0xd2e256e164e2b3de6e4f264b2a52383fd03da5954dd75d6defe48bfc471b883a",
+   "vector": [
+    0.449462890625,
+    -0.548828125,
+    0.650390625,
+    -0.58935546875,
+    -0.75830078125,
+    0.12274169921875,
+    -0.9677734375,
+    -0.322509765625
+   ],
+   "vector_bytes": "QVYSAAgAAAAxN2S4NDm3uBG62y++uym1",
+   "document": "Demo document 121 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.44"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -286
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-122",
+   "key": "0xc210a7900ae28b9bc64285a56af7b371bbf4b4974fd341bd3a9187a6ae4979e8",
+   "vector": [
+    -0.81884765625,
+    -0.0285797119140625,
+    -0.14501953125,
+    -0.8359375,
+    -0.93701171875,
+    0.269287109375,
+    -0.452392578125,
+    0.7841796875
+   ],
+   "vector_bytes": "QVYSAAgAAACNulGnpLCwun+7TzQ9t0Y6",
+   "document": "Demo document 122 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.94"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 259
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-123",
+   "key": "0xf6a86db1cdc697588795b4e21b11606d3cc5311c3c79c570480d6fbd5f286188",
+   "vector": [
+    -0.066650390625,
+    -0.12176513671875,
+    0.12127685546875,
+    -0.84033203125,
+    0.40087890625,
+    -0.00926971435546875,
+    0.2039794921875,
+    0.986328125
+   ],
+   "vector_bytes": "QVYSAAgAAABErMuvwy+5umo2v6CHMuQ7",
+   "document": "Demo document 123 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.78"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -354
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-124",
+   "key": "0xf7d54a6d68a3884b193040ffdf7d230aadfb3e00aa956fe75f95c1c29a683e1f",
+   "vector": [
+    -0.2000732421875,
+    0.5986328125,
+    0.94189453125,
+    0.92529296875,
+    -0.82861328125,
+    -0.2275390625,
+    -0.82177734375,
+    0.74267578125
+   ],
+   "vector_bytes": "QVYSAAgAAABnsso4iTtnO6G6SLOTuvE5",
+   "document": "Demo document 124 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.87"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -307
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-125",
+   "key": "0xaa149ff4425a5f6071edd878f54e5f190783169838b20295404c32bd9f51718a",
+   "vector": [
+    -0.145263671875,
+    0.11395263671875,
+    -0.267578125,
+    0.292236328125,
+    0.046356201171875,
+    0.43603515625,
+    -0.327880859375,
+    0.323974609375
+   ],
+   "vector_bytes": "QVYSAAgAAACmsEsvSLStNO8p+jY/tS81",
+   "document": "Demo document 125 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.09"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 480
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-126",
+   "key": "0x88831dcaa2bf5ad055e15ac9831cf457d16070a5e949a0718c1991bdb8a8f761",
+   "vector": [
+    0.611328125,
+    0.00702667236328125,
+    0.25390625,
+    -0.578125,
+    0.10723876953125,
+    -0.2998046875,
+    -0.98876953125,
+    -0.34912109375
+   ],
+   "vector_bytes": "QVYSAAgAAADkODIfEDSguN0uzLTpu5a1",
+   "document": "Demo document 126 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.70"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -222
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-127",
+   "key": "0x27a13cffa6cb47848faef27d83a8d56dd36d95ca090850eeb600abbeea5e4c6a",
+   "vector": [
+    0.59423828125,
+    -0.044158935546875,
+    0.8447265625,
+    -0.58056640625,
+    -0.859375,
+    0.09368896484375,
+    0.3388671875,
+    0.875
+   ],
+   "vector_bytes": "QVYSAAgAAADBOKepwjqluOC6/y1sNQA7",
+   "document": "Demo document 127 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.04"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 184
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-128",
+   "key": "0xf2da93e07a6cb9e6d61dd14549c41b728a7b259fc9aba4a9cbd91f1d505471a9",
+   "vector": [
+    0.11651611328125,
+    0.89404296875,
+    0.31689453125,
+    -0.49462890625,
+    0.1722412109375,
+    0.94287109375,
+    0.2481689453125,
+    -0.8271484375
+   ],
+   "vector_bytes": "QVYSAAgAAAB1Lyc7EjXqt4MxizvxM566",
+   "document": "Demo document 128 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.30"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 442
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-129",
+   "key": "0xd9d55c48dbdacda363f90e097541c0d78641cc674d5e138efa71e3efd66104ba",
+   "vector": [
+    0.853515625,
+    0.5546875,
+    -0.1524658203125,
+    -0.78955078125,
+    0.327880859375,
+    -0.351318359375,
+    0.1995849609375,
+    -0.280029296875
+   ],
+   "vector_bytes": "QVYSAAgAAADUOnA44bBRuj81n7VjMnu0",
+   "document": "Demo document 129 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.93"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -327
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-130",
+   "key": "0x2374be8ce7933e42e89f763e8b63a6ed513bbd52680d69bf6526e484dae065cb",
+   "vector": [
+    0.31396484375,
+    -0.380126953125,
+    -0.27783203125,
+    0.56689453125,
+    0.62109375,
+    -0.028076171875,
+    0.06353759765625,
+    -0.68115234375
+   ],
+   "vector_bytes": "QVYSAAgAAAAGNRW2crSJOPg4MKcRLHO5",
+   "document": "Demo document 130 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.84"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -480
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-131",
+   "key": "0x6c63f742c833d86d8afe831907025855cc6236083b220939449716c67550e692",
+   "vector": [
+    0.791015625,
+    -0.80908203125,
+    0.263427734375,
+    -0.2376708984375,
+    -0.2423095703125,
+    -0.44873046875,
+    0.63525390625,
+    -0.35791015625
+   ],
+   "vector_bytes": "QVYSAAgAAABUOnm6NzSbs8GzLrcVObq1",
+   "document": "Demo document 131 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.81"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 425
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-132",
+   "key": "0xb3cddb65045469ba9ea622f32a58d0dcba9ce11abdb54b804af43882c635206e",
+   "vector": [
+    0.89990234375,
+    0.79931640625,
+    0.79443359375,
+    0.2220458984375,
+    -0.450927734375,
+    -0.6357421875,
+    0.461669921875,
+    -0.433349609375
+   ],
+   "vector_bytes": "QVYSAAgAAAAzO2U6WzobMze3FrljN++2",
+   "document": "Demo document 132 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.36"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -472
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-133",
+   "key": "0x3fa7c5b4a0eb839be5305f0e7567a40e52308e1a63c8a1bcb246fa7386270a3f",
+   "vector": [
+    0.283935546875,
+    0.67919921875,
+    0.9794921875,
+    -0.403076171875,
+    0.0350341796875,
+    0.357421875,
+    0.83056640625,
+    0.5625
+   ],
+   "vector_bytes": "QVYSAAgAAACLNG851jtztnwouDWlOoA4",
+   "document": "Demo document 133 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.20"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -75
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-134",
+   "key": "0xe13563b36dd0d2f08ddcc8f89d878e2a1e717c2e4fc1ae9d79c9a77a6108c976",
+   "vector": [
+    0.59228515625,
+    0.51513671875,
+    -0.615234375,
+    -0.38330078125,
+    0.90185546875,
+    0.95751953125,
+    -0.74365234375,
+    -0.391845703125
+   ],
+   "vector_bytes": "QVYSAAgAAAC9OB847Lgitjc7qTvzuUW2",
+   "document": "Demo document 134 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.07"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 262
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-135",
+   "key": "0xf9366e4070db276d65bfe6bf234331a9b9a222c424e3c73d91a94fb9ebe797f7",
+   "vector": [
+    0.3154296875,
+    -0.60693359375,
+    0.603515625,
+    0.28173828125,
+    0.294677734375,
+    -0.307861328125,
+    0.317138671875,
+    0.5986328125
+   ],
+   "vector_bytes": "QVYSAAgAAAAMNdu41DiCNLc07bQTNco4",
+   "document": "Demo document 135 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.36"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -91
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-136",
+   "key": "0xef3ad1e08160bf823d169b01358fb43614744b89ed794432e754061c2d809050",
+   "vector": [
+    -0.420654296875,
+    0.1585693359375,
+    0.78955078125,
+    0.363037109375,
+    0.61474609375,
+    -0.37451171875,
+    -0.8232421875,
+    -0.28076171875
+   ],
+   "vector_bytes": "QVYSAAgAAAC7thMxUTrPNes4/rWWun60",
+   "document": "Demo document 136 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.11"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 194
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-137",
+   "key": "0x1a2546aa13f624b16fc8861ce08f2c3cfd4fbcd0febb695f91c4f1b751bf2e57",
+   "vector": [
+    -0.5146484375,
+    -0.08087158203125,
+    -0.05718994140625,
+    0.67578125,
+    -0.6005859375,
+    -0.158935546875,
+    -0.358154296875,
+    0.7470703125
+   ],
+   "vector_bytes": "QVYSAAgAAAAeuC2tUqtoOc64FrG7tfo5",
+   "document": "Demo document 137 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.04"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 424
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-138",
+   "key": "0x9ba9273832521c2e446b286532c4b3ebc1598e50fcc69602dc035373211c7ba1",
+   "vector": [
+    -0.9052734375,
+    0.89306640625,
+    -0.2088623046875,
+    -0.90283203125,
+    -0.127197265625,
+    -0.319091796875,
+    -0.90283203125,
+    0.7568359375
+   ],
+   "vector_bytes": "QVYSAAgAAAA+uyU7r7I5uxKwG7U5uw46",
+   "document": "Demo document 138 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.87"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -306
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-139",
+   "key": "0x97bfefad9a599f619322b55ec28e56ef15495e8b16afd7d4f18e4ee136323673",
+   "vector": [
+    -0.3515625,
+    0.334228515625,
+    0.6103515625,
+    0.80029296875,
+    0.265869140625,
+    -0.035980224609375,
+    -0.84130859375,
+    -0.80810546875
+   ],
+   "vector_bytes": "QVYSAAgAAACgtVk14jhnOkE0m6i7une6",
+   "document": "Demo document 139 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.93"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -300
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-140",
+   "key": "0x6f62ae52fc49d14b30f8690ee8bf8ae194bfdfbb57713f42e7c8fd6921e3af10",
+   "vector": [
+    0.11663818359375,
+    0.74609375,
+    0.82861328125,
+    -0.3369140625,
+    -0.50244140625,
+    -0.09698486328125,
+    -0.6064453125,
+    -0.2213134765625
+   ],
+   "vector_bytes": "QVYSAAgAAAB3L/g5oTpktQW4Na7auBWz",
+   "document": "Demo document 140 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.97"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 58
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-141",
+   "key": "0x6349933dffb565fe4877f36ccc0e3f31f12d6eee36f7656f7aafe2f2d87f3fdb",
+   "vector": [
+    0.67431640625,
+    0.10693359375,
+    -0.2437744140625,
+    -0.66455078125,
+    -0.6884765625,
+    0.935546875,
+    -0.0523681640625,
+    -0.759765625
+   ],
+   "vector_bytes": "QVYSAAgAAABlOdguzbNRuYK5fDu0qhS6",
+   "document": "Demo document 141 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.57"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -158
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-142",
+   "key": "0xf335f3ae5a457b5cf222d893ec3addf409c18391c7f1b564d4fd564dc1d38463",
+   "vector": [
+    -0.80859375,
+    0.322265625,
+    0.28857421875,
+    0.92041015625,
+    -0.54052734375,
+    -0.81005859375,
+    -0.57666015625,
+    -0.7080078125
+   ],
+   "vector_bytes": "QVYSAAgAAAB4uig1njRdO1O4e7qduKq5",
+   "document": "Demo document 142 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.65"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 351
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-143",
+   "key": "0xeef410091eb5637fdf4122c5b7c13ec947ede41d0bacd10b5cbfbf816c81a450",
+   "vector": [
+    0.3359375,
+    0.62548828125,
+    0.92138671875,
+    0.74267578125,
+    -0.96923828125,
+    0.80859375,
+    0.85693359375,
+    0.8779296875
+   ],
+   "vector_bytes": "QVYSAAgAAABgNQE5XzvxOcG7eDrbOgY7",
+   "document": "Demo document 143 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.87"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 319
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-144",
+   "key": "0xe791f191da9f1e2168e7eaa8d0ac3e2b819ca9ed919155ee4665167d525d426e",
+   "vector": [
+    -0.6171875,
+    -0.8564453125,
+    0.92431640625,
+    0.1787109375,
+    -0.485595703125,
+    0.83642578125,
+    -0.869140625,
+    0.12164306640625
+   ],
+   "vector_bytes": "QVYSAAgAAADwuNq6ZTu4McW3sTr0uskv",
+   "document": "Demo document 144 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.90"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 60
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-145",
+   "key": "0x8945292a4f5968e69241d32cb1f41f07dfae9c20b53a6f82580ec70909e2a841",
+   "vector": [
+    -0.6806640625,
+    0.349853515625,
+    -0.98095703125,
+    0.007289886474609375,
+    -0.30615234375,
+    0.9072265625,
+    -0.327392578125,
+    -0.04376220703125
+   ],
+   "vector_bytes": "QVYSAAgAAAByuZk12bt3H+a0Qjs9tZqp",
+   "document": "Demo document 145 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.16"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 282
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-146",
+   "key": "0x8bee31dbf818aba4375aab8aad0d3febe227dfbc46077744c0f869f591042f12",
+   "vector": [
+    0.3466796875,
+    0.61572265625,
+    0.398681640625,
+    0.256591796875,
+    0.96484375,
+    -0.5654296875,
+    0.77783203125,
+    -0.091796875
+   ],
+   "vector_bytes": "QVYSAAgAAACMNe04YTYbNLg7hrg5OuCt",
+   "document": "Demo document 146 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.99"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -441
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-147",
+   "key": "0xe7b7ceab63e4f3eeecc71d50dfa0f8899ec4733276c7b0c8a90575cc6c5852ac",
+   "vector": [
+    -0.63720703125,
+    0.58935546875,
+    -0.55908203125,
+    -0.98681640625,
+    0.1700439453125,
+    0.537109375,
+    0.40869140625,
+    0.99755859375
+   ],
+   "vector_bytes": "QVYSAAgAAAAZubc4ebjlu3ExTDiKNvs7",
+   "document": "Demo document 147 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.84"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -318
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-148",
+   "key": "0xb64c45043b5c5cb04286b61f3ad26741490061c2e8097ada82420be917bc34dc",
+   "vector": [
+    -0.46923828125,
+    -0.385498046875,
+    -0.048675537109375,
+    0.1640625,
+    -0.453125,
+    0.403564453125,
+    0.79931640625,
+    -0.77197265625
+   ],
+   "vector_bytes": "QVYSAAgAAACCtyu2O6pAMUC3dTZlOi26",
+   "document": "Demo document 148 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.65"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 392
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-149",
+   "key": "0x5c21d230f6a1af9e56a670807c5e11881192ba0de536baa8af217082061e0820",
+   "vector": [
+    0.5166015625,
+    -0.0946044921875,
+    -0.71435546875,
+    0.537109375,
+    -0.12188720703125,
+    0.330078125,
+    0.7275390625,
+    -0.3681640625
+   ],
+   "vector_bytes": "QVYSAAgAAAAiOA6ut7lMOM2vSDXSOeS1",
+   "document": "Demo document 149 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.57"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 209
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-150",
+   "key": "0x7a2bb7bf0bbeda27d4d073d0c404a814688650fb5cc425d8fc426edc95754f6b",
+   "vector": [
+    0.497314453125,
+    0.705078125,
+    -0.80810546875,
+    -0.587890625,
+    -0.55712890625,
+    0.139404296875,
+    -0.2166748046875,
+    -0.65966796875
+   ],
+   "vector_bytes": "QVYSAAgAAAD1N6Q5d7q0uHW4djDvske5",
+   "document": "Demo document 150 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.79"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 363
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-151",
+   "key": "0x8b2a00937e90c165e099d05be8a34866bc437e92b0dd59fa02fca7403d4d25fb",
+   "vector": [
+    -0.470458984375,
+    -0.8623046875,
+    0.716796875,
+    -0.1302490234375,
+    -0.1402587890625,
+    0.2047119140625,
+    -0.51708984375,
+    0.65185546875
+   ],
+   "vector_bytes": "QVYSAAgAAACHt+a6vDkrsH2wjTIjuDc5",
+   "document": "Demo document 151 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.01"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 39
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-152",
+   "key": "0xa22d73c32b9cea8b6b1473f0236aab8fb142f22704231aeeb8f18f0c5867541b",
+   "vector": [
+    0.373046875,
+    0.97802734375,
+    -0.98046875,
+    -0.05419921875,
+    0.416259765625,
+    0.79443359375,
+    0.5771484375,
+    -0.442626953125
+   ],
+   "vector_bytes": "QVYSAAgAAAD4NdM72Lvwqqk2WzqeOBW3",
+   "document": "Demo document 152 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.83"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 440
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-153",
+   "key": "0x92742790e559cf4cf3b0fc74109664bd2a6ecab7b5130d82ad73c3dacd426356",
+   "vector": [
+    -0.63720703125,
+    -0.94287109375,
+    0.440673828125,
+    0.062469482421875,
+    0.97900390625,
+    -0.04052734375,
+    0.385986328125,
+    -0.29931640625
+   ],
+   "vector_bytes": "QVYSAAgAAAAZuYu7DTf/K9U7MKktNsq0",
+   "document": "Demo document 153 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.16"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 391
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-154",
+   "key": "0x12fe8aac9e901b582738688cdd266975170b3deaf2c3f3b7829e66fda21dc40e",
+   "vector": [
+    0.42431640625,
+    -0.48291015625,
+    0.6630859375,
+    -0.297119140625,
+    0.075439453125,
+    -0.321044921875,
+    0.51708984375,
+    0.239990234375
+   ],
+   "vector_bytes": "QVYSAAgAAADKNrq3TjnBtNQsI7UjOK4z",
+   "document": "Demo document 154 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.47"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 472
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-155",
+   "key": "0x670ab8b0e91cf94d618619edf2b265413ecdaf2d69d5fdf1b883b7078b6cc566",
+   "vector": [
+    -0.17529296875,
+    0.6435546875,
+    -0.68603515625,
+    0.7978515625,
+    -0.75341796875,
+    0.485595703125,
+    -0.2005615234375,
+    0.57666015625
+   ],
+   "vector_bytes": "QVYSAAgAAACcsSY5fbliOge6xTdrsp04",
+   "document": "Demo document 155 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.23"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -92
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-156",
+   "key": "0x425d46c90550c8480d157156e5a2426b8ff9e0bba95ba0635aefaf75c3ce7982",
+   "vector": [
+    -0.2454833984375,
+    -0.513671875,
+    0.8505859375,
+    -0.20263671875,
+    -0.74169921875,
+    -0.71240234375,
+    -0.2152099609375,
+    -0.5791015625
+   ],
+   "vector_bytes": "QVYSAAgAAADbsxy4zjp8su+5s7njsqK4",
+   "document": "Demo document 156 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.18"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -281
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-157",
+   "key": "0x4ff3241c8d29a2631e23284956a770ef4ede15208b0af7108c1b0d408ee6a7f4",
+   "vector": [
+    -0.6669921875,
+    -0.01183319091796875,
+    0.07293701171875,
+    0.88671875,
+    0.26904296875,
+    -0.392578125,
+    0.65576171875,
+    0.1688232421875
+   ],
+   "vector_bytes": "QVYSAAgAAABWuQ+iqywYO040SLY/OWcx",
+   "document": "Demo document 157 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.08"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -165
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-158",
+   "key": "0x91f8e4e8ab33ead506af85d8bbcf992324cc5938a1832fed713ca749393d0ed2",
+   "vector": [
+    0.130126953125,
+    0.8466796875,
+    -0.89599609375,
+    -0.67138671875,
+    0.5458984375,
+    -0.04632568359375,
+    -0.11297607421875,
+    -0.951171875
+   ],
+   "vector_bytes": "QVYSAAgAAAAqMMY6K7tfuV447qk7r5y7",
+   "document": "Demo document 158 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.13"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 192
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-159",
+   "key": "0x16e1199f7fac6d8312c2ed2402390e1edac4e30ee38debe905d5350e92fa3dd0",
+   "vector": [
+    -0.1982421875,
+    -0.1802978515625,
+    -0.81005859375,
+    0.3876953125,
+    0.8232421875,
+    0.5478515625,
+    0.50048828125,
+    -0.98388671875
+   ],
+   "vector_bytes": "QVYSAAgAAABYssWxe7o0NpY6YjgBON+7",
+   "document": "Demo document 159 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.23"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 19
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-160",
+   "key": "0x0c40eee757ea27b364e135e38240945ab0b03914826345f444ef3040591679ea",
+   "vector": [
+    -0.07159423828125,
+    -0.303466796875,
+    -0.8466796875,
+    -0.185302734375,
+    -0.10211181640625,
+    -0.87548828125,
+    0.26123046875,
+    0.85986328125
+   ],
+   "vector_bytes": "QVYSAAgAAACVrNu0xrrusYmuAbsuNOE6",
+   "document": "Demo document 160 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.74"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -189
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-161",
+   "key": "0x0f775518fa7d6c9eba1468e31a133128629d82ede9b510325e50fd9b7044e4a9",
+   "vector": [
+    0.6533203125,
+    -0.34228515625,
+    0.8525390625,
+    0.354736328125,
+    -0.4453125,
+    -0.982421875,
+    -0.342041015625,
+    -0.51025390625
+   ],
+   "vector_bytes": "QVYSAAgAAAA6OXq10jqtNSC33Lt5tRW4",
+   "document": "Demo document 161 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.44"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -277
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-162",
+   "key": "0xa963af4b3ed0d31d3df64f45d6381973508577a6aef46b862609a68d6f14dd78",
+   "vector": [
+    -0.787109375,
+    0.234130859375,
+    0.482666015625,
+    -0.75,
+    -0.58544921875,
+    -0.7353515625,
+    -0.99365234375,
+    -0.1251220703125
+   ],
+   "vector_bytes": "QVYSAAgAAABMun4zuTcAuq+44rnzuwGw",
+   "document": "Demo document 162 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.79"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 367
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-163",
+   "key": "0x30e86fc2be9a731093cdef4421864b7ae2da259aa5c3f6bf11734dbb4bcc4fd6",
+   "vector": [
+    -0.046112060546875,
+    0.59033203125,
+    -0.93017578125,
+    0.20703125,
+    0.802734375,
+    0.9296875,
+    -0.472900390625,
+    -0.3984375
+   ],
+   "vector_bytes": "QVYSAAgAAADnqbk4cbugMmw6cDuRt2C2",
+   "document": "Demo document 163 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.82"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 245
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-164",
+   "key": "0x10d575367c5c997a36cefd0f83d1c2d30cb3e63d1258a4c00ab3b1f7034476f7",
+   "vector": [
+    -0.06890869140625,
+    -0.65087890625,
+    -0.0034427642822265625,
+    -0.208984375,
+    -0.775390625,
+    0.38330078125,
+    -0.2626953125,
+    -0.4814453125
+   ],
+   "vector_bytes": "QVYSAAgAAABprDW5DZuwsjS6IjY0tLS3",
+   "document": "Demo document 164 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.05"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 305
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-165",
+   "key": "0x6e515e4838198f68f09147c0dd02da0ffa5c51cec3b029441cffbdeb11dbb552",
+   "vector": [
+    0.6767578125,
+    0.67529296875,
+    -0.096435546875,
+    0.7265625,
+    -0.450439453125,
+    0.740234375,
+    0.99853515625,
+    0.43896484375
+   ],
+   "vector_bytes": "QVYSAAgAAABqOWc5LK7QOTW37Dn9OwY3",
+   "document": "Demo document 165 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.52"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 354
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-166",
+   "key": "0xd7d43326748c063565dcf9370ff58176eef06840f73ea37aa32df79dda5ddef9",
+   "vector": [
+    -0.75927734375,
+    -0.1624755859375,
+    -0.185791015625,
+    -0.93798828125,
+    0.494140625,
+    -0.8125,
+    0.5673828125,
+    0.367431640625
+   ],
+   "vector_bytes": "QVYSAAgAAAATujOx8rGBu+g3gLqKOOE1",
+   "document": "Demo document 166 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.55"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 313
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-167",
+   "key": "0xe20f29361b912ec32363a256bd583448a716dc0a9fb21265bcda2ab1e2b40dc9",
+   "vector": [
+    0.08856201171875,
+    0.96826171875,
+    -0.17822265625,
+    0.67724609375,
+    -0.505859375,
+    0.41259765625,
+    0.99560546875,
+    -0.77783203125
+   ],
+   "vector_bytes": "QVYSAAgAAACrLb87tLFrOQy4mjb3Ozm6",
+   "document": "Demo document 167 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.02"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -459
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-168",
+   "key": "0x3b25d1b57345054ae9d0bf171b10f526c8c53960e9f873222d71a42efb5ec764",
+   "vector": [
+    -0.042633056640625,
+    0.2403564453125,
+    -0.81396484375,
+    -0.908203125,
+    -0.43310546875,
+    0.85693359375,
+    -0.7880859375,
+    0.51953125
+   ],
+   "vector_bytes": "QVYSAAgAAAB1qbEzg7pEu+622zpOuig4",
+   "document": "Demo document 168 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.30"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -271
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-169",
+   "key": "0x947e65c5b8cb341d6c4916aa4584c268a29ef3171049ad92e4f9166b609c5c9b",
+   "vector": [
+    0.259521484375,
+    0.1754150390625,
+    0.1810302734375,
+    -0.94677734375,
+    0.25146484375,
+    -0.99267578125,
+    -0.85498046875,
+    -0.010650634765625
+   ],
+   "vector_bytes": "QVYSAAgAAAAnNJ0xyzGTuwY08bvXunSh",
+   "document": "Demo document 169 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.93"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 77
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-170",
+   "key": "0xefcb4d2fc1bb43f4aed007faf382bd2aadcb3476dde6177e7de80cf1ee609231",
+   "vector": [
+    0.1287841796875,
+    -0.6904296875,
+    0.53857421875,
+    0.869140625,
+    -0.7763671875,
+    -0.55078125,
+    0.218994140625,
+    -0.408203125
+   ],
+   "vector_bytes": "QVYSAAgAAAAfMIa5Tzj0Oja6aLgCM4i2",
+   "document": "Demo document 170 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.75"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -243
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-171",
+   "key": "0x16a0eb0b565068044ba2acfffdd90235a219f508686e044c3e61a267bb9558af",
+   "vector": [
+    -0.29736328125,
+    -0.07061767578125,
+    -0.1690673828125,
+    0.94873046875,
+    -0.32275390625,
+    0.89697265625,
+    0.5693359375,
+    -0.09686279296875
+   ],
+   "vector_bytes": "QVYSAAgAAADCtIWsabGXOyq1LTuOODOu",
+   "document": "Demo document 171 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.33"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -114
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-172",
+   "key": "0xfa5145e0ead3779738663dca45bab2ed7191e9337ab79dccc615b8179a677f08",
+   "vector": [
+    -0.264892578125,
+    -0.90185546875,
+    -0.36083984375,
+    0.52978515625,
+    -0.93115234375,
+    0.9248046875,
+    0.325927734375,
+    0.33935546875
+   ],
+   "vector_bytes": "QVYSAAgAAAA9tDe7xrU9OHO7Zjs3NW41",
+   "document": "Demo document 172 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.56"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 494
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-173",
+   "key": "0xe93ef520670377455cbe3eb2d6354580d7fdeb7b34a9a96cdbc5c857ba818868",
+   "vector": [
+    0.13330078125,
+    0.693359375,
+    -0.1552734375,
+    -0.94677734375,
+    -0.68408203125,
+    0.60693359375,
+    0.802734375,
+    -0.81396484375
+   ],
+   "vector_bytes": "QVYSAAgAAABEMIw5+LCTu3m52zhsOoO6",
+   "document": "Demo document 173 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.80"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 231
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-174",
+   "key": "0x2768f663c49c57e4402235176e405d68bd555de2371c18e9a7b49285dde4aefb",
+   "vector": [
+    0.51171875,
+    0.6728515625,
+    -0.10650634765625,
+    -0.8388671875,
+    -0.9560546875,
+    0.80126953125,
+    -0.0611572265625,
+    -0.09619140625
+   ],
+   "vector_bytes": "QVYSAAgAAAAYOGI50a62uqa7aTrUqyiu",
+   "document": "Demo document 174 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.21"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -224
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-175",
+   "key": "0xa13d77f9cf7d869294617dab8674a67ed92855f189af2a6a31d6c644e52c1bb4",
+   "vector": [
+    0.357421875,
+    0.28662109375,
+    0.375244140625,
+    0.77490234375,
+    0.97705078125,
+    0.278564453125,
+    0.83642578125,
+    0.67822265625
+   ],
+   "vector_bytes": "QVYSAAgAAAC4NZY0ATYzOtE7dTSxOm05",
+   "document": "Demo document 175 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.86"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 213
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-176",
+   "key": "0x9198176e6f3c24c45adf388ef0a8a1c677c9720442c83cc6e8944a2a66f7692f",
+   "vector": [
+    0.900390625,
+    0.45654296875,
+    0.75927734375,
+    0.239501953125,
+    0.06304931640625,
+    0.429443359375,
+    0.73828125,
+    0.6826171875
+   ],
+   "vector_bytes": "QVYSAAgAAAA0O043EzqqMwks3zboOXY5",
+   "document": "Demo document 176 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.93"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -173
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-177",
+   "key": "0xdbb0cccb3c3f67f80d9f9da91c508466d338e74cb4c1f18274471e247550608d",
+   "vector": [
+    -0.7177734375,
+    -0.9609375,
+    -0.36572265625,
+    0.98486328125,
+    0.431884765625,
+    -0.2401123046875,
+    0.286376953125,
+    -0.978515625
+   ],
+   "vector_bytes": "QVYSAAgAAAC+ubC72rXhO+k2r7OVNNS7",
+   "document": "Demo document 177 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.02"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 81
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-178",
+   "key": "0x01c99a57a414d4fe034700b53a5cc8fc03e53cfa26795957a9a04cfd3489613e",
+   "vector": [
+    0.12066650390625,
+    -0.8076171875,
+    0.291748046875,
+    0.6865234375,
+    -0.2259521484375,
+    -0.1036376953125,
+    -0.58984375,
+    0.826171875
+   ],
+   "vector_bytes": "QVYSAAgAAAC5L3a6qzR+OTuzoq64uJw6",
+   "document": "Demo document 178 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.38"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -268
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-179",
+   "key": "0x330399c6e214b2b6c5254bf4f25665ea4ce13bccd4ffb61f0583062327749a2c",
+   "vector": [
+    0.053985595703125,
+    -0.433349609375,
+    1.0,
+    0.388427734375,
+    0.23974609375,
+    -0.67919921875,
+    0.68408203125,
+    -0.53271484375
+   ],
+   "vector_bytes": "QVYSAAgAAADpKu+2ADw3Nqwzb7l5OUO4",
+   "document": "Demo document 179 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.51"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 353
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-180",
+   "key": "0x5dc1727a3d2b1076ff6d7c4455bd441c2893f10ea0638cbd4ca5db18b6cae12e",
+   "vector": [
+    -0.6279296875,
+    -0.46728515625,
+    -0.1890869140625,
+    -0.4462890625,
+    -0.55322265625,
+    -0.447998046875,
+    -0.49951171875,
+    0.357666015625
+   ],
+   "vector_bytes": "QVYSAAgAAAAGuXq3DbIkt224K7f+t7k1",
+   "document": "Demo document 180 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.74"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -289
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-181",
+   "key": "0x7e074478089ceffd8a395c9292494c6dc7e4e9fe3c8feefc304f3b8082eca823",
+   "vector": [
+    -0.68212890625,
+    -0.82568359375,
+    0.244873046875,
+    -0.477783203125,
+    -0.303955078125,
+    0.99267578125,
+    0.89794921875,
+    0.310302734375
+   ],
+   "vector_bytes": "QVYSAAgAAAB1uZu61jOlt9208TsvO/c0",
+   "document": "Demo document 181 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.36"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": -243
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-182",
+   "key": "0x2c3cc33c8a49c7d7e05d8050f90f25e75d5340e44479aae407f3fda03e1bd7c8",
+   "vector": [
+    0.15673828125,
+    0.254638671875,
+    0.6943359375,
+    0.330322265625,
+    -0.016357421875,
+    0.162109375,
+    -0.60400390625,
+    0.92138671875
+   ],
+   "vector_bytes": "QVYSAAgAAAAEMRM0jjlJNTCkMDHVuF87",
+   "document": "Demo document 182 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.53"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 212
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-183",
+   "key": "0xb1b6d4e1669ff2e1586e72f3687fb51b369ea613f1e56d6627787586d788752d",
+   "vector": [
+    -0.392578125,
+    0.88330078125,
+    0.8935546875,
+    0.374267578125,
+    -0.09295654296875,
+    0.5322265625,
+    0.6728515625,
+    0.9482421875
+   ],
+   "vector_bytes": "QVYSAAgAAABIthE7Jjv9NfOtQjhiOZY7",
+   "document": "Demo document 183 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.23"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -29
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-184",
+   "key": "0x87e12118158838da0475967c6f9c3fb5ad7e4f09deb6b379aefaaa1d3a32b7b7",
+   "vector": [
+    -0.271484375,
+    -0.90087890625,
+    -0.70458984375,
+    0.876953125,
+    -0.943359375,
+    -0.314453125,
+    0.43115234375,
+    -0.8486328125
+   ],
+   "vector_bytes": "QVYSAAgAAABYtDW7o7kEO4y7CLXmNsq6",
+   "document": "Demo document 184 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.78"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -182
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-185",
+   "key": "0xc7bc4185be6ff8d183db9c09580c71e4868a59be312c391add14edf3948e8049",
+   "vector": [
+    0.853515625,
+    -0.9150390625,
+    -0.298583984375,
+    -0.369140625,
+    -0.01119232177734375,
+    0.01364898681640625,
+    0.30078125,
+    -0.435546875
+   ],
+   "vector_bytes": "QVYSAAgAAADUOlK7x7Totbuh/SLQNPi2",
+   "document": "Demo document 185 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.69"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 190
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-186",
+   "key": "0x1ef324e2b559146a4d37b5b30e0817f9bda2b5260bc5543bc1ed815eba05da25",
+   "vector": [
+    -0.33251953125,
+    0.238037109375,
+    -0.01404571533203125,
+    0.9853515625,
+    -0.6298828125,
+    0.6767578125,
+    -0.884765625,
+    -0.330810546875
+   ],
+   "vector_bytes": "QVYSAAgAAABStZ4zMaPiOwq5ajkUu0u1",
+   "document": "Demo document 186 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.97"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -38
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-187",
+   "key": "0xf9ce17d981a1128bd42917b6abfbba0fcfd953300f608d9cc8474ed90060f152",
+   "vector": [
+    -0.9775390625,
+    -0.185546875,
+    0.26123046875,
+    -0.452880859375,
+    0.3916015625,
+    -0.95947265625,
+    0.411865234375,
+    0.435791015625
+   ],
+   "vector_bytes": "QVYSAAgAAADSu/CxLjQ/t0Q2rbuXNvk2",
+   "document": "Demo document 187 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.12"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 498
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-188",
+   "key": "0x218994c84754fe2cccbdda7f8f0ec3d5b6732da574ba99e4758b3064ee4f3c6c",
+   "vector": [
+    -0.42041015625,
+    0.360595703125,
+    0.324951171875,
+    -0.439208984375,
+    0.044403076171875,
+    0.31201171875,
+    -0.5078125,
+    -0.2958984375
+   ],
+   "vector_bytes": "QVYSAAgAAAC6tsU1MzUHt68p/jQQuLy0",
+   "document": "Demo document 188 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.41"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 454
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-189",
+   "key": "0x23462333e0d564f70f1193a022e2722ecf1375828f25f14797e9e610c9f2cfb6",
+   "vector": [
+    -0.1217041015625,
+    -0.342529296875,
+    0.73388671875,
+    0.442626953125,
+    -0.6513671875,
+    0.58837890625,
+    -0.10595703125,
+    0.8681640625
+   ],
+   "vector_bytes": "QVYSAAgAAADKr3u13zkVNza5tTjIrvI6",
+   "document": "Demo document 189 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.16"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 52
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-190",
+   "key": "0xa14608154479beb667a8c805842e93b1a6e18c136d2a9b872d624db71e7b1fd3",
+   "vector": [
+    -0.0794677734375,
+    -0.6083984375,
+    0.350341796875,
+    -0.5693359375,
+    -0.8681640625,
+    -0.95654296875,
+    -0.3837890625,
+    -0.66064453125
+   ],
+   "vector_bytes": "QVYSAAgAAAAWrd64mzWOuPK6p7sktkm5",
+   "document": "Demo document 190 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.20"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -172
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-191",
+   "key": "0x520ac8d721b8ac00b0bf6c3ebf5df48c95575bfe816844bf0722c66d9371a40c",
+   "vector": [
+    -0.1317138671875,
+    -0.7255859375,
+    -0.29833984375,
+    0.82421875,
+    0.451171875,
+    -0.533203125,
+    -0.06536865234375,
+    -0.2470703125
+   ],
+   "vector_bytes": "QVYSAAgAAAA3sM65xrSYOjg3RLgvrOiz",
+   "document": "Demo document 191 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.68"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 79
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-192",
+   "key": "0x7e94d6e117d069e722a9b39a2e12f201d7e52408b57fd1d2d8837cbe0805551a",
+   "vector": [
+    -0.05535888671875,
+    -0.1717529296875,
+    -0.00182342529296875,
+    -0.220703125,
+    -0.75,
+    -0.12493896484375,
+    0.1619873046875,
+    -0.615234375
+   ],
+   "vector_bytes": "QVYSAAgAAAAWq3+xeJcQswC6/68vMey4",
+   "document": "Demo document 192 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "1.81"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 491
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-193",
+   "key": "0x22a210d361430865c52fbcb85417c80893f3370e099942730d744919661b07ea",
+   "vector": [
+    0.135009765625,
+    -0.44580078125,
+    0.1522216796875,
+    -0.86962890625,
+    -0.65283203125,
+    -0.5869140625,
+    0.18896484375,
+    -0.247314453125
+   ],
+   "vector_bytes": "QVYSAAgAAABSMCK33zD1ujm5srgMMuqz",
+   "document": "Demo document 193 about science.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "science"
+    },
+    "score": {
+     "type": "dec",
+     "value": "0.39"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -311
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-194",
+   "key": "0x7e8acf7f55393989b1c6594f6f5045d934237bf0b931b8758b5a9d3fe9d19f3b",
+   "vector": [
+    0.77978515625,
+    0.70751953125,
+    0.64501953125,
+    0.2047119140625,
+    0.345703125,
+    0.26611328125,
+    -0.84814453125,
+    0.869140625
+   ],
+   "vector_bytes": "QVYSAAgAAAA9Oqk5KTmNMog1QjTJuvQ6",
+   "document": "Demo document 194 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.12"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": -308
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-195",
+   "key": "0x23ad3b44765b7f144ffaeb960a717192ca4d2a90f591403d5dccb7bfaf893ea4",
+   "vector": [
+    -0.346435546875,
+    0.391357421875,
+    -0.41943359375,
+    -0.89794921875,
+    -0.43505859375,
+    0.80224609375,
+    -0.9267578125,
+    -0.89208984375
+   ],
+   "vector_bytes": "QVYSAAgAAACLtUM2trYvu/a2azpquyO7",
+   "document": "Demo document 195 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.95"
+    },
+    "published": {
+     "type": "bool",
+     "value": false
+    },
+    "rank": {
+     "type": "i32",
+     "value": 499
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-196",
+   "key": "0x4ba43336e2204704a698be87b2bf1abd8bc86c7cbf1ece206a806114e6cd425f",
+   "vector": [
+    -0.374267578125,
+    0.194580078125,
+    0.775390625,
+    0.40380859375,
+    -0.420654296875,
+    0.6572265625,
+    0.81298828125,
+    0.165283203125
+   ],
+   "vector_bytes": "QVYSAAgAAAD9tToyNDp2Nru2QjmBOkox",
+   "document": "Demo document 196 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.13"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 304
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-197",
+   "key": "0xbf9b7fc99670fda0395c25a672f451b783504393a053a33d1d5eeabc911d75a7",
+   "vector": [
+    -0.50732421875,
+    0.0877685546875,
+    0.2220458984375,
+    0.78173828125,
+    -0.5361328125,
+    0.9912109375,
+    0.182373046875,
+    -0.92822265625
+   ],
+   "vector_bytes": "QVYSAAgAAAAPuJ4tGzNBOkq47jvWMW27",
+   "document": "Demo document 197 about finance.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "finance"
+    },
+    "score": {
+     "type": "dec",
+     "value": "3.66"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 65
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-198",
+   "key": "0x2e3de39c197bf603f83a876a9c02eeba1cf46be0dbadc74c92e91ca7c9be20f3",
+   "vector": [
+    -0.9208984375,
+    0.7978515625,
+    -0.223876953125,
+    -0.52001953125,
+    0.339111328125,
+    -0.375732421875,
+    0.556640625,
+    -0.265380859375
+   ],
+   "vector_bytes": "QVYSAAgAAABeu2I6KrMpuG01A7Z0OD+0",
+   "document": "Demo document 198 about news.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "news"
+    },
+    "score": {
+     "type": "dec",
+     "value": "2.19"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 411
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  },
+  {
+   "id": "doc-199",
+   "key": "0x5f8536319735fd9e557f564a2d0460464c0036fd1e2731057c89770c8fa901eb",
+   "vector": [
+    0.2012939453125,
+    -0.619140625,
+    -0.59375,
+    -0.869140625,
+    0.307373046875,
+    -0.71875,
+    0.83349609375,
+    0.96875
+   ],
+   "vector_bytes": "QVYSAAgAAABxMvS4wLj0uus0wLmrOsA7",
+   "document": "Demo document 199 about sports.",
+   "attributes": {
+    "category": {
+     "type": "str",
+     "value": "sports"
+    },
+    "score": {
+     "type": "dec",
+     "value": "4.74"
+    },
+    "published": {
+     "type": "bool",
+     "value": true
+    },
+    "rank": {
+     "type": "i32",
+     "value": 130
+    }
+   },
+   "owner": "0x1111111111111111111111111111111111111111",
+   "creator": "0x1111111111111111111111111111111111111111",
+   "expires_at_block": 10000000
+  }
+ ],
+ "queries": [
+  {
+   "name": "unfiltered_k5",
+   "request": {
+    "vector": [
+     0.64501953125,
+     0.71435546875,
+     0.98095703125,
+     0.8154296875,
+     -0.896484375,
+     -0.70556640625,
+     0.85791015625,
+     0.5888671875
+    ],
+    "k": 5,
+    "exact": true,
+    "include": [
+     "attributes"
+    ]
+   },
+   "expected_ids": [
+    "doc-040",
+    "doc-030",
+    "doc-132",
+    "doc-107",
+    "doc-143"
+   ],
+   "expected_distances": [
+    0.139552,
+    0.206005,
+    0.211019,
+    0.243382,
+    0.25085
+   ],
+   "distance_tolerance": 0.002,
+   "expected_count_matching_filter": 200
+  },
+  {
+   "name": "json_filter_finance_k5",
+   "request": {
+    "vector": [
+     0.2286376953125,
+     0.6884765625,
+     -0.0941162109375,
+     0.69873046875,
+     0.9130859375,
+     0.04156494140625,
+     -0.28515625,
+     -0.890625
+    ],
+    "k": 5,
+    "exact": true,
+    "include": [
+     "attributes"
+    ],
+    "filter": {
+     "eq": {
+      "category": "finance"
+     }
+    }
+   },
+   "expected_ids": [
+    "doc-080",
+    "doc-134",
+    "doc-023",
+    "doc-050",
+    "doc-029"
+   ],
+   "expected_distances": [
+    0.292667,
+    0.454993,
+    0.507131,
+    0.539426,
+    0.550564
+   ],
+   "distance_tolerance": 0.002,
+   "expected_count_matching_filter": 46
+  },
+  {
+   "name": "where_score_published_k3",
+   "request": {
+    "vector": [
+     -0.7724609375,
+     0.3056640625,
+     -0.1834716796875,
+     0.87109375,
+     -0.72607421875,
+     -0.2064208984375,
+     -0.4287109375,
+     0.5927734375
+    ],
+    "k": 3,
+    "exact": true,
+    "include": [
+     "attributes"
+    ],
+    "where": "score >= dec(4.0) AND published = true"
+   },
+   "expected_ids": [
+    "doc-021",
+    "doc-083",
+    "doc-050"
+   ],
+   "expected_distances": [
+    0.276691,
+    0.367115,
+    0.504441
+   ],
+   "distance_tolerance": 0.002,
+   "expected_count_matching_filter": 35
+  },
+  {
+   "name": "json_filter_between_k4",
+   "request": {
+    "vector": [
+     0.52197265625,
+     0.9541015625,
+     0.92626953125,
+     -0.787109375,
+     0.0263824462890625,
+     -0.3525390625,
+     0.6953125,
+     -0.3974609375
+    ],
+    "k": 4,
+    "exact": true,
+    "include": [
+     "attributes"
+    ],
+    "filter": {
+     "between": {
+      "rank": [
+       {
+        "type": "i32",
+        "value": -100
+       },
+       {
+        "type": "i32",
+        "value": 100
+       }
+      ]
+     }
+    }
+   },
+   "expected_ids": [
+    "doc-001",
+    "doc-133",
+    "doc-042",
+    "doc-140"
+   ],
+   "expected_distances": [
+    0.212849,
+    0.273614,
+    0.426092,
+    0.436678
+   ],
+   "distance_tolerance": 0.002,
+   "expected_count_matching_filter": 39
+  }
+ ],
+ "notes": [
+  "Distances are cosine distances computed in double precision on binary16-rounded inputs.",
+  "Daemon results with exact=true must match expected_ids in order and distances within distance_tolerance."
+ ]
+}

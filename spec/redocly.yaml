@@ -1,0 +1,6 @@
+# Lint config for spec/openapi.yaml. Errors are declared once via `default` responses (Problem schema).
+extends:
+  - recommended
+rules:
+  operation-4xx-response: off
+  no-unused-components: off

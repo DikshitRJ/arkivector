@@ -1,0 +1,322 @@
+{
+  "spec_version": "1.0.0",
+  "format_version": 1,
+  "types": {
+    "vector": 1,
+    "halfvec": 2,
+    "bit": 3,
+    "sparsevec": 4
+  },
+  "cases": [
+    {
+      "name": "vector_dim3",
+      "valid": true,
+      "hex": "41561100030000000000803f0000004000004040",
+      "base64": "QVYRAAMAAAAAAIA/AAAAQAAAQEA=",
+      "length": 20,
+      "type": "vector",
+      "dim": 3,
+      "normalized": false,
+      "values": [
+        1.0,
+        2.0,
+        3.0
+      ]
+    },
+    {
+      "name": "vector_dim4_normalized_flag",
+      "valid": true,
+      "hex": "41561101040000000000003f0000003f0000003f0000003f",
+      "base64": "QVYRAQQAAAAAAAA/AAAAPwAAAD8AAAA/",
+      "length": 24,
+      "type": "vector",
+      "dim": 4,
+      "normalized": true,
+      "values": [
+        0.5,
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "name": "vector_dim1_zero",
+      "valid": true,
+      "hex": "415611000100000000000000",
+      "base64": "QVYRAAEAAAAAAAAA",
+      "length": 12,
+      "type": "vector",
+      "dim": 1,
+      "normalized": false,
+      "values": [
+        0.0
+      ]
+    },
+    {
+      "name": "vector_float32_rounding",
+      "valid": true,
+      "hex": "4156110003000000cdcccc3dcdcc4cbe6f12833a",
+      "base64": "QVYRAAMAAADNzMw9zcxMvm8Sgzo=",
+      "length": 20,
+      "type": "vector",
+      "dim": 3,
+      "normalized": false,
+      "values": [
+        0.10000000149011612,
+        -0.20000000298023224,
+        0.0010000000474974513
+      ],
+      "note": "values are the float32 roundings of 0.1, -0.2, 0.001"
+    },
+    {
+      "name": "halfvec_dim3",
+      "valid": true,
+      "hex": "4156120003000000003e00c00034",
+      "base64": "QVYSAAMAAAAAPgDAADQ=",
+      "length": 14,
+      "type": "halfvec",
+      "dim": 3,
+      "normalized": false,
+      "values": [
+        1.5,
+        -2.0,
+        0.25
+      ]
+    },
+    {
+      "name": "halfvec_dim8_rounding",
+      "valid": true,
+      "hex": "4156120008000000662e54b5004140568e86003aff7b00bc",
+      "base64": "QVYSAAgAAABmLlS1AEFAVo6GADr/ewC8",
+      "length": 24,
+      "type": "halfvec",
+      "dim": 8,
+      "normalized": false,
+      "values": [
+        0.0999755859375,
+        -0.3330078125,
+        2.5,
+        100.0,
+        -0.00010001659393310547,
+        0.75,
+        65504.0,
+        -1.0
+      ],
+      "input_values": [
+        0.1,
+        -0.333,
+        2.5,
+        100.0,
+        -0.0001,
+        0.75,
+        65504.0,
+        -1.0
+      ],
+      "note": "encoders must round float input to nearest binary16 (round-half-even)"
+    },
+    {
+      "name": "bit_10",
+      "valid": true,
+      "hex": "415613000a000000b0c0",
+      "base64": "QVYTAAoAAACwwA==",
+      "length": 10,
+      "type": "bit",
+      "dim": 10,
+      "bits": "1011000011"
+    },
+    {
+      "name": "bit_8",
+      "valid": true,
+      "hex": "4156130008000000ff",
+      "base64": "QVYTAAgAAAD/",
+      "length": 9,
+      "type": "bit",
+      "dim": 8,
+      "bits": "11111111"
+    },
+    {
+      "name": "sparsevec_dim10",
+      "valid": true,
+      "hex": "415614000a00000003000000000000000000000003000000090000000000c03f000000c00000003f",
+      "base64": "QVYUAAoAAAADAAAAAAAAAAAAAAADAAAACQAAAAAAwD8AAADAAAAAPw==",
+      "length": 40,
+      "type": "sparsevec",
+      "dim": 10,
+      "indices": [
+        0,
+        3,
+        9
+      ],
+      "values": [
+        1.5,
+        -2.0,
+        0.5
+      ],
+      "text": "{1:1.5,4:-2,10:0.5}/10",
+      "note": "indices are 0-based on the wire; pgvector text format is 1-based"
+    },
+    {
+      "name": "sparsevec_empty",
+      "valid": true,
+      "hex": "41561400050000000000000000000000",
+      "base64": "QVYUAAUAAAAAAAAAAAAAAA==",
+      "length": 16,
+      "type": "sparsevec",
+      "dim": 5,
+      "indices": [],
+      "values": []
+    },
+    {
+      "name": "too_short",
+      "valid": false,
+      "hex": "415611000300",
+      "base64": "QVYRAAMA",
+      "length": 6,
+      "error": "VB_TOO_SHORT"
+    },
+    {
+      "name": "bad_magic",
+      "valid": false,
+      "hex": "41581100030000000000803f0000004000004040",
+      "base64": "QVgRAAMAAAAAAIA/AAAAQAAAQEA=",
+      "length": 20,
+      "error": "VB_BAD_MAGIC"
+    },
+    {
+      "name": "bad_version",
+      "valid": false,
+      "hex": "41562100030000000000803f0000004000004040",
+      "base64": "QVYhAAMAAAAAAIA/AAAAQAAAQEA=",
+      "length": 20,
+      "error": "VB_BAD_VERSION"
+    },
+    {
+      "name": "unknown_type",
+      "valid": false,
+      "hex": "41561500030000000000803f0000004000004040",
+      "base64": "QVYVAAMAAAAAAIA/AAAAQAAAQEA=",
+      "length": 20,
+      "error": "VB_UNKNOWN_TYPE"
+    },
+    {
+      "name": "reserved_flag_bits",
+      "valid": false,
+      "hex": "41561102030000000000803f0000004000004040",
+      "base64": "QVYRAgMAAAAAAIA/AAAAQAAAQEA=",
+      "length": 20,
+      "error": "VB_BAD_FLAGS"
+    },
+    {
+      "name": "unused_nonzero",
+      "valid": false,
+      "hex": "41561100030001000000803f0000004000004040",
+      "base64": "QVYRAAMAAQAAAIA/AAAAQAAAQEA=",
+      "length": 20,
+      "error": "VB_UNUSED_NONZERO"
+    },
+    {
+      "name": "dim_zero",
+      "valid": false,
+      "hex": "4156110000000000",
+      "base64": "QVYRAAAAAAA=",
+      "length": 8,
+      "error": "VB_DIM_OUT_OF_RANGE"
+    },
+    {
+      "name": "dim_too_large",
+      "valid": false,
+      "hex": "41561100813e0000",
+      "base64": "QVYRAIE+AAA=",
+      "length": 8,
+      "error": "VB_DIM_OUT_OF_RANGE"
+    },
+    {
+      "name": "length_short_payload",
+      "valid": false,
+      "hex": "41561100030000000000803f00000040",
+      "base64": "QVYRAAMAAAAAAIA/AAAAQA==",
+      "length": 16,
+      "error": "VB_LENGTH_MISMATCH"
+    },
+    {
+      "name": "length_trailing_bytes",
+      "valid": false,
+      "hex": "41561100030000000000803f000000400000404000",
+      "base64": "QVYRAAMAAAAAAIA/AAAAQAAAQEAA",
+      "length": 21,
+      "error": "VB_LENGTH_MISMATCH"
+    },
+    {
+      "name": "non_finite_nan",
+      "valid": false,
+      "hex": "41561100030000000000803f0000c07f00004040",
+      "base64": "QVYRAAMAAAAAAIA/AADAfwAAQEA=",
+      "length": 20,
+      "error": "VB_NON_FINITE"
+    },
+    {
+      "name": "non_finite_inf_half",
+      "valid": false,
+      "hex": "4156120001000000007c",
+      "base64": "QVYSAAEAAAAAfA==",
+      "length": 10,
+      "error": "VB_NON_FINITE"
+    },
+    {
+      "name": "bit_dim_too_large",
+      "valid": false,
+      "hex": "4156130001fa0000",
+      "base64": "QVYTAAH6AAA=",
+      "length": 8,
+      "error": "VB_DIM_OUT_OF_RANGE"
+    },
+    {
+      "name": "bit_padding_nonzero",
+      "valid": false,
+      "hex": "415613000a000000b0ff",
+      "base64": "QVYTAAoAAACw/w==",
+      "length": 10,
+      "error": "VB_BIT_PADDING"
+    },
+    {
+      "name": "sparse_unsorted",
+      "valid": false,
+      "hex": "415614000a000000020000000000000003000000010000000000803f00000040",
+      "base64": "QVYUAAoAAAACAAAAAAAAAAMAAAABAAAAAACAPwAAAEA=",
+      "length": 32,
+      "error": "VB_SPARSE_UNSORTED"
+    },
+    {
+      "name": "sparse_duplicate_index",
+      "valid": false,
+      "hex": "415614000a000000020000000000000003000000030000000000803f00000040",
+      "base64": "QVYUAAoAAAACAAAAAAAAAAMAAAADAAAAAACAPwAAAEA=",
+      "length": 32,
+      "error": "VB_SPARSE_UNSORTED"
+    },
+    {
+      "name": "sparse_index_out_of_range",
+      "valid": false,
+      "hex": "415614000a0000000200000000000000000000000a0000000000803f00000040",
+      "base64": "QVYUAAoAAAACAAAAAAAAAAAAAAAKAAAAAACAPwAAAEA=",
+      "length": 32,
+      "error": "VB_SPARSE_INDEX_OUT_OF_RANGE"
+    },
+    {
+      "name": "sparse_zero_value",
+      "valid": false,
+      "hex": "415614000a000000020000000000000000000000040000000000803f00000000",
+      "base64": "QVYUAAoAAAACAAAAAAAAAAAAAAAEAAAAAACAPwAAAAA=",
+      "length": 32,
+      "error": "VB_SPARSE_ZERO_VALUE"
+    },
+    {
+      "name": "sparse_nnz_gt_dim",
+      "valid": false,
+      "hex": "41561400010000000200000000000000",
+      "base64": "QVYUAAEAAAACAAAAAAAAAA==",
+      "length": 16,
+      "error": "VB_NNZ_OUT_OF_RANGE"
+    }
+  ]
+}

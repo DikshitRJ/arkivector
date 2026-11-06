@@ -1,0 +1,1099 @@
+openapi: 3.1.0
+info:
+  title: Arkivector Daemon API
+  version: 1.0.0
+  summary: Contract between arkivectord (C daemon) and all Arkivector SDKs.
+  description: |
+    This file is the machine-readable contract. Human documentation lives in `docs/api/`.
+    Both are frozen: change them only through a CCR (`spec/changes/README.md`).
+
+    * Wire field names are `snake_case`.
+    * Every data response carries `as_of_block` (body) and the `Arkivector-As-Of-Block` header.
+    * Errors use RFC 9457 `application/problem+json` (schema `Problem`); codes are listed in `spec/error-codes.json`.
+    * Optional features are advertised through `GET /v1/version` → `capabilities` (`spec/capabilities.json`).
+  license:
+    name: PostgreSQL License
+    identifier: PostgreSQL
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local daemon (default bind)
+  - url: http://127.0.0.1:4010
+    description: Prism mock of this file (SDK development)
+security:
+  - {}
+  - bearerAuth: []
+tags:
+  - name: ops
+    description: Health, readiness, version/capabilities, sync status, metrics.
+  - name: collections
+    description: Define, follow, describe and drop collections.
+  - name: entities
+    description: Point reads and managed/prepared writes of vector entities.
+  - name: search
+    description: Similarity search, batch search, scroll and count.
+
+paths:
+  /healthz:
+    get:
+      tags: [ops]
+      operationId: healthz
+      summary: Liveness probe (process is up).
+      security: [{}]
+      responses:
+        "200":
+          description: Alive.
+          content:
+            application/json:
+              schema: { type: object, required: [status], properties: { status: { const: ok } } }
+              example: { status: ok }
+
+  /readyz:
+    get:
+      tags: [ops]
+      operationId: readyz
+      summary: Readiness probe (every followed collection is `live`).
+      security: [{}]
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+              example: { ready: true, collections: { demo.docs: live } }
+        "503":
+          description: Not ready.
+          headers: { Retry-After: { $ref: "#/components/headers/RetryAfter" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+              example: { ready: false, collections: { demo.docs: bootstrap } }
+
+  /v1/version:
+    get:
+      tags: [ops]
+      operationId: getVersion
+      summary: Daemon version, API version and capabilities. SDKs call this once per client.
+      security: [{}]
+      responses:
+        "200":
+          description: Version info.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VersionInfo" }
+              example:
+                daemon_version: 0.1.0
+                api_version: 1.0.0
+                pgvector_version: 0.8.7
+                kernel_tier: x86-64-v3
+                chain_id: 7794095
+                writes_enabled: false
+                capabilities: [ops.version, ops.sync, collections.read, collections.write, collections.follow,
+                               entities.read, search.exact, search.filter.json, search.filter.where,
+                               search.explain, scroll, count, consistency.min_block]
+
+  /v1/sync:
+    get:
+      tags: [ops]
+      operationId: getSync
+      summary: Sync status of every followed collection.
+      responses:
+        "200":
+          description: Sync status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [collections]
+                properties:
+                  collections: { type: array, items: { $ref: "#/components/schemas/SyncStatus" } }
+              example:
+                collections:
+                  - { name: demo.docs, state: live, as_of_block: 582151, head_block: 582151, lag_blocks: 0, last_error: null }
+        default: { $ref: "#/components/responses/Error" }
+
+  /metrics:
+    get:
+      tags: [ops]
+      operationId: getMetrics
+      summary: Prometheus text exposition.
+      security: [{}]
+      responses:
+        "200":
+          description: Metrics.
+          content:
+            text/plain:
+              schema: { type: string }
+              example: "arkivector_as_of_block{collection=\"demo.docs\"} 582151\n"
+
+  /v1/collections:
+    get:
+      tags: [collections]
+      operationId: listCollections
+      summary: List collections.
+      responses:
+        "200":
+          description: All collections on this daemon.
+          headers: { Arkivector-As-Of-Block: { $ref: "#/components/headers/AsOfBlock" } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [collections]
+                properties:
+                  collections: { type: array, items: { $ref: "#/components/schemas/Collection" } }
+              example: { collections: [ { name: demo.docs, schema_tag: arkivector.v1.demo.docs, column: { type: halfvec, dimensions: 8 }, index: { method: hnsw, opclass: halfvec_cosine_ops, with: { m: 16, ef_construction: 64 } }, writers: ["0x1111111111111111111111111111111111111111"], membership: creator, attributes: { category: str, score: dec, published: bool, rank: i32 }, default_ttl: null, model: null, manifest_key: null, open: false, mode: full, stats: { live_entities: 200, segments: 1, quarantined: 0, tombstones: 0 }, sync: { name: demo.docs, state: live, as_of_block: 582151, head_block: 582151, lag_blocks: 0, last_error: null } } ] }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [collections]
+      operationId: createCollection
+      summary: Define a collection and start syncing it (optionally publish an on-chain manifest).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollectionCreate" }
+            examples:
+              demo: { $ref: "#/components/examples/CollectionCreate" }
+      responses:
+        "201":
+          description: Created; sync starts in state `bootstrap`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+              examples:
+                demo: { $ref: "#/components/examples/Collection" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections:follow:
+    post:
+      tags: [collections]
+      operationId: followCollection
+      summary: Follow an existing collection by manifest key or inline definition.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowRequest" }
+            example: { manifest_key: "0x9f2c8d1e4b3a7f05c6d2e8b1a4c7f0e3d5b8a1c4e7f0d2b5c8a1e4f7d0c3b6a9" }
+      responses:
+        "201":
+          description: Following.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+              examples:
+                demo: { $ref: "#/components/examples/Collection" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    get:
+      tags: [collections]
+      operationId: getCollection
+      summary: Describe one collection (config, stats, sync state).
+      responses:
+        "200":
+          description: Collection.
+          headers: { Arkivector-As-Of-Block: { $ref: "#/components/headers/AsOfBlock" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+              examples:
+                demo: { $ref: "#/components/examples/Collection" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [collections]
+      operationId: deleteCollection
+      summary: Stop following and drop local data. On-chain data is not touched.
+      responses:
+        "204": { description: Deleted. }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/entities:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [entities]
+      operationId: upsertEntities
+      summary: Upsert entities through the daemon's managed signer.
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertRequest" }
+            example:
+              wait: receipt
+              entities:
+                - id: doc-900
+                  vector: [0.1, -0.2, 0.3, 0.4, -0.5, 0.6, 0.7, -0.8]
+                  document: "A new finance document."
+                  attributes:
+                    category: { type: str, value: finance }
+                    score: { type: dec, value: "4.5" }
+                  ttl: { days: 30 }
+      responses:
+        "200":
+          description: Included on chain (wait=receipt) or indexed (wait=indexed).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UpsertResponse" }
+              example:
+                results: [ { id: doc-900, key: "0x5e1f0c0d9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d", op: create } ]
+                tx_hashes: ["0x7d1c3b5a9e8f7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a392817060504"]
+                block_number: 582160
+        "202":
+          description: Broadcast but not yet included (wait=none). Keys are predicted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UpsertResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/entities:prepare:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [entities]
+      operationId: prepareEntities
+      summary: Build unsigned execute(ops) transactions for a client-side signer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PrepareRequest" }
+      responses:
+        "200":
+          description: Unsigned transactions and predicted keys.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PrepareResponse" }
+              example:
+                chain_id: 7794095
+                transactions:
+                  - to: "0x4400000000000000000000000000000000000044"
+                    data: "0x49650044000000000000000000000000000000000000000000000000000000000000002000"
+                    value: "0x0"
+                    nonce: 12
+                    gas_estimate: 412000
+                results: [ { id: doc-900, key: "0x5e1f0c0d9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d", op: create } ]
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/entities:delete:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [entities]
+      operationId: deleteEntities
+      summary: Delete entities by refs or filter (managed signer).
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeleteRequest" }
+            example: { refs: [doc-900] }
+      responses:
+        "200":
+          description: Deleted on chain.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxResponse" }
+              example: { affected: 1, tx_hashes: ["0x7d1c3b5a9e8f7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a392817060505"], block_number: 582170 }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/entities:extend:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [entities]
+      operationId: extendEntities
+      summary: Extend entity TTL (managed signer).
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExtendRequest" }
+            example: { refs: [doc-900], ttl: { days: 30 } }
+      responses:
+        "200":
+          description: Extended on chain.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxResponse" }
+              example: { affected: 1, tx_hashes: ["0x7d1c3b5a9e8f7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a392817060506"], block_number: 582171 }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/entities/{ref}:
+    parameters:
+      - { $ref: "#/components/parameters/CollectionName" }
+      - { $ref: "#/components/parameters/EntityRef" }
+    get:
+      tags: [entities]
+      operationId: getEntity
+      summary: Point lookup by key or external id.
+      parameters:
+        - name: include
+          in: query
+          description: Comma-separated subset of `attributes,document,vector`. Default `attributes`.
+          schema: { type: string, example: "attributes,document" }
+        - name: verify
+          in: query
+          description: Cross-check against arkiv_getEntity (capability `entities.verify`).
+          schema: { type: boolean, default: false }
+        - name: min_block
+          in: query
+          schema: { $ref: "#/components/schemas/BlockNumber" }
+        - name: timeout_ms
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 60000, default: 5000 }
+      responses:
+        "200":
+          description: Entity.
+          headers: { Arkivector-As-Of-Block: { $ref: "#/components/headers/AsOfBlock" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EntityResponse" }
+              example:
+                as_of_block: 582151
+                entity: { key: "0x0b4f4d8b4fd9b7b1d0b6a0c7b8d2e1f3a4c5d6e7f8091a2b3c4d5e6f7a8b9c0d", id: doc-040, owner: "0x1111111111111111111111111111111111111111", creator: "0x1111111111111111111111111111111111111111", created_at_block: 580000, updated_at_block: 580000, expires_at_block: 10000000, attributes: { category: { type: str, value: finance }, score: { type: dec, value: "4.12" } }, document: null }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [entities]
+      operationId: deleteEntity
+      summary: Delete one entity (managed signer).
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      responses:
+        "200":
+          description: Deleted on chain.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/search:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [search]
+      operationId: search
+      summary: Vector similarity search (k-NN / filtered ANN).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SearchRequest" }
+            example:
+              vector: [0.1, -0.2, 0.3, 0.4, -0.5, 0.6, 0.7, -0.8]
+              k: 3
+              filter: { eq: { category: finance } }
+              include: [attributes]
+              explain: true
+      responses:
+        "200":
+          description: Nearest neighbours in ascending distance.
+          headers: { Arkivector-As-Of-Block: { $ref: "#/components/headers/AsOfBlock" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+              examples:
+                demo: { $ref: "#/components/examples/SearchResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/search:batch:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [search]
+      operationId: searchBatch
+      summary: Several searches against one snapshot.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BatchSearchRequest" }
+      responses:
+        "200":
+          description: One response per search, all at the same as_of_block.
+          headers: { Arkivector-As-Of-Block: { $ref: "#/components/headers/AsOfBlock" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BatchSearchResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/scroll:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [search]
+      operationId: scroll
+      summary: Filtered enumeration in ascending $key order with an opaque cursor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScrollRequest" }
+            example: { filter: { eq: { category: finance } }, limit: 2, include: [attributes] }
+      responses:
+        "200":
+          description: Page of entities.
+          headers: { Arkivector-As-Of-Block: { $ref: "#/components/headers/AsOfBlock" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScrollResponse" }
+              example:
+                as_of_block: 582151
+                entities: [ { key: "0x0b4f4d8b4fd9b7b1d0b6a0c7b8d2e1f3a4c5d6e7f8091a2b3c4d5e6f7a8b9c0d", id: doc-040, owner: "0x1111111111111111111111111111111111111111", creator: "0x1111111111111111111111111111111111111111", created_at_block: 580000, updated_at_block: 580000, expires_at_block: 10000000, attributes: { category: { type: str, value: finance }, score: { type: dec, value: "4.12" } }, document: null } ]
+                next_cursor: "c2Nyb2xsOjB4MDE2YjQ1"
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/count:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [search]
+      operationId: count
+      summary: Exact filtered count.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CountRequest" }
+            example: { filter: { eq: { category: finance } } }
+      responses:
+        "200":
+          description: Exact count of live entities matching the filter.
+          headers: { Arkivector-As-Of-Block: { $ref: "#/components/headers/AsOfBlock" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountResponse" }
+              example: { as_of_block: 582151, count: 46 }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Daemon API key (scopes read/write/admin). Optional when the daemon runs without api_keys_file.
+
+  headers:
+    AsOfBlock:
+      description: Arkiv block the response state reflects.
+      schema: { $ref: "#/components/schemas/BlockNumber" }
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema: { type: integer, minimum: 0 }
+
+  parameters:
+    CollectionName:
+      name: name
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/CollectionName" }
+    EntityRef:
+      name: ref
+      in: path
+      required: true
+      description: Entity key (`0x` + 64 hex) or URL-encoded external id (`av.id`).
+      schema: { type: string, minLength: 1, maxLength: 384 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Client-chosen unique string (≤ 128 chars). Same key + same body within 24 h returns the stored result.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+
+  responses:
+    Error:
+      description: Error (RFC 9457).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: "urn:arkivector:error:dimension_mismatch"
+            title: Dimension mismatch
+            status: 422
+            detail: "expected 8 dimensions, not 3"
+            code: dimension_mismatch
+            retryable: false
+            request_id: 01JC8Z5Q2W3E4R5T6Y7U8I9O0P
+
+  schemas:
+    # ---------- scalars ----------
+    CollectionName:
+      type: string
+      pattern: "^[a-z][a-z0-9._-]{0,62}$"
+      example: demo.docs
+    EntityKey:
+      type: string
+      pattern: "^0x[0-9a-f]{64}$"
+      description: 32-byte Arkiv entity key, lowercase hex.
+    Address:
+      type: string
+      pattern: "^0x[0-9a-fA-F]{40}$"
+      description: Ethereum address. Responses use EIP-55 checksum case; requests accept any case.
+    TxHash:
+      type: string
+      pattern: "^0x[0-9a-f]{64}$"
+    BlockNumber:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    ExternalId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      description: Stored in the indexed `av.id` str attribute (≤ 128 UTF-8 bytes).
+    VectorType:
+      type: string
+      enum: [vector, halfvec, bit, sparsevec]
+    Opclass:
+      type: string
+      enum: [vector_l2_ops, vector_ip_ops, vector_cosine_ops, vector_l1_ops,
+             halfvec_l2_ops, halfvec_ip_ops, halfvec_cosine_ops, halfvec_l1_ops,
+             sparsevec_l2_ops, sparsevec_ip_ops, sparsevec_cosine_ops, sparsevec_l1_ops,
+             bit_hamming_ops, bit_jaccard_ops]
+    Operator:
+      type: string
+      enum: ["<->", "<#>", "<=>", "<+>", "<~>", "<%>"]
+      description: "pgvector operators: L2, negative inner product, cosine, L1, Hamming, Jaccard."
+    AttrType:
+      type: string
+      enum: [bool, i32, u64, u256, dec, str, addr, key, bytes]
+    SyncState:
+      type: string
+      enum: [init, bootstrap, catch_up, live, reorg_recovery, degraded]
+
+    # ---------- attribute values ----------
+    TypedValue:
+      type: object
+      required: [type, value]
+      additionalProperties: false
+      description: |
+        Canonical attribute value. Encoding of `value` by type:
+        bool → JSON boolean; i32 → JSON integer; u64, u256 → decimal string;
+        dec → decimal string (≤ 18 fraction digits; responses trim trailing zeros);
+        str → JSON string (≤ 128 UTF-8 bytes); addr → 0x+40 hex; key → 0x+64 hex; bytes → base64.
+      properties:
+        type: { $ref: "#/components/schemas/AttrType" }
+        value: { type: [boolean, integer, string] }
+      example: { type: dec, value: "4.5" }
+    AttrInput:
+      description: |
+        Request-side attribute value. Either a TypedValue, or a shorthand JSON scalar that the daemon
+        types from the collection `attributes` schema (string→str, boolean→bool, integer→i32 when no schema entry).
+      oneOf:
+        - { $ref: "#/components/schemas/TypedValue" }
+        - { type: string }
+        - { type: boolean }
+        - { type: integer }
+    Attributes:
+      type: object
+      description: Map attribute name → TypedValue (responses always use TypedValue).
+      additionalProperties: { $ref: "#/components/schemas/TypedValue" }
+    AttributesInput:
+      type: object
+      maxProperties: 29
+      propertyNames: { pattern: "^[a-zA-Z][a-zA-Z0-9._-]{0,31}$" }
+      additionalProperties: { $ref: "#/components/schemas/AttrInput" }
+
+    # ---------- vectors ----------
+    SparseVectorJson:
+      type: object
+      required: [dim, indices, values]
+      additionalProperties: false
+      properties:
+        dim: { type: integer, minimum: 1, maximum: 1000000000 }
+        indices: { type: array, items: { type: integer, minimum: 0 }, maxItems: 16000, description: "0-based, strictly ascending." }
+        values: { type: array, items: { type: number }, maxItems: 16000, description: "Nonzero, finite." }
+    VectorInput:
+      description: |
+        A vector as JSON. Use exactly one of `vector` or `vector_bytes` in a request.
+        * array of numbers → dense; parsed as float32 then cast to the collection column type.
+        * string → pgvector text literal: `[1,2,3]` (vector/halfvec), `{1:1.5,4:-2}/10` (sparsevec, 1-based), `101` (bit).
+        * object → sparse JSON (0-based indices).
+      oneOf:
+        - { type: array, items: { type: number }, minItems: 1, maxItems: 16000 }
+        - { type: string, minLength: 1 }
+        - { $ref: "#/components/schemas/SparseVectorJson" }
+    VectorBytesB64:
+      type: string
+      contentEncoding: base64
+      description: Base64 (RFC 4648, with padding) of a VectorBytes v1 blob (docs/api/vectors.md).
+
+    Ttl:
+      description: Lifetime. Exactly one key. seconds must be even (2 s blocks). Max 7,884,000 blocks.
+      oneOf:
+        - { type: object, required: [blocks], additionalProperties: false, properties: { blocks: { type: integer, minimum: 1, maximum: 7884000 } } }
+        - { type: object, required: [seconds], additionalProperties: false, properties: { seconds: { type: integer, minimum: 2, maximum: 15768000 } } }
+        - { type: object, required: [days], additionalProperties: false, properties: { days: { type: number, exclusiveMinimum: 0, maximum: 182.5 } } }
+        - { type: object, required: [expires_at_block], additionalProperties: false, properties: { expires_at_block: { $ref: "#/components/schemas/BlockNumber" } } }
+
+    # ---------- collections ----------
+    Column:
+      type: object
+      required: [type, dimensions]
+      additionalProperties: false
+      properties:
+        type: { $ref: "#/components/schemas/VectorType" }
+        dimensions:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+          description: "vector/halfvec ≤ 16000; bit ≤ 64000; sparsevec ≤ 1e9 (nnz ≤ 16000)."
+    IndexDef:
+      type: object
+      required: [method, opclass]
+      additionalProperties: false
+      properties:
+        method: { type: string, enum: [hnsw, none] }
+        opclass: { $ref: "#/components/schemas/Opclass" }
+        with:
+          type: object
+          additionalProperties: false
+          properties:
+            m: { type: integer, minimum: 2, maximum: 100, default: 16 }
+            ef_construction: { type: integer, minimum: 4, maximum: 1000, default: 64 }
+    CollectionCreate:
+      type: object
+      required: [name, column, index]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/CollectionName" }
+        schema_tag: { type: string, maxLength: 128, description: "Default `arkivector.v1.<name>`." }
+        column: { $ref: "#/components/schemas/Column" }
+        index: { $ref: "#/components/schemas/IndexDef" }
+        writers: { type: array, items: { $ref: "#/components/schemas/Address" }, maxItems: 6500 }
+        membership: { type: string, enum: [creator, owner, open], default: creator, description: "`open` requires writers to be empty." }
+        attributes:
+          type: object
+          description: Attribute type schema used to type shorthand values and JSON filters.
+          additionalProperties: { $ref: "#/components/schemas/AttrType" }
+        default_ttl: { $ref: "#/components/schemas/Ttl" }
+        publish_manifest: { type: boolean, default: false }
+        model: { type: string, maxLength: 128 }
+        mode: { type: string, enum: [full, lite], default: full }
+    FollowRequest:
+      oneOf:
+        - type: object
+          required: [manifest_key]
+          additionalProperties: false
+          properties:
+            manifest_key: { $ref: "#/components/schemas/EntityKey" }
+            name: { $ref: "#/components/schemas/CollectionName" }
+        - type: object
+          required: [definition]
+          additionalProperties: false
+          properties:
+            definition: { $ref: "#/components/schemas/CollectionCreate" }
+    Collection:
+      type: object
+      required: [name, schema_tag, column, index, writers, membership, attributes, open, mode, stats, sync]
+      properties:
+        name: { $ref: "#/components/schemas/CollectionName" }
+        schema_tag: { type: string }
+        column: { $ref: "#/components/schemas/Column" }
+        index: { $ref: "#/components/schemas/IndexDef" }
+        writers: { type: array, items: { $ref: "#/components/schemas/Address" } }
+        membership: { type: string, enum: [creator, owner, open] }
+        attributes: { type: object, additionalProperties: { $ref: "#/components/schemas/AttrType" } }
+        default_ttl: { oneOf: [ { $ref: "#/components/schemas/Ttl" }, { type: "null" } ] }
+        model: { type: [string, "null"] }
+        manifest_key: { oneOf: [ { $ref: "#/components/schemas/EntityKey" }, { type: "null" } ] }
+        open: { type: boolean, description: "True when membership is open (poisoning risk)." }
+        mode: { type: string, enum: [full, lite] }
+        stats:
+          type: object
+          required: [live_entities, segments, quarantined, tombstones]
+          properties:
+            live_entities: { type: integer, minimum: 0 }
+            segments: { type: integer, minimum: 0 }
+            quarantined: { type: integer, minimum: 0 }
+            tombstones: { type: integer, minimum: 0 }
+        sync: { $ref: "#/components/schemas/SyncStatus" }
+
+    # ---------- entities ----------
+    EntityInput:
+      type: object
+      required: [id]
+      additionalProperties: false
+      description: Exactly one of `vector` / `vector_bytes`.
+      properties:
+        id: { $ref: "#/components/schemas/ExternalId" }
+        vector: { $ref: "#/components/schemas/VectorInput" }
+        vector_bytes: { $ref: "#/components/schemas/VectorBytesB64" }
+        document: { type: string, description: "UTF-8; stored in `av.doc`; shares the 128 KiB bytes budget." }
+        attributes: { $ref: "#/components/schemas/AttributesInput" }
+        ttl: { $ref: "#/components/schemas/Ttl" }
+    UpsertRequest:
+      type: object
+      required: [entities]
+      additionalProperties: false
+      properties:
+        entities: { type: array, items: { $ref: "#/components/schemas/EntityInput" }, minItems: 1, maxItems: 1000 }
+        wait: { type: string, enum: [none, receipt, indexed], default: receipt }
+        timeout_ms: { type: integer, minimum: 1000, maximum: 300000, default: 60000 }
+    OpResult:
+      type: object
+      required: [id, key, op]
+      properties:
+        id: { $ref: "#/components/schemas/ExternalId" }
+        key: { $ref: "#/components/schemas/EntityKey" }
+        op: { type: string, enum: [create, patch, noop] }
+    UpsertResponse:
+      type: object
+      required: [results, tx_hashes]
+      properties:
+        results: { type: array, items: { $ref: "#/components/schemas/OpResult" } }
+        tx_hashes: { type: array, items: { $ref: "#/components/schemas/TxHash" } }
+        block_number: { oneOf: [ { $ref: "#/components/schemas/BlockNumber" }, { type: "null" } ], description: "Receipt block; null when wait=none." }
+    PrepareRequest:
+      type: object
+      required: [entities, from]
+      additionalProperties: false
+      properties:
+        entities: { type: array, items: { $ref: "#/components/schemas/EntityInput" }, minItems: 1, maxItems: 1000 }
+        from: { $ref: "#/components/schemas/Address" }
+    UnsignedTx:
+      type: object
+      required: [to, data, value, nonce]
+      properties:
+        to: { $ref: "#/components/schemas/Address" }
+        data: { type: string, pattern: "^0x([0-9a-f]{2})*$" }
+        value: { const: "0x0" }
+        nonce: { type: integer, minimum: 0, description: "Arkiv account tx nonce assumed for key prediction." }
+        gas_estimate: { type: [integer, "null"] }
+    PrepareResponse:
+      type: object
+      required: [chain_id, transactions, results]
+      properties:
+        chain_id: { type: integer }
+        transactions: { type: array, items: { $ref: "#/components/schemas/UnsignedTx" } }
+        results: { type: array, items: { $ref: "#/components/schemas/OpResult" } }
+    DeleteRequest:
+      type: object
+      additionalProperties: false
+      description: Exactly one of refs / filter / where.
+      properties:
+        refs: { type: array, items: { type: string }, minItems: 1, maxItems: 1000 }
+        filter: { $ref: "#/components/schemas/Filter" }
+        where: { type: string, maxLength: 8192 }
+    ExtendRequest:
+      type: object
+      required: [ttl]
+      additionalProperties: false
+      description: Exactly one of refs / filter / where.
+      properties:
+        refs: { type: array, items: { type: string }, minItems: 1, maxItems: 1000 }
+        filter: { $ref: "#/components/schemas/Filter" }
+        where: { type: string, maxLength: 8192 }
+        ttl: { $ref: "#/components/schemas/Ttl" }
+    TxResponse:
+      type: object
+      required: [affected, tx_hashes, block_number]
+      properties:
+        affected: { type: integer, minimum: 0 }
+        tx_hashes: { type: array, items: { $ref: "#/components/schemas/TxHash" } }
+        block_number: { $ref: "#/components/schemas/BlockNumber" }
+    Entity:
+      type: object
+      required: [key, id, owner, creator, created_at_block, updated_at_block, expires_at_block]
+      properties:
+        key: { $ref: "#/components/schemas/EntityKey" }
+        id: { oneOf: [ { $ref: "#/components/schemas/ExternalId" }, { type: "null" } ] }
+        owner: { $ref: "#/components/schemas/Address" }
+        creator: { $ref: "#/components/schemas/Address" }
+        created_at_block: { $ref: "#/components/schemas/BlockNumber" }
+        updated_at_block: { $ref: "#/components/schemas/BlockNumber" }
+        expires_at_block: { $ref: "#/components/schemas/BlockNumber" }
+        attributes: { $ref: "#/components/schemas/Attributes" }
+        document: { type: [string, "null"] }
+        vector_bytes: { $ref: "#/components/schemas/VectorBytesB64" }
+    EntityResponse:
+      type: object
+      required: [as_of_block, entity]
+      properties:
+        as_of_block: { $ref: "#/components/schemas/BlockNumber" }
+        entity: { $ref: "#/components/schemas/Entity" }
+        verified: { type: boolean, description: "Present when verify=true." }
+
+    # ---------- filters ----------
+    FilterValue:
+      description: TypedValue or shorthand scalar (typed from the collection attribute schema).
+      oneOf:
+        - { $ref: "#/components/schemas/TypedValue" }
+        - { type: string }
+        - { type: boolean }
+        - { type: integer }
+    FieldValue:
+      type: object
+      minProperties: 1
+      maxProperties: 1
+      description: "{ <field>: <value> }. field is an attribute name or $owner/$creator/$expiresAt/$key."
+      additionalProperties: { $ref: "#/components/schemas/FilterValue" }
+    Filter:
+      description: JSON filter AST. Each node is an object with exactly one operator key. Depth ≤ 16, leaves ≤ 256.
+      oneOf:
+        - { type: object, required: [and], additionalProperties: false, properties: { and: { type: array, minItems: 1, items: { $ref: "#/components/schemas/Filter" } } } }
+        - { type: object, required: [or], additionalProperties: false, properties: { or: { type: array, minItems: 1, items: { $ref: "#/components/schemas/Filter" } } } }
+        - { type: object, required: [not], additionalProperties: false, properties: { not: { $ref: "#/components/schemas/Filter" } } }
+        - { type: object, required: [eq], additionalProperties: false, properties: { eq: { $ref: "#/components/schemas/FieldValue" } } }
+        - { type: object, required: [ne], additionalProperties: false, properties: { ne: { $ref: "#/components/schemas/FieldValue" } } }
+        - { type: object, required: [lt], additionalProperties: false, properties: { lt: { $ref: "#/components/schemas/FieldValue" } } }
+        - { type: object, required: [lte], additionalProperties: false, properties: { lte: { $ref: "#/components/schemas/FieldValue" } } }
+        - { type: object, required: [gt], additionalProperties: false, properties: { gt: { $ref: "#/components/schemas/FieldValue" } } }
+        - { type: object, required: [gte], additionalProperties: false, properties: { gte: { $ref: "#/components/schemas/FieldValue" } } }
+        - type: object
+          required: [between]
+          additionalProperties: false
+          properties:
+            between:
+              type: object
+              minProperties: 1
+              maxProperties: 1
+              additionalProperties:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items: { $ref: "#/components/schemas/FilterValue" }
+        - type: object
+          required: [startswith]
+          additionalProperties: false
+          properties:
+            startswith: { type: object, minProperties: 1, maxProperties: 1, additionalProperties: { type: string } }
+        - { type: object, required: [exists], additionalProperties: false, properties: { exists: { type: string } } }
+        - type: object
+          required: [typeof]
+          additionalProperties: false
+          properties:
+            typeof: { type: object, minProperties: 1, maxProperties: 1, additionalProperties: { $ref: "#/components/schemas/AttrType" } }
+
+    Consistency:
+      type: object
+      additionalProperties: false
+      properties:
+        min_block: { $ref: "#/components/schemas/BlockNumber" }
+        timeout_ms: { type: integer, minimum: 0, maximum: 60000, default: 5000 }
+
+    Include:
+      type: array
+      uniqueItems: true
+      items: { type: string, enum: [attributes, document, vector] }
+      default: [attributes]
+
+    # ---------- search ----------
+    SearchRequest:
+      type: object
+      required: [k]
+      additionalProperties: false
+      description: Exactly one of vector / vector_bytes. At most one of filter / where.
+      properties:
+        vector: { $ref: "#/components/schemas/VectorInput" }
+        vector_bytes: { $ref: "#/components/schemas/VectorBytesB64" }
+        k: { type: integer, minimum: 1, maximum: 1000, default: 10 }
+        offset: { type: integer, minimum: 0, maximum: 999, default: 0, description: "offset + k ≤ 1000." }
+        operator: { $ref: "#/components/schemas/Operator" }
+        filter: { $ref: "#/components/schemas/Filter" }
+        where: { type: string, maxLength: 8192, description: "Arkiv query-language predicate (no ORDER BY)." }
+        ef_search: { type: integer, minimum: 1, maximum: 1000 }
+        iterative_scan: { type: string, enum: ["off", relaxed_order, strict_order] }
+        max_scan_tuples: { type: integer, minimum: 1, maximum: 1000000 }
+        max_distance: { type: number }
+        min_score: { type: number }
+        exact: { type: boolean, default: false }
+        include: { $ref: "#/components/schemas/Include" }
+        consistency: { $ref: "#/components/schemas/Consistency" }
+        explain: { type: boolean, default: false }
+    Hit:
+      type: object
+      required: [key, id, distance, score, owner, creator, expires_at_block]
+      properties:
+        key: { $ref: "#/components/schemas/EntityKey" }
+        id: { type: [string, "null"] }
+        distance: { type: number, description: "pgvector distance for the operator (ascending = closer)." }
+        score: { type: number, description: "Higher = closer. cosine: 1-distance; ip: -distance; others: -distance." }
+        owner: { $ref: "#/components/schemas/Address" }
+        creator: { $ref: "#/components/schemas/Address" }
+        expires_at_block: { $ref: "#/components/schemas/BlockNumber" }
+        attributes: { $ref: "#/components/schemas/Attributes" }
+        document: { type: [string, "null"] }
+        vector_bytes: { $ref: "#/components/schemas/VectorBytesB64" }
+    Plan:
+      type: object
+      required: [strategy, exact, elapsed_ms]
+      properties:
+        strategy: { type: string, enum: [hnsw, exact_flat, hnsw_iterative, mixed, remote_prefilter, remote_postfilter] }
+        candidates: { type: [integer, "null"], description: "|F| after filter + liveness; null without filter." }
+        selectivity: { type: [number, "null"] }
+        exact: { type: boolean }
+        kernel: { type: string, example: halfvec_f16c }
+        elapsed_ms: { type: number }
+        segments:
+          type: array
+          items:
+            type: object
+            required: [id, strategy]
+            properties:
+              id: { type: integer }
+              strategy: { type: string }
+              candidates: { type: [integer, "null"] }
+              scanned_tuples: { type: [integer, "null"] }
+    SearchResponse:
+      type: object
+      required: [as_of_block, sync_state, results]
+      properties:
+        as_of_block: { $ref: "#/components/schemas/BlockNumber" }
+        sync_state: { $ref: "#/components/schemas/SyncState" }
+        open_collection: { type: boolean }
+        results: { type: array, items: { $ref: "#/components/schemas/Hit" } }
+        plan: { $ref: "#/components/schemas/Plan" }
+    BatchSearchRequest:
+      type: object
+      required: [searches]
+      additionalProperties: false
+      properties:
+        searches: { type: array, minItems: 1, maxItems: 64, items: { $ref: "#/components/schemas/SearchRequest" } }
+        consistency: { $ref: "#/components/schemas/Consistency" }
+    BatchSearchResponse:
+      type: object
+      required: [as_of_block, sync_state, responses]
+      properties:
+        as_of_block: { $ref: "#/components/schemas/BlockNumber" }
+        sync_state: { $ref: "#/components/schemas/SyncState" }
+        responses:
+          type: array
+          items:
+            type: object
+            required: [results]
+            properties:
+              results: { type: array, items: { $ref: "#/components/schemas/Hit" } }
+              plan: { $ref: "#/components/schemas/Plan" }
+    ScrollRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        filter: { $ref: "#/components/schemas/Filter" }
+        where: { type: string, maxLength: 8192 }
+        limit: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+        cursor: { type: string, description: "Opaque; from next_cursor." }
+        include: { $ref: "#/components/schemas/Include" }
+        consistency: { $ref: "#/components/schemas/Consistency" }
+    ScrollResponse:
+      type: object
+      required: [as_of_block, entities, next_cursor]
+      properties:
+        as_of_block: { $ref: "#/components/schemas/BlockNumber" }
+        entities: { type: array, items: { $ref: "#/components/schemas/Entity" } }
+        next_cursor: { type: [string, "null"] }
+    CountRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        filter: { $ref: "#/components/schemas/Filter" }
+        where: { type: string, maxLength: 8192 }
+        consistency: { $ref: "#/components/schemas/Consistency" }
+    CountResponse:
+      type: object
+      required: [as_of_block, count]
+      properties:
+        as_of_block: { $ref: "#/components/schemas/BlockNumber" }
+        count: { type: integer, minimum: 0 }
+
+    # ---------- ops ----------
+    VersionInfo:
+      type: object
+      required: [daemon_version, api_version, pgvector_version, kernel_tier, chain_id, writes_enabled, capabilities]
+      properties:
+        daemon_version: { type: string }
+        api_version: { type: string, description: "spec/VERSION this daemon implements (semver)." }
+        pgvector_version: { type: string }
+        kernel_tier: { type: string, enum: [x86-64, x86-64-v3, x86-64-v4, aarch64, native] }
+        chain_id: { type: integer }
+        writes_enabled: { type: boolean }
+        capabilities: { type: array, items: { type: string } }
+    SyncStatus:
+      type: object
+      required: [name, state, as_of_block, head_block, lag_blocks, last_error]
+      properties:
+        name: { $ref: "#/components/schemas/CollectionName" }
+        state: { $ref: "#/components/schemas/SyncState" }
+        as_of_block: { $ref: "#/components/schemas/BlockNumber" }
+        head_block: { $ref: "#/components/schemas/BlockNumber" }
+        lag_blocks: { type: integer, minimum: 0 }
+        last_error: { type: [string, "null"] }
+    Readiness:
+      type: object
+      required: [ready, collections]
+      properties:
+        ready: { type: boolean }
+        collections: { type: object, additionalProperties: { $ref: "#/components/schemas/SyncState" } }
+    Problem:
+      type: object
+      required: [type, title, status, code, retryable]
+      properties:
+        type: { type: string, example: "urn:arkivector:error:invalid_filter" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, description: "One of spec/error-codes.json errors[].code." }
+        retryable: { type: boolean }
+        request_id: { type: string }
+        field: { type: string, description: "JSON pointer of the offending field (invalid_argument)." }
+        position: { type: integer, description: "Byte offset in `where` (invalid_filter)." }
+        vb_error: { type: string, description: "VB_* code (invalid_vector)." }
+        as_of_block: { $ref: "#/components/schemas/BlockNumber" }
+        revert_error: { type: string, description: "Solidity error name (tx_reverted)." }
+
+  examples:
+    CollectionCreate:
+      value:
+        name: demo.docs
+        schema_tag: arkivector.v1.demo.docs
+        column: { type: halfvec, dimensions: 8 }
+        index: { method: hnsw, opclass: halfvec_cosine_ops, with: { m: 16, ef_construction: 64 } }
+        writers: ["0x1111111111111111111111111111111111111111"]
+        membership: creator
+        attributes: { category: str, score: dec, published: bool, rank: i32 }
+    Collection:
+      value:
+        name: demo.docs
+        schema_tag: arkivector.v1.demo.docs
+        column: { type: halfvec, dimensions: 8 }
+        index: { method: hnsw, opclass: halfvec_cosine_ops, with: { m: 16, ef_construction: 64 } }
+        writers: ["0x1111111111111111111111111111111111111111"]
+        membership: creator
+        attributes: { category: str, score: dec, published: bool, rank: i32 }
+        default_ttl: null
+        model: null
+        manifest_key: null
+        open: false
+        mode: full
+        stats: { live_entities: 200, segments: 1, quarantined: 0, tombstones: 0 }
+        sync: { name: demo.docs, state: live, as_of_block: 582151, head_block: 582151, lag_blocks: 0, last_error: null }
+    Entity:
+      value:
+        key: "0x0b4f4d8b4fd9b7b1d0b6a0c7b8d2e1f3a4c5d6e7f8091a2b3c4d5e6f7a8b9c0d"
+        id: doc-040
+        owner: "0x1111111111111111111111111111111111111111"
+        creator: "0x1111111111111111111111111111111111111111"
+        created_at_block: 580000
+        updated_at_block: 580000
+        expires_at_block: 10000000
+        attributes:
+          category: { type: str, value: finance }
+          score: { type: dec, value: "4.12" }
+          published: { type: bool, value: true }
+          rank: { type: i32, value: 17 }
+        document: null
+    SearchResponse:
+      value:
+        as_of_block: 582151
+        sync_state: live
+        open_collection: false
+        results:
+          - key: "0x0b4f4d8b4fd9b7b1d0b6a0c7b8d2e1f3a4c5d6e7f8091a2b3c4d5e6f7a8b9c0d"
+            id: doc-040
+            distance: 0.1182
+            score: 0.8818
+            owner: "0x1111111111111111111111111111111111111111"
+            creator: "0x1111111111111111111111111111111111111111"
+            expires_at_block: 10000000
+            attributes:
+              category: { type: str, value: finance }
+              score: { type: dec, value: "4.12" }
+        plan: { strategy: exact_flat, candidates: 46, selectivity: 0.23, exact: true, kernel: halfvec_f16c, elapsed_ms: 0.21,
+                segments: [ { id: 0, strategy: exact_flat, candidates: 46, scanned_tuples: 46 } ] }

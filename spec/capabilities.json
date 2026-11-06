@@ -1,0 +1,30 @@
+{
+  "spec_version": "1.0.0",
+  "note": "GET /v1/version returns the subset this daemon build supports. SDKs must check before calling and must map HTTP 501 not_implemented to a typed error.",
+  "capabilities": [
+    {"name": "ops.version",            "phase": "D3", "endpoints": ["GET /v1/version", "GET /healthz", "GET /readyz"]},
+    {"name": "ops.sync",               "phase": "D3", "endpoints": ["GET /v1/sync"]},
+    {"name": "ops.metrics",            "phase": "D3", "endpoints": ["GET /metrics"]},
+    {"name": "collections.read",       "phase": "D3", "endpoints": ["GET /v1/collections", "GET /v1/collections/{name}"]},
+    {"name": "collections.write",      "phase": "D3", "endpoints": ["POST /v1/collections", "DELETE /v1/collections/{name}"]},
+    {"name": "collections.follow",     "phase": "D3", "endpoints": ["POST /v1/collections:follow"]},
+    {"name": "collections.manifest",   "phase": "D5", "endpoints": ["POST /v1/collections (publish_manifest=true)"]},
+    {"name": "entities.read",          "phase": "D3", "endpoints": ["GET /v1/collections/{name}/entities/{ref}"]},
+    {"name": "entities.verify",        "phase": "D6", "endpoints": ["GET /v1/collections/{name}/entities/{ref}?verify=true"]},
+    {"name": "entities.write",         "phase": "D5", "endpoints": ["POST /v1/collections/{name}/entities", "DELETE /v1/collections/{name}/entities/{ref}", "POST /v1/collections/{name}/entities:delete", "POST /v1/collections/{name}/entities:extend"]},
+    {"name": "entities.prepare",       "phase": "D5", "endpoints": ["POST /v1/collections/{name}/entities:prepare"]},
+    {"name": "search.exact",           "phase": "D3", "endpoints": ["POST /v1/collections/{name}/search (exact=true or flat plan)"]},
+    {"name": "search.hnsw",            "phase": "D4", "endpoints": ["POST /v1/collections/{name}/search (approximate plans)"]},
+    {"name": "search.filter.json",     "phase": "D3", "endpoints": ["search/scroll/count with 'filter'"]},
+    {"name": "search.filter.where",    "phase": "D3", "endpoints": ["search/scroll/count with 'where'"]},
+    {"name": "search.batch",           "phase": "D4", "endpoints": ["POST /v1/collections/{name}/search:batch"]},
+    {"name": "search.explain",         "phase": "D3", "endpoints": ["search with explain=true"]},
+    {"name": "scroll",                 "phase": "D3", "endpoints": ["POST /v1/collections/{name}/scroll"]},
+    {"name": "count",                  "phase": "D3", "endpoints": ["POST /v1/collections/{name}/count"]},
+    {"name": "consistency.min_block",  "phase": "D3", "endpoints": ["consistency object on search/scroll/count/get"]},
+    {"name": "idempotency",            "phase": "D5", "endpoints": ["Idempotency-Key header on write endpoints"]},
+    {"name": "auth.api_keys",          "phase": "D6", "endpoints": ["Authorization: Bearer on all /v1 endpoints"]},
+    {"name": "qdrant",                 "phase": "D6", "endpoints": ["/qdrant/*"]},
+    {"name": "mcp",                    "phase": "D6", "endpoints": ["POST /mcp"]}
+  ]
+}
