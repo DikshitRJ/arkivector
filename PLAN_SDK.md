@@ -323,8 +323,8 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | S0 | S1 (M1) | S2 | S3 (M2) | S4 (M3) | S5 | S6 (M4) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Python | done | done | done | done | | | |
-| Node | done | done | done | done | | | |
+| Python | done | done | done | done | done | | |
+| Node | done | done | done | done | done | | |
 | C | deferred | | | | | | |
 | C++ | deferred | | | | | | |
 | Rust | deferred | | | | | | |
