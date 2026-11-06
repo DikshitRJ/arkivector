@@ -5,6 +5,13 @@
 
 #include <string.h>
 
+#include "postgres.h"
+
+#include "halfvec.h"
+#include "sparsevec.h"
+#include "utils/varbit.h"
+#include "vector.h"
+
 const char *av_vtype_name(av_vtype t)
 {
     switch (t) {
@@ -30,4 +37,19 @@ bool av_vtype_parse(const char *s, av_vtype *out)
         }
     }
     return false;
+}
+
+int av_pgvec_dim(av_vtype t, const void *v)
+{
+    switch (t) {
+    case AV_VT_VECTOR:
+        return ((const Vector *) v)->dim;
+    case AV_VT_HALFVEC:
+        return ((const HalfVector *) v)->dim;
+    case AV_VT_BIT:
+        return ((const VarBit *) v)->bit_len;
+    case AV_VT_SPARSEVEC:
+        return ((const SparseVector *) v)->dim;
+    }
+    return -1;
 }

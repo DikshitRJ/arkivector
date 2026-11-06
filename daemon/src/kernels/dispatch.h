@@ -16,15 +16,15 @@
 #include "codec/vtype.h"
 
 typedef enum {
-    AV_METRIC_L2 = 0,      /* <->, sqrt applied */
-    AV_METRIC_L2SQ,        /* squared L2 (HNSW index distance) */
-    AV_METRIC_IP,          /* inner product (positive) */
-    AV_METRIC_NEG_IP,      /* <#>, negative inner product */
-    AV_METRIC_COSINE,      /* <=> */
-    AV_METRIC_L1,          /* <+> */
-    AV_METRIC_HAMMING,     /* <~> (bit) */
-    AV_METRIC_JACCARD,     /* <%> (bit) */
-    AV_METRIC_NORM,        /* l2 norm of one vector (cosine normalisation check) */
+    AV_METRIC_L2 = 0,  /* <->, sqrt applied */
+    AV_METRIC_L2SQ,    /* squared L2 (HNSW index distance) */
+    AV_METRIC_IP,      /* inner product (positive) */
+    AV_METRIC_NEG_IP,  /* <#>, negative inner product */
+    AV_METRIC_COSINE,  /* <=> */
+    AV_METRIC_L1,      /* <+> */
+    AV_METRIC_HAMMING, /* <~> (bit) */
+    AV_METRIC_JACCARD, /* <%> (bit) */
+    AV_METRIC_NORM,    /* l2 norm of one vector (cosine normalisation check) */
     AV_METRIC_COUNT
 } av_metric;
 

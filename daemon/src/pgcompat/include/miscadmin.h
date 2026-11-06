@@ -12,11 +12,11 @@
 #include "postgres.h"
 extern __thread volatile bool *av_pg_interrupt_flag;
 extern void av_pg_process_interrupts(void);
-#define CHECK_FOR_INTERRUPTS()                                                          \
-    do {                                                                                \
-        volatile bool *av_flag_ = av_pg_interrupt_flag;                                 \
+#define CHECK_FOR_INTERRUPTS()                                                         \
+    do {                                                                               \
+        volatile bool *av_flag_ = av_pg_interrupt_flag;                                \
         if (unlikely(av_flag_ != NULL && __atomic_load_n(av_flag_, __ATOMIC_RELAXED))) \
-            av_pg_process_interrupts();                                                 \
+            av_pg_process_interrupts();                                                \
     } while (0)
 extern int maintenance_work_mem;
 extern int work_mem;

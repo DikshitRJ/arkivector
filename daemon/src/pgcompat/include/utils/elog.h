@@ -106,29 +106,30 @@ typedef struct av_pg_unwind_state {
 extern av_pg_unwind_state av_pg_unwind_save(void);
 extern void av_pg_unwind_restore(av_pg_unwind_state s);
 
-#define PG_TRY(...)                                                          \
-    do {                                                                     \
+#define PG_TRY(...)                                                                \
+    do {                                                                           \
         const av_pg_unwind_state _unwind_state##__VA_ARGS__ = av_pg_unwind_save(); \
-        sigjmp_buf *_save_exception_stack##__VA_ARGS__ = PG_exception_stack; \
-        sigjmp_buf _local_sigjmp_buf##__VA_ARGS__;                           \
-        bool _do_rethrow##__VA_ARGS__ = false;                               \
-        if (_setjmp(_local_sigjmp_buf##__VA_ARGS__) == 0) {                  \
+        sigjmp_buf *_save_exception_stack##__VA_ARGS__ = PG_exception_stack;       \
+        sigjmp_buf _local_sigjmp_buf##__VA_ARGS__;                                 \
+        bool _do_rethrow##__VA_ARGS__ = false;                                     \
+        if (_setjmp(_local_sigjmp_buf##__VA_ARGS__) == 0) {                        \
         PG_exception_stack = &_local_sigjmp_buf##__VA_ARGS__
 
-#define PG_CATCH(...) \
-    }                 \
-    else              \
-    {                 \
+#define PG_CATCH(...)                                            \
+    }                                                            \
+    else                                                         \
+    {                                                            \
         PG_exception_stack = _save_exception_stack##__VA_ARGS__; \
         av_pg_unwind_restore(_unwind_state##__VA_ARGS__);
 
-#define PG_FINALLY(...)                   \
-    }                                     \
-    else {                                \
-        _do_rethrow##__VA_ARGS__ = true;  \
+#define PG_FINALLY(...)                                   \
+    }                                                     \
+    else                                                  \
+    {                                                     \
+        _do_rethrow##__VA_ARGS__ = true;                  \
         av_pg_unwind_restore(_unwind_state##__VA_ARGS__); \
-    }                                     \
-    {                                     \
+    }                                                     \
+    {                                                     \
         PG_exception_stack = _save_exception_stack##__VA_ARGS__;
 
 #define PG_END_TRY(...)                                      \
@@ -160,7 +161,6 @@ extern const ErrorData *av_pg_error_data(void);
 extern ErrorData *CopyErrorData(void);
 extern void FlushErrorState(void);
 extern char *unpack_sql_state(int sql_state);
-
 
 /* Log sink for levels < ERROR (default: stderr). Set by the daemon's logger. */
 typedef void (*av_pg_log_fn)(int elevel, const char *message);

@@ -23,6 +23,16 @@
  */
 av_status av_text_to_pgvec(av_vtype t, const char *s, int32_t typmod_dim, av_arena *a, void **out, av_err *e);
 
+/*
+ * Same with an explicit length (e.g. from JSON): rejects literals longer than
+ * AV_TEXT_MAX_LEN and embedded NUL bytes. Parsed values must also satisfy the
+ * per-type VectorBytes limits (dims, nnz), which bounds memory and CPU per input.
+ */
+#define AV_TEXT_MAX_LEN (1024u * 1024u)
+#define AV_TEXT_CTX_CAP ((size_t) 16 * 1024 * 1024)
+av_status av_text_to_pgvecn(av_vtype t, const char *s, size_t len, int32_t typmod_dim, av_arena *a,
+                            void **out, av_err *e);
+
 /* Format a pgvector struct as text (pgvector's *_out). *out is NUL-terminated, in a. */
 av_status av_pgvec_to_text(av_vtype t, const void *v, av_arena *a, char **out, av_err *e);
 

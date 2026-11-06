@@ -21,7 +21,10 @@ typedef av_pgfn kernel_table[5][AV_METRIC_COUNT]; /* [vtype][metric] */
 
 /* pgvector functions (Datum fn(PG_FUNCTION_ARGS)); declared with our opaque types. */
 #define DECL(name) extern unsigned long name(av_fcinfo fcinfo)
-#define DECL_TIERED(name) DECL(name); DECL(name##_t3); DECL(name##_t4)
+#define DECL_TIERED(name) \
+    DECL(name);           \
+    DECL(name##_t3);      \
+    DECL(name##_t4)
 
 DECL_TIERED(l2_distance);
 DECL_TIERED(vector_l2_squared_distance);
@@ -87,21 +90,21 @@ extern void HalfvecInit(void);
 extern void BitvecInit(void);
 
 #if defined(__x86_64__)
-#define CPU_FEATURE_FMA (1u << 12)
-#define CPU_FEATURE_MOVBE (1u << 22)
-#define CPU_FEATURE_POPCNT (1u << 23)
-#define CPU_FEATURE_OSXSAVE (1u << 27)
-#define CPU_FEATURE_AVX (1u << 28)
-#define CPU_FEATURE_F16C (1u << 29)
-#define CPU_FEATURE7_BMI1 (1u << 3)
-#define CPU_FEATURE7_AVX2 (1u << 5)
-#define CPU_FEATURE7_BMI2 (1u << 8)
-#define CPU_FEATURE7_AVX512F (1u << 16)
+#define CPU_FEATURE_FMA       (1u << 12)
+#define CPU_FEATURE_MOVBE     (1u << 22)
+#define CPU_FEATURE_POPCNT    (1u << 23)
+#define CPU_FEATURE_OSXSAVE   (1u << 27)
+#define CPU_FEATURE_AVX       (1u << 28)
+#define CPU_FEATURE_F16C      (1u << 29)
+#define CPU_FEATURE7_BMI1     (1u << 3)
+#define CPU_FEATURE7_AVX2     (1u << 5)
+#define CPU_FEATURE7_BMI2     (1u << 8)
+#define CPU_FEATURE7_AVX512F  (1u << 16)
 #define CPU_FEATURE7_AVX512DQ (1u << 17)
 #define CPU_FEATURE7_AVX512CD (1u << 28)
 #define CPU_FEATURE7_AVX512BW (1u << 30)
 #define CPU_FEATURE7_AVX512VL (1u << 31)
-#define CPU_FEATUREX_LZCNT (1u << 5)
+#define CPU_FEATUREX_LZCNT    (1u << 5)
 
 __attribute__((target("xsave"))) static unsigned long long os_xstate(void)
 {
@@ -128,12 +131,12 @@ static int detect_level(void)
     if (__get_cpuid(0x80000001u, &a, &b, &c, &d)) {
         ecxx = c;
     }
-    const unsigned int v3_1 = CPU_FEATURE_FMA | CPU_FEATURE_MOVBE | CPU_FEATURE_POPCNT | CPU_FEATURE_AVX |
-                              CPU_FEATURE_F16C;
+    const unsigned int v3_1 =
+        CPU_FEATURE_FMA | CPU_FEATURE_MOVBE | CPU_FEATURE_POPCNT | CPU_FEATURE_AVX | CPU_FEATURE_F16C;
     const unsigned int v3_7 = CPU_FEATURE7_BMI1 | CPU_FEATURE7_AVX2 | CPU_FEATURE7_BMI2;
     /* XMM and YMM registers enabled (pgvector halfutils.c: _xgetbv(0) & 6) */
-    bool v3 = (ecx1 & v3_1) == v3_1 && (ebx7 & v3_7) == v3_7 && (ecxx & CPU_FEATUREX_LZCNT) &&
-              (xcr0 & 6) == 6;
+    bool v3 =
+        (ecx1 & v3_1) == v3_1 && (ebx7 & v3_7) == v3_7 && (ecxx & CPU_FEATUREX_LZCNT) && (xcr0 & 6) == 6;
     if (!v3) {
         return 1;
     }
@@ -203,6 +206,9 @@ av_pgfn av_kernel_fn(av_vtype type, av_metric metric)
 av_pgfn av_kernel_fn_tier(const char *tier, av_vtype type, av_metric metric)
 {
     av_kernels_init();
+    if (tier == NULL) {
+        return NULL;
+    }
     if ((int) type < 1 || (int) type > 4 || (int) metric < 0 || metric >= AV_METRIC_COUNT) {
         return NULL;
     }

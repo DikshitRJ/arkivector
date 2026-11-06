@@ -16,6 +16,7 @@
 
 #include "kernels/dispatch.h"
 #include "kernels/opclass.h"
+#include "codec/text.h"
 
 #include "greatest.h"
 
@@ -144,8 +145,8 @@ static double ref_metric(av_metric m, const double *a, const double *b, int n)
     }
 }
 
-static const av_metric float_metrics[] = {AV_METRIC_L2, AV_METRIC_L2SQ, AV_METRIC_IP, AV_METRIC_NEG_IP,
-                                          AV_METRIC_COSINE, AV_METRIC_L1};
+static const av_metric float_metrics[] = {AV_METRIC_L2,     AV_METRIC_L2SQ,   AV_METRIC_IP,
+                                          AV_METRIC_NEG_IP, AV_METRIC_COSINE, AV_METRIC_L1};
 
 static double call_fn(av_pgfn fn, const void *a, const void *b)
 {
@@ -195,11 +196,13 @@ TEST tiered_float_kernels_match_reference(void)
                 double gh = call_fn(av_kernel_fn_tier(tiers[ti], AV_VT_HALFVEC, m), qa, qb);
                 /* float32 accumulation: relative 1e-5 (vector), 2e-3 (halfvec); scale for near-zero */
                 if (!check_close(gv, rv, 1e-5, sv)) {
-                    fprintf(stderr, "vector tier %s dim %d metric %d: got %.9g ref %.9g\n", tiers[ti], n, m, gv, rv);
+                    fprintf(stderr, "vector tier %s dim %d metric %d: got %.9g ref %.9g\n", tiers[ti], n, m,
+                            gv, rv);
                     FAILm("vector kernel mismatch");
                 }
                 if (!check_close(gh, rh, 2e-3, sh)) {
-                    fprintf(stderr, "halfvec tier %s dim %d metric %d: got %.9g ref %.9g\n", tiers[ti], n, m, gh, rh);
+                    fprintf(stderr, "halfvec tier %s dim %d metric %d: got %.9g ref %.9g\n", tiers[ti], n, m,
+                            gh, rh);
                     FAILm("halfvec kernel mismatch");
                 }
             }
@@ -231,7 +234,8 @@ TEST tiered_float_kernels_match_reference(void)
                 double ss = (m == AV_METRIC_IP || m == AV_METRIC_NEG_IP) ? g_ip_abs : 1e-2;
                 double gs = call_fn(av_kernel_fn_tier(tiers[ti], AV_VT_SPARSEVEC, m), sa, sb);
                 if (!check_close(gs, rs, 1e-5, m == AV_METRIC_COSINE ? 1.0 : ss)) {
-                    fprintf(stderr, "sparsevec tier %s dim %d metric %d: got %.9g ref %.9g\n", tiers[ti], n, m, gs, rs);
+                    fprintf(stderr, "sparsevec tier %s dim %d metric %d: got %.9g ref %.9g\n", tiers[ti], n,
+                            m, gs, rs);
                     FAILm("sparsevec kernel mismatch");
                 }
             }
@@ -269,7 +273,8 @@ TEST bit_kernels_exact(void)
         double gh = call_fn(av_kernel_fn(AV_VT_BIT, AV_METRIC_HAMMING), a, b);
         double gj = call_fn(av_kernel_fn(AV_VT_BIT, AV_METRIC_JACCARD), a, b);
         ASSERT_EQ((double) ham, gh);
-        double rj = ab == 0 ? 1.0 : 1.0 - (double) ab / (double) (aa + bb - ab); /* pgvector: no overlap -> 1 */
+        double rj =
+            ab == 0 ? 1.0 : 1.0 - (double) ab / (double) (aa + bb - ab); /* pgvector: no overlap -> 1 */
         ASSERT_IN_RANGE(rj, gj, 1e-12);
         MemoryContextReset(ctx);
     }
@@ -310,8 +315,36 @@ TEST opclass_registry_matches_pgvector(void)
     PASS();
 }
 
+TEST hardening_limits(void)
+{
+    /* opclass distance on mismatched dims: NaN, never an ERROR */
+    MemoryContext ctx = AllocSetContextCreate(NULL, "k", ALLOCSET_DEFAULT_SIZES);
+    MemoryContext old = MemoryContextSwitchTo(ctx);
+    Vector *a = InitVector(2), *b = InitVector(3);
+    ASSERT(isnan(av_opclass_find("vector_l2_ops")->distance(a, b)));
+    MemoryContextSwitchTo(old);
+    MemoryContextDelete(ctx);
+    /* text literals: NUL byte, oversized bit string */
+    av_arena *ar = av_arena_create("t", 0, 0);
+    av_err e;
+    void *v = NULL;
+    ASSERT_EQ(AV_ERR, av_text_to_pgvecn(AV_VT_VECTOR, "[1,2]\0[3]", 9, -1, ar, &v, &e));
+    ASSERT_STR_EQ("invalid_vector", e.code);
+    size_t n = 64001;
+    char *bits = malloc(n + 1);
+    memset(bits, '1', n);
+    bits[n] = '\0';
+    ASSERT_EQ(AV_ERR, av_text_to_pgvec(AV_VT_BIT, bits, -1, ar, &v, &e));
+    bits[64000] = '\0';
+    ASSERT_EQ(AV_OK, av_text_to_pgvec(AV_VT_BIT, bits, -1, ar, &v, &e));
+    free(bits);
+    av_arena_destroy(ar);
+    PASS();
+}
+
 SUITE(kernels)
 {
+    RUN_TEST(hardening_limits);
     RUN_TEST(tiered_float_kernels_match_reference);
     RUN_TEST(bit_kernels_exact);
     RUN_TEST(opclass_registry_matches_pgvector);

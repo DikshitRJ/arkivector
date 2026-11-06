@@ -6,6 +6,9 @@
 #define AV_CODEC_VTYPE_H
 #include <stdbool.h>
 typedef enum { AV_VT_VECTOR = 1, AV_VT_HALFVEC = 2, AV_VT_BIT = 3, AV_VT_SPARSEVEC = 4 } av_vtype;
-const char *av_vtype_name(av_vtype t);           /* "vector" | "halfvec" | "bit" | "sparsevec" | "?" */
+const char *av_vtype_name(av_vtype t); /* "vector" | "halfvec" | "bit" | "sparsevec" | "?" */
 bool av_vtype_parse(const char *s, av_vtype *out);
+
+/* Dimension of a pgvector struct of type t (bit: number of bits). */
+int av_pgvec_dim(av_vtype t, const void *v);
 #endif

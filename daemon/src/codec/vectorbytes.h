@@ -27,6 +27,8 @@
 #include "core/arena.h"
 #include "log.h"
 
+/* NORMALIZED is informational only: on-chain data is untrusted, so consumers never skip
+ * normalisation because of it (cosine values are always re-normalised at ingest). */
 #define AV_VB_FLAG_NORMALIZED 0x01u
 
 typedef struct {

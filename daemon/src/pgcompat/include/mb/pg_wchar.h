@@ -5,7 +5,11 @@
 static inline int pg_mblen_cstr(const char *mbstr)
 {
     unsigned char c = (unsigned char) *mbstr;
-    int len = (c & 0x80) == 0 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : (c & 0xf8) == 0xf0 ? 4 : 1;
+    int len = (c & 0x80) == 0      ? 1
+              : (c & 0xe0) == 0xc0 ? 2
+              : (c & 0xf0) == 0xe0 ? 3
+              : (c & 0xf8) == 0xf0 ? 4
+                                   : 1;
     for (int i = 1; i < len; i++)
         if (mbstr[i] == '\0')
             return i;

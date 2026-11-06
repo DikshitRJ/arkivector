@@ -23,4 +23,5 @@ av_status av_base64_encode(const uint8_t *buf, size_t len, av_arena *a, char **o
                            av_err *e);
 av_status av_base64_decode(const char *s, size_t n, av_arena *a, uint8_t **out, size_t *outlen, av_err *e);
 
+/* Callers cap the input length (e.g. the 128 KiB Arkiv bytes budget) before decoding. */
 #endif /* AV_CODEC_BASE64_H */

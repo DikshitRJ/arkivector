@@ -10,6 +10,10 @@
 
 #include <string.h>
 
+#if !defined(__BYTE_ORDER__) || __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+#error "VectorBytes struct copies assume a little-endian host (as pgvector does)"
+#endif
+
 #include "codec/vectorbytes.h"
 
 #define VB_HDR            4u

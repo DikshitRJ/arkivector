@@ -7,7 +7,7 @@
  *   normalize      = the opclass has a FUNCTION 2 norm proc (cosine): values are
  *                    l2-normalised before insertion and for queries (HnswNormValue)
  * Distance functions go through the dispatched kernels (kernels/dispatch.h). They
- * raise ereport(ERROR) on dimension mismatch, so call them inside PG_TRY.
+ * never raise: on a dimension mismatch they return NaN (validate dims first).
  */
 #ifndef AV_KERNELS_OPCLASS_H
 #define AV_KERNELS_OPCLASS_H
@@ -21,14 +21,14 @@
 typedef double (*av_dist_fn)(const void *a, const void *b); /* pgvector struct pointers */
 
 typedef struct {
-    const char *name;         /* "halfvec_cosine_ops" */
+    const char *name; /* "halfvec_cosine_ops" */
     av_vtype type;
-    const char *op;           /* "<=>" */
-    av_dist_fn distance;      /* API-facing distance (sqrt applied for l2) */
-    av_dist_fn index_distance;/* distance used inside HNSW */
-    bool normalize;           /* cosine: l2-normalise at insert and query */
-    av_metric metric;         /* metric of distance */
-    av_metric index_metric;   /* metric of index_distance */
+    const char *op;            /* "<=>" */
+    av_dist_fn distance;       /* API-facing distance (sqrt applied for l2) */
+    av_dist_fn index_distance; /* distance used inside HNSW */
+    bool normalize;            /* cosine: l2-normalise at insert and query */
+    av_metric metric;          /* metric of distance */
+    av_metric index_metric;    /* metric of index_distance */
 } av_opclass;
 
 const av_opclass *av_opclass_find(const char *name);
