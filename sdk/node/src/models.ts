@@ -373,6 +373,7 @@ export interface ClientOptions {
   timeout?: number;
   maxRetries?: number;
   sessionConsistency?: boolean;
+  idempotency?: boolean;
   fetch?: typeof globalThis.fetch;
   userAgent?: string;
 }
@@ -1006,6 +1007,185 @@ export interface GetEntityOptions {
 }
 
 /**
+ * Direct-write on-chain attribute representation.
+ * Docs: docs/api/collections.md §4
+ */
+export interface DirectAttribute {
+  name: string;
+  typeId: number;
+  valueBytes: Uint8Array;
+}
+
+/**
+ * Input representation of an entity for managed upsert or prepare.
+ * Docs: docs/api/entities.md §3, §4
+ */
+export interface EntityInput {
+  id?: string | null;
+  vector?:
+    | AnyVector
+    | number[]
+    | Float32Array
+    | Float64Array
+    | string
+    | Record<string, unknown>;
+  vectorBytes?: string;
+  vector_bytes?: string;
+  document?: string | null;
+  attributes?: Record<string, TypedValue | unknown>;
+  ttl?: TtlInput;
+}
+
+/**
+ * Result for a single entity operation within an upsert / prepare call.
+ * Docs: docs/api/entities.md §3, §4
+ */
+export interface UpsertItemResult {
+  id?: string | null;
+  key: string;
+  op: "create" | "patch" | "noop" | string;
+}
+
+/**
+ * Result of a managed upsert operation.
+ * Docs: docs/api/entities.md §3
+ */
+export class UpsertResult {
+  readonly results: UpsertItemResult[];
+  readonly txHashes: string[];
+  readonly blockNumber?: number | null;
+
+  get tx_hashes(): string[] {
+    return this.txHashes;
+  }
+  get block_number(): number | null | undefined {
+    return this.blockNumber;
+  }
+
+  constructor(init: {
+    results: UpsertItemResult[];
+    txHashes: string[];
+    blockNumber?: number | null;
+  }) {
+    this.results = init.results;
+    this.txHashes = init.txHashes;
+    this.blockNumber = init.blockNumber ?? null;
+  }
+}
+
+/**
+ * Unsigned transaction for client-side signing.
+ * Docs: docs/api/entities.md §4
+ */
+export interface PreparedTransaction {
+  to: string;
+  data: string;
+  value: string;
+  nonce: number;
+  gasEstimate: number | null;
+  gas_estimate?: number | null;
+}
+
+/**
+ * Result of prepareEntities.
+ * Docs: docs/api/entities.md §4
+ */
+export class PrepareResult {
+  readonly chainId: number;
+  readonly transactions: PreparedTransaction[];
+  readonly results: UpsertItemResult[];
+
+  get chain_id(): number {
+    return this.chainId;
+  }
+
+  constructor(init: {
+    chainId: number;
+    transactions: PreparedTransaction[];
+    results: UpsertItemResult[];
+  }) {
+    this.chainId = init.chainId;
+    this.transactions = init.transactions;
+    this.results = init.results;
+  }
+}
+
+/**
+ * Result of a delete or extend operation.
+ * Docs: docs/api/entities.md §5
+ */
+export class TxResult {
+  readonly affected: number;
+  readonly txHashes: string[];
+  readonly blockNumber?: number | null;
+
+  get tx_hashes(): string[] {
+    return this.txHashes;
+  }
+  get block_number(): number | null | undefined {
+    return this.blockNumber;
+  }
+
+  constructor(init: {
+    affected: number;
+    txHashes: string[];
+    blockNumber?: number | null;
+  }) {
+    this.affected = init.affected;
+    this.txHashes = init.txHashes;
+    this.blockNumber = init.blockNumber ?? null;
+  }
+}
+
+/**
+ * Options for upsert().
+ */
+export interface UpsertOptions {
+  wait?: "none" | "receipt" | "indexed" | string;
+  timeoutMs?: number;
+  timeout_ms?: number;
+  idempotencyKey?: string;
+  idempotency_key?: string;
+  idempotency?: boolean;
+}
+
+/**
+ * Options for prepare().
+ */
+export interface PrepareOptions {
+  from: string;
+}
+
+/**
+ * Options for delete().
+ */
+export interface DeleteEntitiesOptions {
+  ref?: string;
+  refs?: string[];
+  filter?: Filter;
+  where?: string;
+  idempotencyKey?: string;
+  idempotency_key?: string;
+  idempotency?: boolean;
+  timeoutMs?: number;
+  timeout_ms?: number;
+}
+
+/**
+ * Options for extend().
+ */
+export interface ExtendEntitiesOptions {
+  refs?: string[];
+  filter?: Filter;
+  where?: string;
+  idempotencyKey?: string;
+  idempotency_key?: string;
+  idempotency?: boolean;
+  timeoutMs?: number;
+  timeout_ms?: number;
+}
+
+/**
  * Parse wire JSON into Entity.
  */
 export function parseEntity(raw: Record<string, unknown>): Entity {
@@ -1193,4 +1373,93 @@ export function parseCountResult(raw: Record<string, unknown>): CountResult {
     count: Number(raw.count ?? 0),
     asOfBlock: Number(raw.as_of_block ?? raw.asOfBlock ?? 0),
   });
+}
+
+/**
+ * Parse wire JSON into UpsertResult.
+ */
+export function parseUpsertResult(raw: Record<string, unknown>): UpsertResult {
+  const rawResults = Array.isArray(raw.results) ? raw.results : [];
+  const results: UpsertItemResult[] = rawResults.map(
+    (r: Record<string, unknown>) => ({
+      id: r.id != null ? String(r.id) : null,
+      key: String(r.key ?? ""),
+      op: (r.op ?? "create") as "create" | "patch" | "noop",
+    }),
+  );
+  const rawHashes = Array.isArray(raw.tx_hashes)
+    ? raw.tx_hashes
+    : Array.isArray(raw.txHashes)
+      ? raw.txHashes
+      : [];
+  const txHashes = rawHashes.map(String);
+  const blockNumber =
+    typeof raw.block_number === "number"
+      ? raw.block_number
+      : typeof raw.blockNumber === "number"
+        ? raw.blockNumber
+        : null;
+
+  return new UpsertResult({ results, txHashes, blockNumber });
+}
+
+/**
+ * Parse wire JSON into PrepareResult.
+ */
+export function parsePrepareResult(
+  raw: Record<string, unknown>,
+): PrepareResult {
+  const chainId = Number(raw.chain_id ?? raw.chainId ?? 0);
+  const rawTxs = Array.isArray(raw.transactions) ? raw.transactions : [];
+  const transactions: PreparedTransaction[] = rawTxs.map(
+    (t: Record<string, unknown>) => ({
+      to: String(t.to ?? ""),
+      data: String(t.data ?? ""),
+      value: String(t.value ?? "0x0"),
+      nonce: Number(t.nonce ?? 0),
+      gasEstimate:
+        t.gas_estimate != null
+          ? Number(t.gas_estimate)
+          : t.gasEstimate != null
+            ? Number(t.gasEstimate)
+            : null,
+      gas_estimate:
+        t.gas_estimate != null
+          ? Number(t.gas_estimate)
+          : t.gasEstimate != null
+            ? Number(t.gasEstimate)
+            : null,
+    }),
+  );
+  const rawResults = Array.isArray(raw.results) ? raw.results : [];
+  const results: UpsertItemResult[] = rawResults.map(
+    (r: Record<string, unknown>) => ({
+      id: r.id != null ? String(r.id) : null,
+      key: String(r.key ?? ""),
+      op: (r.op ?? "create") as "create" | "patch" | "noop",
+    }),
+  );
+
+  return new PrepareResult({ chainId, transactions, results });
+}
+
+/**
+ * Parse wire JSON into TxResult.
+ */
+export function parseTxResult(raw: Record<string, unknown>): TxResult {
+  const affected = Number(raw.affected ?? 0);
+  const rawHashes = Array.isArray(raw.tx_hashes)
+    ? raw.tx_hashes
+    : Array.isArray(raw.txHashes)
+      ? raw.txHashes
+      : [];
+  const txHashes = rawHashes.map(String);
+  const blockNumber =
+    typeof raw.block_number === "number"
+      ? raw.block_number
+      : typeof raw.blockNumber === "number"
+        ? raw.blockNumber
+        : null;
+
+  return new TxResult({ affected, txHashes, blockNumber });
 }

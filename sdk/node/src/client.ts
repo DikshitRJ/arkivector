@@ -3,6 +3,7 @@
  * Docs: docs/api/sdk-guidelines.md §2, §3, docs/api/operations.md, docs/api/collections.md
  */
 
+import * as crypto from "node:crypto";
 import { ApiError, NotImplementedByDaemonError } from "./errors.js";
 import { HttpTransport } from "./http.js";
 import {
@@ -23,6 +24,17 @@ import {
   ScrollOptions,
   CountOptions,
   GetEntityOptions,
+  EntityInput,
+  UpsertResult,
+  PrepareResult,
+  TxResult,
+  UpsertOptions,
+  PrepareOptions,
+  DeleteEntitiesOptions,
+  ExtendEntitiesOptions,
+  DirectAttribute,
+  TtlInput,
+  TypedValue,
   parseVersionInfo,
   parseReadiness,
   parseSyncStatus,
@@ -30,11 +42,16 @@ import {
   serializeCollectionCreate,
   serializeFollowRequest,
   serializeConsistency,
+  serializeTtl,
   parseEntity,
   parseSearchResult,
   parseBatchResult,
   parseScrollPage,
   parseCountResult,
+  parseUpsertResult,
+  parsePrepareResult,
+  parseTxResult,
+  plainAttributes,
 } from "./models.js";
 import { Vector, HalfVector, Bit, SparseVector } from "./types.js";
 
@@ -47,10 +64,23 @@ export class Arkivector {
   readonly timeoutMs: number;
   readonly maxRetries: number;
   readonly sessionConsistency: boolean;
+  readonly idempotency: boolean;
 
   private readonly transport: HttpTransport;
   private cachedVersion: VersionInfo | null = null;
   private readonly columnTypeCache = new Map<string, string>();
+  private _lastWriteBlock: number | null = null;
+
+  /**
+   * Latest block number returned by a managed write operation.
+   * Docs: docs/api/consistency.md §2
+   */
+  get lastWriteBlock(): number | null {
+    return this._lastWriteBlock;
+  }
+  get last_write_block(): number | null {
+    return this._lastWriteBlock;
+  }
 
   constructor(options?: ClientOptions) {
     const rawUrl =
@@ -70,6 +100,7 @@ export class Arkivector {
     this.timeoutMs = options?.timeoutMs ?? options?.timeout ?? 10000;
     this.maxRetries = options?.maxRetries ?? 3;
     this.sessionConsistency = options?.sessionConsistency ?? false;
+    this.idempotency = options?.idempotency ?? true;
 
     this.transport = new HttpTransport({
       baseUrl: this.url,
@@ -79,6 +110,30 @@ export class Arkivector {
       fetchFn: options?.fetch,
       userAgent: options?.userAgent ?? "@arkivector/client/0.1.0",
     });
+  }
+
+  private resolveIdempotencyKey(options?: {
+    idempotencyKey?: string;
+    idempotency_key?: string;
+    idempotency?: boolean;
+  }): string | undefined {
+    const explicit = options?.idempotencyKey ?? options?.idempotency_key;
+    if (explicit !== undefined) {
+      return explicit;
+    }
+    const enabled = options?.idempotency ?? this.idempotency;
+    if (enabled) {
+      return crypto.randomUUID();
+    }
+    return undefined;
+  }
+
+  private updateLastWriteBlock(blockNumber?: number | null): void {
+    if (typeof blockNumber === "number" && blockNumber > 0) {
+      if (this._lastWriteBlock === null || blockNumber > this._lastWriteBlock) {
+        this._lastWriteBlock = blockNumber;
+      }
+    }
   }
 
   /**
@@ -296,11 +351,18 @@ export class Arkivector {
     if (options?.verify !== undefined) {
       params.set("verify", String(options.verify));
     }
-    const minBlock =
+    let minBlock =
       options?.minBlock ??
       options?.min_block ??
       options?.consistency?.minBlock ??
       options?.consistency?.min_block;
+    if (
+      minBlock === undefined &&
+      this.sessionConsistency &&
+      this._lastWriteBlock !== null
+    ) {
+      minBlock = this._lastWriteBlock;
+    }
     if (minBlock !== undefined) {
       params.set("min_block", String(minBlock));
     }
@@ -341,7 +403,15 @@ export class Arkivector {
       }
     }
 
-    const body = serializeSearchRequest(options, colType);
+    let consistency = options.consistency;
+    if (this.sessionConsistency && this._lastWriteBlock !== null) {
+      const existingMin = consistency?.minBlock ?? consistency?.min_block;
+      if (existingMin === undefined) {
+        consistency = { ...consistency, minBlock: this._lastWriteBlock };
+      }
+    }
+
+    const body = serializeSearchRequest({ ...options, consistency }, colType);
     const raw = await this.transport.post<Record<string, unknown>>(
       `/v1/collections/${encodeURIComponent(collection)}/search`,
       body,
@@ -368,6 +438,18 @@ export class Arkivector {
       }
     }
 
+    let batchConsistency = consistency;
+    if (this.sessionConsistency && this._lastWriteBlock !== null) {
+      const existingMin =
+        batchConsistency?.minBlock ?? batchConsistency?.min_block;
+      if (existingMin === undefined) {
+        batchConsistency = {
+          ...batchConsistency,
+          minBlock: this._lastWriteBlock,
+        };
+      }
+    }
+
     const serializedSearches = searches.map((s) => {
       const sBody = serializeSearchRequest(s, colType);
       delete sBody.consistency; // per-search consistency is ignored in batch per search.md §2
@@ -377,7 +459,9 @@ export class Arkivector {
     const body: Record<string, unknown> = {
       searches: serializedSearches,
     };
-    const cons = consistency ? serializeConsistency(consistency) : undefined;
+    const cons = batchConsistency
+      ? serializeConsistency(batchConsistency)
+      : undefined;
     if (cons !== undefined) {
       body.consistency = cons;
     }
@@ -399,16 +483,25 @@ export class Arkivector {
   ): Promise<ScrollPage> {
     await this.checkCapability("scroll");
 
+    let consistency = options?.consistency;
+    if (this.sessionConsistency && this._lastWriteBlock !== null) {
+      const existingMin = consistency?.minBlock ?? consistency?.min_block;
+      if (existingMin === undefined) {
+        consistency = { ...consistency, minBlock: this._lastWriteBlock };
+      }
+    }
+
     const body: Record<string, unknown> = {};
     if (options?.filter !== undefined) body.filter = options.filter;
     if (options?.where !== undefined) body.where = options.where;
     if (options?.limit !== undefined) body.limit = options.limit;
     if (options?.cursor !== undefined) body.cursor = options.cursor;
     if (options?.include !== undefined) body.include = options.include;
-    const consistency = options?.consistency
-      ? serializeConsistency(options.consistency)
+    const consistencySerialized = consistency
+      ? serializeConsistency(consistency)
       : undefined;
-    if (consistency !== undefined) body.consistency = consistency;
+    if (consistencySerialized !== undefined)
+      body.consistency = consistencySerialized;
 
     const raw = await this.transport.post<Record<string, unknown>>(
       `/v1/collections/${encodeURIComponent(collection)}/scroll`,
@@ -452,19 +545,198 @@ export class Arkivector {
   ): Promise<CountResult> {
     await this.checkCapability("count");
 
+    let consistency = options?.consistency;
+    if (this.sessionConsistency && this._lastWriteBlock !== null) {
+      const existingMin = consistency?.minBlock ?? consistency?.min_block;
+      if (existingMin === undefined) {
+        consistency = { ...consistency, minBlock: this._lastWriteBlock };
+      }
+    }
+
     const body: Record<string, unknown> = {};
     if (options?.filter !== undefined) body.filter = options.filter;
     if (options?.where !== undefined) body.where = options.where;
-    const consistency = options?.consistency
-      ? serializeConsistency(options.consistency)
+    const consistencySerialized = consistency
+      ? serializeConsistency(consistency)
       : undefined;
-    if (consistency !== undefined) body.consistency = consistency;
+    if (consistencySerialized !== undefined)
+      body.consistency = consistencySerialized;
 
     const raw = await this.transport.post<Record<string, unknown>>(
       `/v1/collections/${encodeURIComponent(collection)}/count`,
       body,
     );
     return parseCountResult(raw);
+  }
+
+  /**
+   * Managed entity upsert: POST /v1/collections/{name}/entities.
+   * Docs: docs/api/entities.md §3
+   */
+  async upsert(
+    collection: string,
+    entities: EntityInput[],
+    options?: UpsertOptions,
+  ): Promise<UpsertResult> {
+    let colType = this.getColumnType(collection);
+    if (!colType) {
+      try {
+        const col = await this.getCollection(collection);
+        colType = col.column.type;
+      } catch {
+        // Continue if column type cannot be retrieved
+      }
+    }
+
+    const serializedEntities = entities.map((e) =>
+      serializeEntityInput(e, colType),
+    );
+
+    const wait = options?.wait ?? "receipt";
+    const timeoutMs =
+      options?.timeoutMs ??
+      options?.timeout_ms ??
+      (wait === "none" ? this.timeoutMs : Math.max(this.timeoutMs, 30000));
+
+    const body: Record<string, unknown> = {
+      entities: serializedEntities,
+      wait,
+    };
+    if (options?.timeoutMs !== undefined || options?.timeout_ms !== undefined) {
+      body.timeout_ms = options.timeoutMs ?? options.timeout_ms;
+    }
+
+    const idempotencyKey = this.resolveIdempotencyKey(options);
+
+    const raw = await this.transport.post<Record<string, unknown>>(
+      `/v1/collections/${encodeURIComponent(collection)}/entities`,
+      body,
+      { idempotencyKey, timeoutMs },
+    );
+
+    const result = parseUpsertResult(raw);
+    this.updateLastWriteBlock(result.blockNumber);
+    return result;
+  }
+
+  /**
+   * Client-side signing preparation: POST /v1/collections/{name}/entities:prepare.
+   * Docs: docs/api/entities.md §4
+   */
+  async prepare(
+    collection: string,
+    entities: EntityInput[],
+    options: PrepareOptions,
+  ): Promise<PrepareResult> {
+    let colType = this.getColumnType(collection);
+    if (!colType) {
+      try {
+        const col = await this.getCollection(collection);
+        colType = col.column.type;
+      } catch {
+        // Continue if column type cannot be retrieved
+      }
+    }
+
+    const serializedEntities = entities.map((e) =>
+      serializeEntityInput(e, colType),
+    );
+
+    const body: Record<string, unknown> = {
+      entities: serializedEntities,
+      from: options.from,
+    };
+
+    const raw = await this.transport.post<Record<string, unknown>>(
+      `/v1/collections/${encodeURIComponent(collection)}/entities:prepare`,
+      body,
+      { isIdempotent: true },
+    );
+
+    return parsePrepareResult(raw);
+  }
+
+  /**
+   * Delete entity or entities:
+   * - DELETE /v1/collections/{name}/entities/{ref} if options.ref
+   * - POST /v1/collections/{name}/entities:delete if options.refs/filter/where
+   * Docs: docs/api/entities.md §5
+   */
+  async delete(
+    collection: string,
+    options: DeleteEntitiesOptions,
+  ): Promise<TxResult> {
+    const idempotencyKey = this.resolveIdempotencyKey(options);
+    const timeoutMs = options.timeoutMs ?? options.timeout_ms;
+
+    let raw: Record<string, unknown>;
+
+    if (options.ref !== undefined) {
+      const isKey = /^0x[0-9a-fA-F]{64}$/.test(options.ref);
+      const refSegment = isKey ? options.ref : encodeURIComponent(options.ref);
+      raw = await this.transport.delete<Record<string, unknown>>(
+        `/v1/collections/${encodeURIComponent(collection)}/entities/${refSegment}`,
+        { idempotencyKey, timeoutMs },
+      );
+    } else if (
+      options.refs !== undefined ||
+      options.filter !== undefined ||
+      options.where !== undefined
+    ) {
+      const body: Record<string, unknown> = {};
+      if (options.refs !== undefined) body.refs = options.refs;
+      else if (options.filter !== undefined) body.filter = options.filter;
+      else if (options.where !== undefined) body.where = options.where;
+
+      raw = await this.transport.post<Record<string, unknown>>(
+        `/v1/collections/${encodeURIComponent(collection)}/entities:delete`,
+        body,
+        { idempotencyKey, timeoutMs },
+      );
+    } else {
+      throw new Error(
+        "DeleteEntitiesOptions must specify either ref, refs, filter, or where",
+      );
+    }
+
+    const result = parseTxResult(raw);
+    this.updateLastWriteBlock(result.blockNumber);
+    return result;
+  }
+
+  /**
+   * Extend entity TTL: POST /v1/collections/{name}/entities:extend.
+   * Docs: docs/api/entities.md §5
+   */
+  async extend(
+    collection: string,
+    ttl: TtlInput,
+    options: ExtendEntitiesOptions,
+  ): Promise<TxResult> {
+    const idempotencyKey = this.resolveIdempotencyKey(options);
+    const timeoutMs = options.timeoutMs ?? options.timeout_ms;
+
+    const body: Record<string, unknown> = {
+      ttl: serializeTtl(ttl),
+    };
+    if (options.refs !== undefined) body.refs = options.refs;
+    else if (options.filter !== undefined) body.filter = options.filter;
+    else if (options.where !== undefined) body.where = options.where;
+    else {
+      throw new Error(
+        "ExtendEntitiesOptions must specify either refs, filter, or where",
+      );
+    }
+
+    const raw = await this.transport.post<Record<string, unknown>>(
+      `/v1/collections/${encodeURIComponent(collection)}/entities:extend`,
+      body,
+      { idempotencyKey, timeoutMs },
+    );
+
+    const result = parseTxResult(raw);
+    this.updateLastWriteBlock(result.blockNumber);
+    return result;
   }
 }
 
@@ -565,3 +837,421 @@ function serializeSearchRequest(
  */
 export const Client = Arkivector;
 export type Client = Arkivector;
+
+/**
+ * Serialize an EntityInput into wire JSON for managed upsert or prepare.
+ */
+export function serializeEntityInput(
+  entity: EntityInput,
+  colType?: string,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+
+  if (entity.id !== undefined) {
+    body.id = entity.id;
+  }
+
+  const vb = (entity.vectorBytes ?? entity.vector_bytes) as unknown;
+  if (vb !== undefined && vb !== null) {
+    if (typeof vb === "string") {
+      body.vector_bytes = vb;
+    } else if (vb instanceof Uint8Array) {
+      body.vector_bytes = Buffer.from(vb).toString("base64");
+    }
+  } else if (entity.vector !== undefined) {
+    const v = entity.vector;
+    let matchesType = false;
+    if (colType) {
+      if (colType === "halfvec" && v instanceof HalfVector) matchesType = true;
+      else if (colType === "vector" && v instanceof Vector) matchesType = true;
+      else if (colType === "bit" && v instanceof Bit) matchesType = true;
+      else if (colType === "sparsevec" && v instanceof SparseVector)
+        matchesType = true;
+    }
+
+    if (
+      matchesType &&
+      (v instanceof HalfVector ||
+        v instanceof Vector ||
+        v instanceof Bit ||
+        v instanceof SparseVector)
+    ) {
+      body.vector_bytes = Buffer.from(v.toVectorBytes()).toString("base64");
+    } else if (v instanceof HalfVector || v instanceof Vector) {
+      body.vector = v.toList();
+    } else if (v instanceof Bit) {
+      body.vector = v.toList();
+    } else if (v instanceof SparseVector) {
+      body.vector = {
+        dim: v.dim,
+        indices: Array.from(v.indices),
+        values: Array.from(v.values),
+      };
+    } else if (Array.isArray(v)) {
+      body.vector = v;
+    } else if (v instanceof Float32Array || v instanceof Float64Array) {
+      body.vector = Array.from(v);
+    } else {
+      body.vector = v;
+    }
+  }
+
+  if (entity.document !== undefined) {
+    body.document = entity.document;
+  }
+
+  if (entity.attributes !== undefined) {
+    const attrs: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(entity.attributes)) {
+      if (v instanceof TypedValue) {
+        attrs[k] = v.toJSON();
+      } else if (v && typeof v === "object" && "type" in v && "value" in v) {
+        attrs[k] = {
+          type: (v as { type: string }).type,
+          value: (v as { value: unknown }).value,
+        };
+      } else {
+        attrs[k] = v;
+      }
+    }
+    body.attributes = attrs;
+  }
+
+  if (entity.ttl !== undefined) {
+    body.ttl = serializeTtl(entity.ttl);
+  }
+
+  return body;
+}
+
+/**
+ * Big-endian 32-byte representation of a 256-bit BigInt.
+ */
+function bigIntToBytes32(bi: bigint): Uint8Array {
+  const buf = new Uint8Array(32);
+  let temp = BigInt.asUintN(256, bi);
+  for (let i = 31; i >= 0; i--) {
+    buf[i] = Number(temp & 0xffn);
+    temp >>= 8n;
+  }
+  return buf;
+}
+
+/**
+ * Parse decimal string into fixed-point integer scaled by 10^18.
+ */
+function parseDecToBigInt(s: string): bigint {
+  const str = String(s).trim();
+  const isNeg = str.startsWith("-");
+  const unsignedStr = isNeg ? str.slice(1) : str;
+  const [intPart, fracPart = ""] = unsignedStr.split(".");
+  if (fracPart.length > 18) {
+    throw new RangeError(`Decimal exceeds 18 decimal places: ${s}`);
+  }
+  const paddedFrac = fracPart.padEnd(18, "0");
+  const combined = BigInt(intPart + paddedFrac);
+  return isNeg ? -combined : combined;
+}
+
+/**
+ * Encode an attribute name and value into wire DirectAttribute representation.
+ */
+export function encodeAttributeValue(
+  type?: string,
+  value?: unknown,
+): { typeId: number; valueBytes: Uint8Array } {
+  if (
+    value &&
+    typeof value === "object" &&
+    "typeId" in value &&
+    "valueBytes" in value
+  ) {
+    const rawObj = value as { typeId: number; valueBytes: Uint8Array };
+    return { typeId: rawObj.typeId, valueBytes: rawObj.valueBytes };
+  }
+
+  let resolvedType = type;
+  let val = value;
+  if (val instanceof TypedValue) {
+    resolvedType = val.type;
+    val = val.value;
+  } else if (
+    val &&
+    typeof val === "object" &&
+    "type" in val &&
+    "value" in val
+  ) {
+    resolvedType = (val as { type: string }).type;
+    val = (val as { value: unknown }).value;
+  }
+
+  if (!resolvedType) {
+    if (typeof val === "boolean") resolvedType = "bool";
+    else if (typeof val === "number")
+      resolvedType = Number.isInteger(val) ? "i32" : "dec";
+    else if (typeof val === "bigint") resolvedType = "u64";
+    else if (val instanceof Uint8Array) resolvedType = "bytes";
+    else if (typeof val === "string") {
+      if (/^0x[0-9a-fA-F]{40}$/.test(val)) resolvedType = "addr";
+      else if (/^0x[0-9a-fA-F]{64}$/.test(val)) resolvedType = "key";
+      else resolvedType = "str";
+    } else {
+      resolvedType = "str";
+    }
+  }
+
+  switch (resolvedType) {
+    case "bool": {
+      const buf = new Uint8Array(32);
+      if (val) buf[31] = 1;
+      return { typeId: 0x01, valueBytes: buf };
+    }
+    case "i32": {
+      const num =
+        typeof val === "number" ? Math.trunc(val) : parseInt(String(val), 10);
+      const buf = bigIntToBytes32(BigInt.asIntN(256, BigInt(num)));
+      return { typeId: 0x02, valueBytes: buf };
+    }
+    case "u64": {
+      const bi = BigInt(val as string | number | bigint);
+      return { typeId: 0x03, valueBytes: bigIntToBytes32(bi) };
+    }
+    case "u256": {
+      const bi = BigInt(val as string | number | bigint);
+      return { typeId: 0x04, valueBytes: bigIntToBytes32(bi) };
+    }
+    case "dec": {
+      const bi = parseDecToBigInt(String(val));
+      return { typeId: 0x05, valueBytes: bigIntToBytes32(bi) };
+    }
+    case "bytes": {
+      if (val instanceof Uint8Array) {
+        return { typeId: 0x07, valueBytes: val };
+      }
+      if (typeof val === "string") {
+        return {
+          typeId: 0x07,
+          valueBytes: Uint8Array.from(Buffer.from(val, "base64")),
+        };
+      }
+      throw new TypeError(`Cannot convert value to bytes: ${String(val)}`);
+    }
+    case "str": {
+      return {
+        typeId: 0x08,
+        valueBytes: new TextEncoder().encode(String(val ?? "")),
+      };
+    }
+    case "addr": {
+      const clean = String(val).toLowerCase().replace(/^0x/, "");
+      const addrBuf = Buffer.from(clean, "hex");
+      const buf = new Uint8Array(32);
+      buf.set(addrBuf, 12);
+      return { typeId: 0x09, valueBytes: buf };
+    }
+    case "key": {
+      const clean = String(val).toLowerCase().replace(/^0x/, "");
+      const keyBuf = Buffer.from(clean, "hex");
+      const buf = new Uint8Array(32);
+      buf.set(keyBuf, 0);
+      return { typeId: 0x0a, valueBytes: buf };
+    }
+    default: {
+      return {
+        typeId: 0x08,
+        valueBytes: new TextEncoder().encode(String(val ?? "")),
+      };
+    }
+  }
+}
+
+/**
+ * Extract raw VectorBytes Uint8Array from EntityInput based on collection column type.
+ */
+function extractVectorBytes(
+  collectionDef: Collection | Record<string, unknown>,
+  entity: EntityInput,
+): Uint8Array {
+  const vb = (entity.vectorBytes ?? entity.vector_bytes) as unknown;
+  if (vb) {
+    if (typeof vb === "string") {
+      return Uint8Array.from(Buffer.from(vb, "base64"));
+    }
+    if (vb instanceof Uint8Array) {
+      return vb;
+    }
+  }
+
+  const v = entity.vector;
+  if (v) {
+    if (
+      v instanceof HalfVector ||
+      v instanceof Vector ||
+      v instanceof Bit ||
+      v instanceof SparseVector
+    ) {
+      return v.toVectorBytes();
+    }
+    const rawCol = ((collectionDef as Record<string, unknown>).column ??
+      {}) as Record<string, unknown>;
+    const colType = String(rawCol.type ?? "halfvec");
+    const dims = Number(rawCol.dimensions ?? 0);
+
+    if (colType === "vector") {
+      if (typeof v === "string") return Vector.fromText(v).toVectorBytes();
+      return new Vector(
+        v as unknown as number[] | Float32Array,
+      ).toVectorBytes();
+    } else if (colType === "halfvec") {
+      if (typeof v === "string") return HalfVector.fromText(v).toVectorBytes();
+      return new HalfVector(
+        v as unknown as number[] | Float32Array,
+      ).toVectorBytes();
+    } else if (colType === "bit") {
+      if (typeof v === "string") return Bit.fromText(v).toVectorBytes();
+      return new Bit(v as unknown as Uint8Array, dims).toVectorBytes();
+    } else if (colType === "sparsevec") {
+      if (typeof v === "string")
+        return SparseVector.fromText(v).toVectorBytes();
+      const sv = v as unknown as {
+        dim: number;
+        indices: number[];
+        values: number[];
+      };
+      return new SparseVector(sv.dim, sv.indices, sv.values).toVectorBytes();
+    }
+  }
+
+  throw new Error("EntityInput must contain either vector or vectorBytes");
+}
+
+/**
+ * Build direct on-chain entity attributes per docs/api/collections.md §4.
+ * Produces arkiv.schema (0x88), av.vec (0x07), av.id (0x88, if present),
+ * av.doc (0x07, if present), and user attributes sorted by name.
+ */
+export function buildEntityAttributes(
+  collectionDef: Collection | Record<string, unknown>,
+  entity: EntityInput,
+): DirectAttribute[] {
+  const raw = collectionDef as Record<string, unknown>;
+  const schemaTag = String(raw.schemaTag ?? raw.schema_tag ?? raw.name ?? "");
+
+  if (!schemaTag) {
+    throw new Error(
+      "Collection definition must contain schemaTag or schema_tag",
+    );
+  }
+
+  const attrs: DirectAttribute[] = [];
+
+  // 1. arkiv.schema (0x88)
+  attrs.push({
+    name: "arkiv.schema",
+    typeId: 0x88,
+    valueBytes: new TextEncoder().encode(schemaTag),
+  });
+
+  // 2. av.vec (0x07)
+  const vecBytes = extractVectorBytes(collectionDef, entity);
+  attrs.push({
+    name: "av.vec",
+    typeId: 0x07,
+    valueBytes: vecBytes,
+  });
+
+  // 3. av.id (0x88, if present)
+  if (entity.id != null) {
+    attrs.push({
+      name: "av.id",
+      typeId: 0x88,
+      valueBytes: new TextEncoder().encode(entity.id),
+    });
+  }
+
+  // 4. av.doc (0x07, if present)
+  if (entity.document != null) {
+    attrs.push({
+      name: "av.doc",
+      typeId: 0x07,
+      valueBytes: new TextEncoder().encode(entity.document),
+    });
+  }
+
+  // 5. User attributes sorted by name
+  if (entity.attributes) {
+    const colAttrs = (raw.attributes ?? {}) as Record<string, string>;
+    const userAttrs: DirectAttribute[] = [];
+    for (const [k, v] of Object.entries(entity.attributes)) {
+      if (k === "arkiv.schema" || k.startsWith("av.")) {
+        continue;
+      }
+      let type: string | undefined;
+      let val: unknown = v;
+      if (v instanceof TypedValue) {
+        type = v.type;
+        val = v.value;
+      } else if (v && typeof v === "object" && "type" in v && "value" in v) {
+        type = (v as { type: string }).type;
+        val = (v as { value: unknown }).value;
+      } else {
+        type = colAttrs[k];
+      }
+      const encoded = encodeAttributeValue(type, val);
+      userAttrs.push({
+        name: k,
+        typeId: encoded.typeId,
+        valueBytes: encoded.valueBytes,
+      });
+    }
+
+    userAttrs.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    attrs.push(...userAttrs);
+  }
+
+  return attrs;
+}
+
+/**
+ * Shape attributes for @arkiv-network/sdk createEntity.
+ * Docs: PLAN_SDK.md §7.1 item 5
+ */
+export function toArkivSdkAttributes(
+  collectionDef: Collection | Record<string, unknown>,
+  entity: EntityInput,
+): Record<string, unknown> {
+  const raw = collectionDef as Record<string, unknown>;
+  const schemaTag = String(raw.schemaTag ?? raw.schema_tag ?? raw.name ?? "");
+
+  if (!schemaTag) {
+    throw new Error(
+      "Collection definition must contain schemaTag or schema_tag",
+    );
+  }
+
+  const vecBytes = extractVectorBytes(collectionDef, entity);
+
+  const result: Record<string, unknown> = {
+    "arkiv.schema": schemaTag,
+    "av.vec": vecBytes,
+  };
+
+  if (entity.id != null) {
+    result["av.id"] = entity.id;
+  }
+  if (entity.document != null) {
+    result["av.doc"] = new TextEncoder().encode(entity.document);
+  }
+
+  if (entity.attributes) {
+    const plain = plainAttributes(entity.attributes);
+    for (const [k, v] of Object.entries(plain)) {
+      if (k === "arkiv.schema" || k.startsWith("av.")) {
+        continue;
+      }
+      result[k] = v;
+    }
+  }
+
+  return result;
+}
