@@ -156,7 +156,8 @@ set(AV_CORE_SOURCES
     src/codec/vectorbytes.c
     src/codec/hex.c
     src/codec/base64.c
-    src/sync/ttl.c)
+    src/sync/ttl.c
+    src/arkiv/rlp.c)
 
 add_library(av_core STATIC ${AV_CORE_SOURCES})
 target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

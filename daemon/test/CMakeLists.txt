@@ -5,8 +5,9 @@ set(AV_UNIT_SOURCES
     unit/test_kernels.c
     unit/test_vectorbytes.c
     unit/test_text_io.c
-    unit/test_ttl.c)
-set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl)
+    unit/test_ttl.c
+    unit/test_rlp.c)
+set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)

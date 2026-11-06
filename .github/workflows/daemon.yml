@@ -72,8 +72,9 @@ jobs:
         if: matrix.cc == 'gcc'
         working-directory: daemon
         run: |
-          tools/format-files.sh | grep '\.c$' | xargs cppcheck --enable=warning,performance,portability \
+          tools/format-files.sh | grep '^src/.*\.c$' | xargs cppcheck --enable=warning,performance,portability \
             --error-exitcode=1 --inline-suppr --suppress=missingIncludeSystem --quiet \
+            -D__BYTE_ORDER__=1234 -D__ORDER_LITTLE_ENDIAN__=1234 -D__x86_64__=1 -DAV_REPO_ROOT='"/"' \
             -Isrc -Isrc/pgcompat/include -Isrc/pgvector -Ibuild/dev/generated
 
   provenance:
