@@ -255,6 +255,9 @@ static void encode_op_payload(abi_buf *b, const av_mutation_op *op)
 {
     switch (op->type) {
     case AV_OP_CREATE: {
+        /* abi.encode(CreateOp): the struct is dynamic (Attribute[]), so a 0x20 head offset comes first.
+         * Verified against Rabdi, which rejects payloads without it ("type check failed for offset"). */
+        buf_write_word_u64(b, 32);
         /* uint128 salt */
         uint8_t salt_w[32];
         memset(salt_w, 0, 32);
@@ -277,6 +280,7 @@ static void encode_op_payload(abi_buf *b, const av_mutation_op *op)
         break;
     }
     case AV_OP_PATCH: {
+        buf_write_word_u64(b, 32); /* abi.encode(PatchOp): dynamic struct head offset */
         /* bytes32 entityKey */
         buf_write_word_bytes(b, op->u.patch.entity_key, 32);
 
@@ -540,6 +544,13 @@ av_status av_abi_decode_execute(const uint8_t *calldata, size_t len, av_arena *a
 
         switch (ops[i].type) {
         case AV_OP_CREATE: {
+            size_t hoff = 0;
+            if (dlen < 32 || !read_size(pdata, dlen, &hoff) || !fits(hoff, 0, dlen)) {
+                av_err_set(e, "invalid_argument", "CREATE head offset invalid");
+                return AV_ERR;
+            }
+            pdata += hoff;
+            dlen -= hoff;
             if (dlen < 160) {
                 av_err_set(e, "invalid_argument", "CREATE payload too short");
                 return AV_ERR;
@@ -561,6 +572,13 @@ av_status av_abi_decode_execute(const uint8_t *calldata, size_t len, av_arena *a
             break;
         }
         case AV_OP_PATCH: {
+            size_t hoff = 0;
+            if (dlen < 32 || !read_size(pdata, dlen, &hoff) || !fits(hoff, 0, dlen)) {
+                av_err_set(e, "invalid_argument", "PATCH head offset invalid");
+                return AV_ERR;
+            }
+            pdata += hoff;
+            dlen -= hoff;
             if (dlen < 64) {
                 av_err_set(e, "invalid_argument", "PATCH payload too short");
                 return AV_ERR;

@@ -175,8 +175,9 @@ def decode_execute(calldata: bytes) -> list[Op]:
         data_len = int.from_bytes(item[data_off : data_off + 32], "big")
         op_data = item[data_off + 32 : data_off + 32 + data_len]
         if opcode == 1:  # CREATE
-            # encodeAbiParameters(uint128, uint64, uint64, uint8, Attribute[]): a parameter list, no leading offset
-            body = op_data
+            # abi.encode(CreateOp): dynamic tuple, so a 0x20 head offset comes first (verified on Rabdi)
+            head_off = int.from_bytes(op_data[:32], "big")
+            body = op_data[head_off:]
             salt = int.from_bytes(body[:32], "big")
             expires_at = int.from_bytes(body[32:64], "big")
             min_lifetime = int.from_bytes(body[64:96], "big")
@@ -185,7 +186,8 @@ def decode_execute(calldata: bytes) -> list[Op]:
             attrs = decode_attrs_array(body[attrs_off:])
             ops.append(Op("create", salt=salt, expires_at=expires_at, min_lifetime=min_lifetime, flags=flags, attrs=attrs))
         elif opcode == 2:  # PATCH
-            body = op_data  # encodeAbiParameters(bytes32, Attribute[])
+            head_off = int.from_bytes(op_data[:32], "big")  # abi.encode(PatchOp): dynamic tuple
+            body = op_data[head_off:]
             key = body[:32]
             attrs_off = int.from_bytes(body[32:64], "big")
             attrs = decode_attrs_array(body[attrs_off:])
