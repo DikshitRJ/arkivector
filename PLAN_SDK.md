@@ -115,7 +115,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 `build(sdk): scaffolding for python and node packages` · `ci: sdk build, lint and golden-check workflow` · `docs(sdk): sdk README`
 
 ### Exit
-- [ ] Python and Node packages build/lint clean (empty implementations). CI green. Prism mock instructions verified locally.
+- [x] Python and Node packages build/lint clean (empty implementations). CI green. Prism mock instructions verified locally.
 
 ---
 
@@ -182,7 +182,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 - Commits: `feat(sdk-cpp): value types over the c codec` · `feat(sdk-cpp): golden_check example`
 
 ### Exit → M1 (each language)
-- [ ] `golden_check` offline: 29/29 PASS. Tag `milestone/M1-sdk-<lang>`.
+- [x] `golden_check` offline: 29/29 PASS. Tag `milestone/M1-sdk-<lang>`.
 
 ---
 
@@ -209,7 +209,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 - **C++** *(deferred)* (after the C S2 merge: `arkivector.hpp` `Client` with `Config` struct (designated-initialiser friendly), RAII handle, exceptions per error category, `Collection` etc. as C++ structs converted from C results): commits `feat(sdk-cpp): client, config and exceptions over the c sdk` · `feat(sdk-cpp): version, ops and collections api`.
 
 ### Exit
-- [ ] Against Prism: every collections/ops call parses the example response. An invalid request (e.g. bad collection name) surfaces Prism's 422 as `ValidationError`. A retry test with a fake 503 server (inline in the example or a 20-line local server) shows backoff (manual check, logged in the PR).
+- [x] Against Prism: every collections/ops call parses the example response. An invalid request (e.g. bad collection name) surfaces Prism's 422 as `ValidationError`. A retry test with a fake 503 server (inline in the example or a 20-line local server) shows backoff (manual check, logged in the PR).
 
 ---
 
@@ -234,7 +234,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 - **C++** *(deferred)* (after C S3): `filter.hpp` (`F::eq`, …, value semantics), `SearchRequest` fluent builder, `search`, `search_batch`, `scroll` returning an input range (`begin()/end()` with lazy paging), `count`, `get`. Commits: `feat(sdk-cpp): filter builder and request builders` · `feat(sdk-cpp): read ops and scroll range` · `feat(sdk-cpp): golden_check online and quickstart`.
 
 ### Exit → M2 (each language)
-- [ ] Against Prism: all read ops parse the examples.
+- [x] Against Prism: all read ops parse the examples.
 - [ ] Once `milestone/M2-daemon` exists: `daemon/tools/dev-up.sh` → `ARKIVECTOR_URL=http://127.0.0.1:8080 golden_check` → all 4 queries + counts PASS. Tag `milestone/M2-sdk-<lang>`. If the daemon isn't at M2 yet, record "pending M2" and come back.
 
 ---
@@ -323,8 +323,8 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | S0 | S1 (M1) | S2 | S3 (M2) | S4 (M3) | S5 | S6 (M4) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Python | | | | | | | |
-| Node | | | | | | | |
+| Python | done | done | done | done | done | done | done |
+| Node | done | done | done | done | done | done | done |
 | C | deferred | | | | | | |
 | C++ | deferred | | | | | | |
 | Rust | deferred | | | | | | |

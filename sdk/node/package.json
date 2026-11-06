@@ -1,0 +1,64 @@
+{
+  "name": "@arkivector/client",
+  "version": "0.1.0",
+  "description": "Arkivector Node.js and TypeScript client library",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./langchain": {
+      "types": "./dist/src/langchain.d.ts",
+      "import": "./dist/src/langchain.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arkivector/arkivector.git",
+    "directory": "sdk/node"
+  },
+  "homepage": "https://github.com/arkivector/arkivector#readme",
+  "bugs": {
+    "url": "https://github.com/arkivector/arkivector/issues"
+  },
+  "keywords": [
+    "arkivector",
+    "vector",
+    "pgvector",
+    "arkiv",
+    "embedding",
+    "database"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ examples/",
+    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\""
+  },
+  "peerDependencies": {
+    "@langchain/core": ">=0.1.0 <1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.14.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.12.2"
+  }
+}
