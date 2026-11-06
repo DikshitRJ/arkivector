@@ -1,8 +1,8 @@
 # Design: web-landing
 
 ## Stack
-- Vite + React 18 + TypeScript, Tailwind CSS v4 (`@tailwindcss/vite`). No router library: a 30-line hash router (`#/install`), which also works on any static host including GitHub Pages.
-- No animation, icon, or UI library. Animations are SVG elements whose attributes are computed from a time value each frame (`requestAnimationFrame`). Target: under 80 kB gzipped JavaScript.
+- Vite + React 19 + TypeScript, Tailwind CSS v4 (`@tailwindcss/vite`). No router library: a 30-line hash router (`#/install`), which also works on any static host including GitHub Pages.
+- No animation, icon, or UI library. Animations are SVG elements whose attributes are computed from a time value each frame (`requestAnimationFrame`). Target: under 100 kB gzipped JavaScript; React 19 accounts for about 70 kB of it.
 - Fonts (Google Fonts): IBM Plex Mono for body and code, Space Grotesk for headings, Caveat for hand-written annotations only. No Inter/Roboto, no italic serif hero.
 
 ## Visual language

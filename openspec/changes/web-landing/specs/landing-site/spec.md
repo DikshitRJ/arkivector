@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Static, lightweight site
-The site SHALL build to static files with no backend and SHALL ship under 80 kB of gzipped JavaScript.
+The site SHALL build to static files with no backend and SHALL ship under 100 kB of gzipped JavaScript (React 19 itself is about 70 kB).
 
 #### Scenario: Build
 - **WHEN** `npm run build` runs in `web/`
