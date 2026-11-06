@@ -5,12 +5,8 @@
  * does not depend on host endianness or on the alignment of the input buffer.
  * (The struct copy in decode/encode assumes a little-endian host, like pgvector.)
  */
-/* pgcompat headers use __int128, which -Wpedantic rejects: relax it for this include only */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
 #include "postgres.h"
 #include "varatt.h"
-#pragma GCC diagnostic pop
 
 #include <string.h>
 
