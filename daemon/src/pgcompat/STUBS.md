@@ -14,7 +14,7 @@ Kinds: **V** verbatim PostgreSQL file · **S** PostgreSQL subset (struct/macros 
 | `postgres.h` | stub | primary backend include | `Datum` + all `*GetDatum`/`DatumGet*`, includes elog/palloc/pgcompat_types | D0 |
 | `port.h` | stub | `random()`/`strtof()` include in pgvector | `pg_strcasecmp`, `pg_tolower`, `qsort_arg`, `pg_strong_random` | D0 |
 | `pgcompat_types.h` | stub | opaque types named in pgvector prototypes of disk/AM functions we never call | `Relation`, `IndexScanDesc`, `Buffer`, `ForkNumber`, `ScanDirection`, … | D0 |
-| `utils/elog.h` | stub | error reporting | `ereport`, `elog`, `errcode/errmsg/errdetail/errhint`, `PG_TRY/PG_CATCH/PG_FINALLY/PG_END_TRY`, `ErrorData` | D0 |
+| `utils/elog.h` | stub | error reporting | `ereport`, `elog`, `errcode/errmsg/errdetail/errhint`, `PG_TRY/PG_CATCH/PG_FINALLY/PG_END_TRY` (on `_setjmp`/`_longjmp` = `sigsetjmp(buf, 0)` semantics, which TSan can follow on glibc 2.44), `ErrorData` | D0 |
 | `utils/errcodes.h` | stub | SQLSTATE values used by pgvector | `ERRCODE_*` (subset of REL_17_11 errcodes.txt) | D0 |
 | `utils/palloc.h` | stub | memory contexts on `av_arena` | `palloc*`, `repalloc*`, `pfree` (no-op), `MemoryContextSwitchTo`, `add_size`, `mul_size`, `psprintf` | D0 |
 | `utils/memutils.h` | stub | context management | `AllocSetContextCreate`, `AvContextCreate`, `MemoryContextReset/Delete`, `GetMemoryChunkContext` | D0 |
@@ -39,6 +39,12 @@ Kinds: **V** verbatim PostgreSQL file · **S** PostgreSQL subset (struct/macros 
 | `lib/pairingheap.h` | V | HNSW candidate heaps | `pairingheap_*` | D0 |
 | `lib/simplehash.h` | V | HNSW visited hash tables | `SH_*` template | D0 |
 | `nodes/pg_list.h` | V | `List` used throughout HNSW | `List`, `lappend`, `foreach`, … | D0 |
+| `utils/datum.h` | stub | `datumIsEqual` (duplicate detection in hnswbuild) | `datumIsEqual` (by-value and varlena) | D0 |
+| `miscadmin.h` | stub | `CHECK_FOR_INTERRUPTS` | polls thread-local `av_pg_interrupt_pending` (wired to request deadlines in D4) | D0 |
+| `port/atomics.h` | stub | included by hnswutils.c | (barriers are in c.h) | D0 |
+| `storage/bufmgr.h` | stub | `BufferIsValid` in dead disk branches | `BufferIsValid` | D0 |
+| `access/genam.h` | stub | hnsw.h gets `List` through it | includes `nodes/pg_list.h` | D0 |
+| `access/{parallel,generic_xlog,relscan}.h`, `nodes/execnodes.h`, `utils/{sampling,fmgrprotos,rel,relcache,snapmgr,builtins,lsyscache,array}.h`, `storage/{freespace,lmgr}.h`, `pgstat.h`, `catalog/pg_type.h`, `libpq/pqformat.h`, `parser/scansup.h` | stub (empty) | included by copied files for disk/SQL code that is compiled out | nothing (include `postgres.h`) | D0 |
 | `nodes/nodes.h` | stub | Node header for pg_list.h | `NodeTag` (list tags only), `Node`, `IsA`, `castNode`, `makeNode` | D0 |
 
 ## Sources (`src/`)

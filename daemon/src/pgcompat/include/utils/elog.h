@@ -76,7 +76,10 @@ extern int errhidecontext(bool hide_ctx);
 
 #define elog(elevel, ...) ereport(elevel, errmsg_internal(__VA_ARGS__))
 
-/* ---- PG_TRY ---- */
+/* ---- PG_TRY ----
+ * _setjmp/_longjmp: same semantics as PostgreSQL's sigsetjmp(buf, 0) (signal mask not
+ * saved), and the only variant ThreadSanitizer can follow with glibc 2.44. On glibc
+ * sigjmp_buf and jmp_buf are the same type. */
 extern __thread sigjmp_buf *PG_exception_stack;
 
 #define PG_TRY(...)                                                          \
@@ -84,7 +87,7 @@ extern __thread sigjmp_buf *PG_exception_stack;
         sigjmp_buf *_save_exception_stack##__VA_ARGS__ = PG_exception_stack; \
         sigjmp_buf _local_sigjmp_buf##__VA_ARGS__;                           \
         bool _do_rethrow##__VA_ARGS__ = false;                               \
-        if (sigsetjmp(_local_sigjmp_buf##__VA_ARGS__, 0) == 0) {             \
+        if (_setjmp(_local_sigjmp_buf##__VA_ARGS__) == 0) {                  \
             PG_exception_stack = &_local_sigjmp_buf##__VA_ARGS__
 
 #define PG_CATCH(...)                                         \

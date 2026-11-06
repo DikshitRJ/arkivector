@@ -39,8 +39,8 @@
     {
       "name": "tsan",
       "inherits": "base",
-      "displayName": "ThreadSanitizer",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "AV_TSAN": "ON" }
+      "displayName": "ThreadSanitizer (clang; gcc's TSan runtime crashes at startup with glibc 2.44)",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "CMAKE_C_COMPILER": "clang", "AV_TSAN": "ON" }
     },
     {
       "name": "fuzz",

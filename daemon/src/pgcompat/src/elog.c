@@ -196,7 +196,7 @@ void pg_re_throw(void)
         av_pg_on_error_release_locks();
     }
     if (PG_exception_stack != NULL) {
-        siglongjmp(*PG_exception_stack, 1);
+        _longjmp(*PG_exception_stack, 1);
     }
     fprintf(stderr, "pgcompat: ERROR outside PG_TRY: %s (%s:%d)\n", last_error.message,
             last_error.filename ? last_error.filename : "?", last_error.lineno);

@@ -181,6 +181,13 @@ typedef struct varlena VarChar;
     } while (0)
 #define StaticAssertExpr(condition, errmessage) ((void)({ StaticAssertStmt(condition, errmessage); true; }))
 
+#define AssertVariableIsOfType(varname, typename)                                        \
+    StaticAssertStmt(__builtin_types_compatible_p(__typeof__(varname), typename),         \
+                     CppAsString(varname) " does not have type " CppAsString(typename))
+#define AssertVariableIsOfTypeMacro(varname, typename)                                   \
+    (StaticAssertExpr(__builtin_types_compatible_p(__typeof__(varname), typename),        \
+                      CppAsString(varname) " does not have type " CppAsString(typename)))
+
 /* ---- misc ---- */
 #define HIGHBIT (0x80)
 #define IS_HIGHBIT_SET(ch) ((unsigned char)(ch) & HIGHBIT)
