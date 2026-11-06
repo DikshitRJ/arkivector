@@ -1,0 +1,88 @@
+# VENDORED.lock: pinned third-party sources vendored into daemon/third_party/.
+# sha256 is of the downloaded artifact (archive or single file) named in "artifact", not of the
+# files in this tree. Archives are never committed. Update procedure: third_party/README.md.
+
+[[lib]]
+name = "yyjson"
+version = "0.13.0"
+url = "https://github.com/ibireme/yyjson/archive/refs/tags/0.13.0.tar.gz"
+artifact = "tarball (src/yyjson.c, src/yyjson.h, LICENSE)"
+sha256 = "34e0f62a2bc11ab20d601e8ca1cc2b2079503aa45119a19133d89d19b94a0fae"
+license = "MIT"
+
+[[lib]]
+name = "croaring"
+version = "5.5.5"
+url = "https://github.com/RoaringBitmap/CRoaring/releases/download/v5.5.5/roaring.c"
+artifact = "release asset roaring.c (amalgamation)"
+sha256 = "190216f349ac5aad430b58ed9b9d5b1966a2462a14ce045b0ca59d8507a9cee8"
+license = "Apache-2.0 OR MIT"
+
+[[lib]]
+name = "croaring-header"
+version = "5.5.5"
+url = "https://github.com/RoaringBitmap/CRoaring/releases/download/v5.5.5/roaring.h"
+artifact = "release asset roaring.h (amalgamation)"
+sha256 = "1a336307c3b5a732045941d1bd33232aa4b45661366ac9643c583e6d67513a34"
+license = "Apache-2.0 OR MIT"
+
+[[lib]]
+name = "llhttp"
+version = "9.4.3"
+url = "https://github.com/nodejs/llhttp/archive/refs/tags/release/v9.4.3.tar.gz"
+artifact = "tarball of release/v9.4.3 (src/api.c, src/http.c, src/llhttp.c, include/llhttp.h, LICENSE)"
+sha256 = "1eb813c7437b31a87496a1cd3ed79f00746720f5e7e29c79b42c02cb69f36c39"
+license = "MIT"
+
+[[lib]]
+name = "lmdb"
+version = "0.9.33"
+url = "https://github.com/LMDB/lmdb/archive/refs/tags/LMDB_0.9.33.tar.gz"
+artifact = "tarball (libraries/liblmdb: mdb.c, midl.c, lmdb.h, midl.h, LICENSE, COPYRIGHT)"
+sha256 = "9c352fa9bdad53d920128ac6a62296f2850c7e29862a610d3a72f5f49a1cd7ea"
+license = "OLDAP-2.8 (OpenLDAP Public License)"
+
+[[lib]]
+name = "tomlc99"
+version = "62ce93ceb713dc49909d0fef1411f9d37bef83f2"
+url = "https://github.com/cktan/tomlc99/archive/62ce93ceb713dc49909d0fef1411f9d37bef83f2.tar.gz"
+artifact = "tarball at commit (toml.c, toml.h, LICENSE)"
+sha256 = "158dbe2b3a98923277db182ec6151ef39fbd3a70f6cc4a6b0460bbcd02ad9a50"
+license = "MIT"
+
+[[lib]]
+name = "greatest"
+version = "1.5.0"
+url = "https://raw.githubusercontent.com/silentbicycle/greatest/v1.5.0/greatest.h"
+artifact = "single file greatest.h at tag v1.5.0 (LICENSE from the same tag, sha256 98a91cee50890ad55ea369d00932a0aecf31610ad6ae07468d451508e54f3553)"
+sha256 = "1292593d95c35eeccc89ffa1c91d6fe53b49f81cbf2c2b7758842b7f3186fcc2"
+license = "ISC (MIT-equivalent permissive)"
+
+[[lib]]
+name = "secp256k1"
+version = "0.8.0"
+url = "https://github.com/bitcoin-core/secp256k1/archive/refs/tags/v0.8.0.tar.gz"
+artifact = "tarball (subset: include/{secp256k1,secp256k1_recovery,secp256k1_preallocated}.h, src/ without tests/benchmarks and without modules other than recovery, COPYING)"
+sha256 = "eb52b0e9239dff7dc26be5f9623567141b8720ec47da29eb3c1e0a660d17c8bb"
+license = "MIT"
+
+[[lib]]
+name = "tiny_sha3"
+version = "dcbb3192047c2a721f5f851db591871d428036a9"
+url = "https://github.com/mjosaarinen/tiny_sha3/archive/dcbb3192047c2a721f5f851db591871d428036a9.tar.gz"
+artifact = "tarball at commit (sha3.c, sha3.h, LICENSE), unmodified"
+sha256 = "b09787cd69c9f2c8ae5be5187cbf432ccfef243c86e00b0932bfa641959837d3"
+license = "MIT"
+
+# System dependencies (found with pkg-config; minimums enforced in cmake/Vendored.cmake).
+# Audit 2026-11-06: no known critical/high advisories for the vendored pins above.
+[[system]]
+name = "libuv"
+min = "1.48.0"
+advisories = "GHSA-f74f-cvh7-c6q6 fixed in 1.48.0"
+
+[[system]]
+name = "libcurl"
+min = "8.11"
+recommended = "8.23.0"
+advisories = "CURL-CVE-2026-92392 (High) affects 8.12-8.22 except 8.14.3/8.16.2/8.20.2; CI and release builds use 8.23.0"

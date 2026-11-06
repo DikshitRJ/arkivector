@@ -1,2 +1,14 @@
 *.serena*
 .env
+daemon/build/
+sdk/*/build/
+sdk/rust/target/
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.claude/worktrees/
+*/build/*
+*/cmake/*
+!daemon/cmake/*

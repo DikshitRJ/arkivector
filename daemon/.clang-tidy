@@ -1,0 +1,34 @@
+# Conservative clang-tidy set for Arkivector's own code (see tools/format-files.sh).
+# Run: tools/format-files.sh | grep '\.c$' | xargs clang-tidy -p build/dev
+#
+# Disabled bugprone checks, with reasons:
+#  - easily-swappable-parameters, reserved-identifier: PostgreSQL API shapes and names (_PG_init, ...) are fixed.
+#  - signed-bitwise: PostgreSQL's int-typed flag words and macros (elevel, sqlerrcode, Size math) trigger it
+#    in pgcompat and in the verbatim pgvector headers that every .c file includes; -Wconversion covers real bugs.
+#  - macro-parentheses: PostgreSQL list/itemptr/relptr macros (verbatim upstream style) take type/field tokens.
+#  - branch-clone: upstream itemptr.h, intentionally repeated branches.
+#  - narrowing-conversions, implicit-widening-of-multiplication-result, misplaced-widening-cast:
+#    duplicates of -Wconversion (which is -Werror in our build) and noisy on int-typed PostgreSQL APIs.
+#  - clang-analyzer-valist.Uninitialized: false positive (clang 18) for a va_list started with va_start
+#    and passed to vsnprintf in a helper.
+#  - clang-analyzer-optin.core.EnumCastOutOfRange: tests deliberately pass invalid enum values.
+#  - clang-analyzer-optin.performance.Padding: layout follows the documented field order (small structs).
+Checks: >-
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
+  -bugprone-signed-bitwise,
+  -bugprone-macro-parentheses,
+  -bugprone-branch-clone,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-misplaced-widening-cast,
+  cert-err34-c,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.*,
+  -clang-analyzer-valist.Uninitialized,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  -clang-analyzer-optin.performance.Padding,
+  misc-redundant-expression
+WarningsAsErrors: '*'

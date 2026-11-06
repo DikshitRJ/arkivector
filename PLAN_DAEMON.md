@@ -688,9 +688,9 @@ None from pgvector. Ethereum test vectors (EIP-155/1559 signing, RLP) from the E
 `docs(daemon): rabdi probe script, measured facts and tuned defaults` · `feat(server): api keys and scopes` · `feat(server): rate limiting` · `feat(server): entity verify against arkiv_getEntity` · `feat(server): qdrant-compatible subset` · `feat(server): mcp streamable http endpoint` · `feat(query): recall canary` · `build(daemon): static release builds and docker image` · `ci: release workflow for daemon binaries and image` · `test(daemon): qdrant, mcp, auth suites` (gemini) · `docs(daemon): generated docs for D6`
 
 ### 10.5 Exit criteria → **Milestone M4**
-- [ ] All suites + contract tests green. Rabdi 24 h soak passes.
-- [ ] Release artifacts build reproducibly. The Docker image runs `dev-up`-equivalent compose.
-- [ ] Tag `daemon-v0.1.0` and `milestone/M4-daemon`.
+- [x] All suites + contract tests green. Rabdi 24 h soak passes.
+- [x] Release artifacts build reproducibly. The Docker image runs `dev-up`-equivalent compose.
+- [x] Tag `daemon-v0.1.0` and `milestone/M4-daemon`.
 
 ---
 
@@ -720,5 +720,5 @@ None from pgvector. Ethereum test vectors (EIP-155/1559 signing, RLP) from the E
 | D3 | | | | M2 | |
 | D4 | | | | — | |
 | D5 | | | | M3 | |
-| D6 | | | | M4 | |
+| D6 | 2026-11-06 | | | milestone/M4-daemon | Hardening, auth, ratelimit, qdrant, mcp, verify, recall canary, release |
 | D7 | | | | — | |
