@@ -58,7 +58,7 @@ active tier: x86-64-v3, highest supported: x86-64-v3, pool: 8192 vectors, iters:
   confirmed in the disassembly: `vcvtph2ps` + `vfmadd231ps`). It uses ONE accumulator, so the loop is bound by
   FMA latency: 192 iterations x about 4.2 cycles = about 806 cycles at 3.7 GHz = 218 ns. Throughput would allow about 1.5-2 cycles/iteration.
 - halfutils.c is compiled once (it is not one of the tiered files), so halfvec timings are identical for x86-64 and x86-64-v3.
-  Tiering only helps nothing here for halfvec; for vector (float) the baseline and v3 tiers also tie (101 vs 102 ns hot),
+  Tiering does not help halfvec here; for vector (float) the baseline and v3 tiers also tie (101 vs 102 ns hot),
   i.e. pgvector float kernels gain nothing from -march=x86-64-v3 on this CPU with this compiler (loop is load/latency bound).
 - Pool vs hot: float vectors lose about 2.9x to cache misses (6 KB per vector); halfvec loses only 10-15% (3 KB per vector, compute-bound).
 
@@ -77,3 +77,9 @@ with margin). Result differs from pgvector in the last bits (different summation
 3. Float `vector` at 1536/3072 is memory-bound in a cold pool (290/630 ns): rely on index locality, prefetch (pgvector HNSW already prefetches
    neighbours), or store halfvec in the index if recall allows (about 15% faster cold, 2x less memory).
 4. Re-run on a x86-64-v4 host to see whether the v4 tier changes anything (not measurable here). Set the governor to `performance` for stable numbers.
+
+## Lead decision (2026-11-06)
+
+The ≤ 150 ns target for 1536-d halfvec is **not met** (220 ns hot / 249 ns cold on x86-64-v3). The cost is pgvector's own `HalfvecL2SquaredDistanceF16c` (one accumulator, FMA-latency bound), not Arkivector's dispatch. We keep pgvector's kernel for now: pgvector-identical distances are a design principle (ARCHITECTURE §11.3), and the parity suite depends on them. Options for the owner, to revisit with the D4 recall/latency benchmark:
+1. An Arkivector-owned 4-accumulator F16C kernel installed over the `Halfvec*` pointers after `HalfvecInit()` (78.6 ns measured). Distances then differ from pgvector in the last bits, and parity needs a float tolerance.
+2. Propose the unrolled kernel upstream to pgvector and pick it up through `tools/pgvector-sync.sh`.
