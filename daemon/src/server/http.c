@@ -22,8 +22,10 @@
 #include "core/mpsc.h"
 #include "core/threadpool.h"
 #include "llhttp.h"
+#include "server/auth.h"
 #include "server/metrics.h"
 #include "server/problem.h"
+#include "server/ratelimit.h"
 #include "server/router.h"
 #include "version.h"
 
@@ -507,6 +509,7 @@ struct conn {
     bool closing;
     bool reading;
     bool busy; /* a request is being handled or its response written */
+    char peer[64];
 };
 
 struct av_http_server {
@@ -533,6 +536,8 @@ struct av_http_server {
     av_mfamily *m_duration;
     av_mfamily *m_in_flight;
     av_mfamily *m_conns;
+    av_auth *auth;
+    av_ratelimit *ratelimit;
 };
 
 static void conn_close(conn *c);
@@ -954,6 +959,33 @@ static void dispatch(conn *c)
         respond_problem(j, "unsupported_media_type", 0, "request bodies must be application/json");
         return;
     }
+
+    if (s->auth != NULL && av_auth_is_enabled(s->auth) && !av_auth_is_unauthenticated_path(req->path)) {
+        uint32_t req_scope = av_auth_required_scope(req->method, req->path);
+        const char *key_id = NULL;
+        av_err ae;
+        av_err_clear(&ae);
+        if (av_auth_check(s->auth, req->authorization, req_scope, &key_id, &ae) != AV_OK) {
+            int st = strcmp(ae.code, "unauthorized") == 0 ? 401 : 403;
+            respond_problem(j, ae.code, st, "%s", ae.msg);
+            return;
+        }
+    }
+
+    if (s->ratelimit != NULL && av_ratelimit_is_enabled(s->ratelimit)) {
+        const char *id = req->authorization != NULL ? req->authorization : (c->peer[0] != '\0' ? c->peer : "127.0.0.1");
+        int retry_after = 0;
+        av_err re;
+        av_err_clear(&re);
+        if (av_ratelimit_check(s->ratelimit, id, &retry_after, &re) != AV_OK) {
+            char ra[16];
+            snprintf(ra, sizeof(ra), "%d", retry_after);
+            j->resp.retry_after = av_arena_strdup(req->arena, ra);
+            respond_problem(j, "rate_limited", 429, "%s", re.msg);
+            return;
+        }
+    }
+
     j->handler = m.handler;
     j->hctx = m.ctx;
     j->n_params = m.n_params;
@@ -1117,6 +1149,15 @@ static void on_connection(uv_stream_t *listener, int status)
     }
     uv_tcp_nodelay(&c->tcp, 1);
     uv_tcp_keepalive(&c->tcp, 1, 60);
+    struct sockaddr_storage ss;
+    int sslen = sizeof(ss);
+    if (uv_tcp_getpeername(&c->tcp, (struct sockaddr *) &ss, &sslen) == 0) {
+        if (ss.ss_family == AF_INET) {
+            uv_ip4_name((const struct sockaddr_in *) &ss, c->peer, sizeof(c->peer));
+        } else if (ss.ss_family == AF_INET6) {
+            uv_ip6_name((const struct sockaddr_in6 *) &ss, c->peer, sizeof(c->peer));
+        }
+    }
     arm_timer(c, s->cfg.idle_timeout_ms);
     if (uv_read_start((uv_stream_t *) &c->tcp, alloc_cb, read_cb) == 0) {
         c->reading = true;
@@ -1187,8 +1228,25 @@ av_http_server *av_http_create(uv_loop_t *loop, const av_http_config *cfg, av_er
                                         AV_MTYPE_GAUGE, NULL, 0);
     s->m_conns =
         av_metric_register("arkivector_http_connections", "Open HTTP connections.", AV_MTYPE_GAUGE, NULL, 0);
+
+    if (s->cfg.api_keys_file != NULL && s->cfg.api_keys_file[0] != '\0') {
+        s->auth = av_auth_create(s->cfg.api_keys_file, e);
+        if (s->auth == NULL) {
+            goto fail;
+        }
+    }
+    if (s->cfg.ratelimit_rps > 0.0) {
+        s->ratelimit = av_ratelimit_create(s->cfg.ratelimit_rps, s->cfg.ratelimit_burst);
+    }
+
     return s;
 fail:
+    if (s->auth != NULL) {
+        av_auth_destroy(s->auth);
+    }
+    if (s->ratelimit != NULL) {
+        av_ratelimit_destroy(s->ratelimit);
+    }
     av_threadpool_destroy(s->pool);
     free(s->rbuf);
     free(s);
@@ -1309,6 +1367,12 @@ void av_http_destroy(av_http_server *s)
 {
     if (s == NULL) {
         return;
+    }
+    if (s->auth != NULL) {
+        av_auth_destroy(s->auth);
+    }
+    if (s->ratelimit != NULL) {
+        av_ratelimit_destroy(s->ratelimit);
     }
     av_threadpool_destroy(s->pool);
     free(s->rbuf);

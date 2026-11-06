@@ -100,6 +100,9 @@ typedef struct av_http_config {
     int request_timeout_ms;   /* receive a full request within this; 0 = 30000 */
     int idle_timeout_ms;      /* keep-alive idle; 0 = 60000 */
     int drain_timeout_ms;     /* graceful shutdown wait for in-flight; 0 = 10000 */
+    const char *api_keys_file; /* NULL or "" = auth disabled */
+    double ratelimit_rps;     /* 0 = disabled */
+    double ratelimit_burst;
     struct av_router *router; /* not owned */
 } av_http_config;
 
