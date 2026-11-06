@@ -8,7 +8,6 @@
 
 __thread sigjmp_buf *PG_exception_stack = NULL;
 
-void (*av_pg_on_error_release_locks)(void) = NULL;
 int log_min_messages = WARNING;
 
 static av_pg_log_fn log_hook = NULL;
@@ -190,11 +189,7 @@ void errfinish(const char *filename, int lineno, const char *funcname)
 
 void pg_re_throw(void)
 {
-    /* PostgreSQL's AbortTransaction calls LWLockReleaseAll(); do the same before unwinding. */
-    LWLockReleaseAll();
-    if (av_pg_on_error_release_locks != NULL) {
-        av_pg_on_error_release_locks();
-    }
+    /* Locks taken inside the frame are released by PG_CATCH (av_pg_unwind_restore). */
     if (PG_exception_stack != NULL) {
         _longjmp(*PG_exception_stack, 1);
     }

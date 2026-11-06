@@ -188,8 +188,50 @@ TEST oom_in_capped_context(void)
     PASS();
 }
 
+TEST catch_releases_only_inner_locks(void)
+{
+    static LWLock outer, inner;
+    LWLockInitialize(&outer, 0);
+    LWLockInitialize(&inner, 0);
+    LWLockAcquire(&outer, LW_EXCLUSIVE);
+    PG_TRY();
+    {
+        LWLockAcquire(&inner, LW_SHARED);
+        (void) av_lwlock_readonly_enter();
+        elog(ERROR, "inner failure");
+    }
+    PG_CATCH();
+    {
+        FlushErrorState();
+    }
+    PG_END_TRY();
+    ASSERT_EQ(false, av_lwlock_readonly_arena); /* restored */
+    ASSERT_EQ(1, av_lwlock_held_count());       /* outer still held */
+    ASSERT(LWLockHeldByMe(&outer));
+    ASSERT(LWLockConditionalAcquire(&inner, LW_EXCLUSIVE));
+    LWLockRelease(&inner);
+    LWLockRelease(&outer);
+    ASSERT_EQ(0, av_lwlock_held_count());
+    PASS();
+}
+
+TEST release_after_flag_change(void)
+{
+    static LWLock lock;
+    LWLockInitialize(&lock, 0);
+    LWLockAcquire(&lock, LW_EXCLUSIVE);
+    bool prev = av_lwlock_readonly_enter();
+    LWLockRelease(&lock); /* real lock: released for real */
+    av_lwlock_readonly_leave(prev);
+    ASSERT_EQ(0u, lock.state);
+    ASSERT_EQ(0, av_lwlock_held_count());
+    PASS();
+}
+
 SUITE(pgcompat)
 {
+    RUN_TEST(catch_releases_only_inner_locks);
+    RUN_TEST(release_after_flag_change);
     RUN_TEST(palloc_in_context);
     RUN_TEST(reset_frees_everything);
     RUN_TEST(list_works);

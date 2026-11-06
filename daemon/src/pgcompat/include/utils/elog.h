@@ -6,8 +6,15 @@
  * ERROR are logged and execution continues. FATAL/PANIC abort the process.
  * The error data of the last caught error is available via av_pg_error_data().
  *
- * Before jumping, every LWLock held by the thread is released (PostgreSQL's
- * LWLockReleaseAll() on abort), see av_pg_on_error_release_locks in lwlock.c.
+ * Unwinding is scoped per PG_TRY frame: when control reaches a PG_CATCH (or the
+ * error path of PG_FINALLY), the LWLocks acquired since that PG_TRY began are
+ * released and the read-only arena flag is restored to its value at PG_TRY
+ * (av_pg_unwind_save/restore in lwlock.c). Locks held before the PG_TRY stay held.
+ * An ERROR with no PG_TRY frame aborts the process, so every worker task, applier
+ * batch and request handler runs inside a top-level PG_TRY.
+ *
+ * Rules inherited from PostgreSQL: locals modified in the PG_TRY body and read in
+ * PG_CATCH must be volatile, and the body must not return/goto out of the block.
  *
  * ARKIVECTOR-owned. See STUBS.md.
  */
@@ -83,8 +90,16 @@ extern int errhidecontext(bool hide_ctx);
  * sigjmp_buf and jmp_buf are the same type. */
 extern __thread sigjmp_buf *PG_exception_stack;
 
+typedef struct av_pg_unwind_state {
+    int nlocks;
+    bool readonly;
+} av_pg_unwind_state;
+extern av_pg_unwind_state av_pg_unwind_save(void);
+extern void av_pg_unwind_restore(av_pg_unwind_state s);
+
 #define PG_TRY(...)                                                          \
     do {                                                                     \
+        const av_pg_unwind_state _unwind_state##__VA_ARGS__ = av_pg_unwind_save(); \
         sigjmp_buf *_save_exception_stack##__VA_ARGS__ = PG_exception_stack; \
         sigjmp_buf _local_sigjmp_buf##__VA_ARGS__;                           \
         bool _do_rethrow##__VA_ARGS__ = false;                               \
@@ -95,11 +110,15 @@ extern __thread sigjmp_buf *PG_exception_stack;
     }                 \
     else              \
     {                 \
-        PG_exception_stack = _save_exception_stack##__VA_ARGS__;
+        PG_exception_stack = _save_exception_stack##__VA_ARGS__; \
+        av_pg_unwind_restore(_unwind_state##__VA_ARGS__);
 
 #define PG_FINALLY(...)                   \
     }                                     \
-    else _do_rethrow##__VA_ARGS__ = true; \
+    else {                                \
+        _do_rethrow##__VA_ARGS__ = true;  \
+        av_pg_unwind_restore(_unwind_state##__VA_ARGS__); \
+    }                                     \
     {                                     \
         PG_exception_stack = _save_exception_stack##__VA_ARGS__;
 
@@ -133,8 +152,6 @@ extern ErrorData *CopyErrorData(void);
 extern void FlushErrorState(void);
 extern char *unpack_sql_state(int sql_state);
 
-/* Hook used by lwlock.c to release held locks before unwinding (set in D0). */
-extern void (*av_pg_on_error_release_locks)(void);
 
 /* Log sink for levels < ERROR (default: stderr). Set by the daemon's logger. */
 typedef void (*av_pg_log_fn)(int elevel, const char *message);

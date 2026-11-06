@@ -72,11 +72,19 @@ static bool try_acquire(LWLock *lock, LWLockMode mode)
                                        __ATOMIC_RELAXED);
 }
 
-static void remember(LWLock *lock, LWLockMode mode)
+static void check_room(LWLockMode mode)
 {
+    /* Checked before touching the lock word, so an ERROR here never leaks a lock. */
     if (num_held >= MAX_SIMUL_LWLOCKS) {
         elog(ERROR, "too many LWLocks taken");
     }
+    if (mode == LW_WAIT_UNTIL_FREE) {
+        elog(ERROR, "LW_WAIT_UNTIL_FREE is not supported by pgcompat");
+    }
+}
+
+static void remember(LWLock *lock, LWLockMode mode)
+{
     held[num_held].lock = lock;
     held[num_held].mode = mode;
     num_held++;
@@ -87,6 +95,7 @@ bool LWLockAcquire(LWLock *lock, LWLockMode mode)
     if (av_lwlock_readonly_arena) {
         return true;
     }
+    check_room(mode);
     int spins = 0;
     while (!try_acquire(lock, mode)) {
         if (++spins < 200) {
@@ -105,6 +114,7 @@ bool LWLockConditionalAcquire(LWLock *lock, LWLockMode mode)
     if (av_lwlock_readonly_arena) {
         return true;
     }
+    check_room(mode);
     if (!try_acquire(lock, mode)) {
         return false;
     }
@@ -123,10 +133,11 @@ static void release_word(LWLock *lock, LWLockMode mode)
 
 void LWLockRelease(LWLock *lock)
 {
-    if (av_lwlock_readonly_arena) {
-        return;
-    }
-    /* Most recently acquired locks are released first, so search from the top. */
+    /*
+     * Look the lock up first, independent of the read-only flag: a lock taken for
+     * real is always released for real, even if the flag changed in between.
+     * Most recently acquired locks are released first, so search from the top.
+     */
     for (int i = num_held - 1; i >= 0; i--) {
         if (held[i].lock == lock) {
             LWLockMode mode = held[i].mode;
@@ -138,15 +149,50 @@ void LWLockRelease(LWLock *lock)
             return;
         }
     }
+    if (av_lwlock_readonly_arena) {
+        return; /* acquired as a no-op in read-only mode */
+    }
     elog(ERROR, "lock is not held");
+}
+
+/* Release locks acquired after the stack had 'n' entries (most recent first). */
+static void release_to(int n)
+{
+    while (num_held > n) {
+        num_held--;
+        release_word(held[num_held].lock, held[num_held].mode);
+    }
+}
+
+av_pg_unwind_state av_pg_unwind_save(void)
+{
+    av_pg_unwind_state s;
+    s.nlocks = num_held;
+    s.readonly = av_lwlock_readonly_arena;
+    return s;
+}
+
+void av_pg_unwind_restore(av_pg_unwind_state s)
+{
+    release_to(s.nlocks);
+    av_lwlock_readonly_arena = s.readonly;
+}
+
+bool av_lwlock_readonly_enter(void)
+{
+    bool prev = av_lwlock_readonly_arena;
+    av_lwlock_readonly_arena = true;
+    return prev;
+}
+
+void av_lwlock_readonly_leave(bool prev)
+{
+    av_lwlock_readonly_arena = prev;
 }
 
 void LWLockReleaseAll(void)
 {
-    while (num_held > 0) {
-        num_held--;
-        release_word(held[num_held].lock, held[num_held].mode);
-    }
+    release_to(0);
 }
 
 bool LWLockHeldByMe(LWLock *lock)

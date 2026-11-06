@@ -19,12 +19,11 @@ int			hnsw_lock_tranche_id = 0;
 int			maintenance_work_mem = 65536;	/* kB */
 int			work_mem = 4096;	/* kB */
 
-__thread volatile bool av_pg_interrupt_pending = false;
+__thread volatile bool *av_pg_interrupt_flag = NULL;
 
 void
 av_pg_process_interrupts(void)
 {
-	av_pg_interrupt_pending = false;
 	ereport(ERROR,
 			(errcode(ERRCODE_QUERY_CANCELED),
 			 errmsg("canceling statement due to request timeout")));
@@ -47,8 +46,15 @@ av_hnsw_prng_current(void)
 		return av_hnsw_prng;
 	if (!av_hnsw_prng_seeded)
 	{
-		/* Deterministic per thread unless a segment installs its own state. */
-		pg_prng_seed(&av_hnsw_prng_default, (uint64) 0x41524B49564543ULL);
+		/*
+		 * Distinct per thread (a process-wide counter), so threads do not draw
+		 * correlated levels. Segments install their own seeded state for
+		 * deterministic builds.
+		 */
+		static uint64 thread_counter = 0;
+		uint64		n = __atomic_fetch_add(&thread_counter, 1, __ATOMIC_RELAXED);
+
+		pg_prng_seed(&av_hnsw_prng_default, (uint64) 0x41524B49564543ULL ^ (n * UINT64CONST(0x9E3779B97F4A7C15)));
 		av_hnsw_prng_seeded = true;
 	}
 	return &av_hnsw_prng_default;

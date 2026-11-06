@@ -40,7 +40,7 @@ Kinds: **V** verbatim PostgreSQL file · **S** PostgreSQL subset (struct/macros 
 | `lib/simplehash.h` | V | HNSW visited hash tables | `SH_*` template | D0 |
 | `nodes/pg_list.h` | V | `List` used throughout HNSW | `List`, `lappend`, `foreach`, … | D0 |
 | `utils/datum.h` | stub | `datumIsEqual` (duplicate detection in hnswbuild) | `datumIsEqual` (by-value and varlena) | D0 |
-| `miscadmin.h` | stub | `CHECK_FOR_INTERRUPTS` | polls thread-local `av_pg_interrupt_pending` (wired to request deadlines in D4) | D0 |
+| `miscadmin.h` | stub | `CHECK_FOR_INTERRUPTS` | polls the request's flag via thread-local pointer `av_pg_interrupt_flag` (settable from any thread) | D0 |
 | `port/atomics.h` | stub | included by hnswutils.c | (barriers are in c.h) | D0 |
 | `storage/bufmgr.h` | stub | `BufferIsValid` in dead disk branches | `BufferIsValid` | D0 |
 | `access/genam.h` | stub | hnsw.h gets `List` through it | includes `nodes/pg_list.h` | D0 |

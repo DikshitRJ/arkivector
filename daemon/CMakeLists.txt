@@ -135,7 +135,8 @@ endif()
 # av_core: Arkivector code (strict warnings)
 # ---------------------------------------------------------------------------
 set(AV_CORE_SOURCES
-    src/version.c)
+    src/version.c
+    src/log.c)
 
 add_library(av_core STATIC ${AV_CORE_SOURCES})
 target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
