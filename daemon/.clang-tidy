@@ -1,0 +1,27 @@
+# Conservative clang-tidy set for Arkivector's own code (see tools/format-files.sh).
+# Run: tools/format-files.sh | grep '\.c$' | xargs clang-tidy -p build/dev
+#
+# Disabled bugprone checks, with reasons:
+#  - easily-swappable-parameters, reserved-identifier: PostgreSQL API shapes and names (_PG_init, ...) are fixed.
+#  - signed-bitwise: PostgreSQL's int-typed flag words and macros (elevel, sqlerrcode, Size math) trigger it
+#    in pgcompat and in the verbatim pgvector headers that every .c file includes; -Wconversion covers real bugs.
+#  - macro-parentheses: PostgreSQL list/itemptr/relptr macros (verbatim upstream style) take type/field tokens.
+#  - branch-clone: upstream itemptr.h, intentionally repeated branches.
+#  - narrowing-conversions, implicit-widening-of-multiplication-result, misplaced-widening-cast:
+#    duplicates of -Wconversion (which is -Werror in our build) and noisy on int-typed PostgreSQL APIs.
+Checks: >-
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
+  -bugprone-signed-bitwise,
+  -bugprone-macro-parentheses,
+  -bugprone-branch-clone,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-misplaced-widening-cast,
+  cert-err34-c,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.*,
+  misc-redundant-expression
+WarningsAsErrors: '*'
