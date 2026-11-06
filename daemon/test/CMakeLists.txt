@@ -34,3 +34,8 @@ if(AV_FUZZ)
   target_compile_options(fuzz_vectorbytes PRIVATE -fsanitize=fuzzer-no-link)
   target_link_options(fuzz_vectorbytes PRIVATE -fsanitize=fuzzer)
 endif()
+
+# pgvector parity helper (used by test/parity/*.py; see test/parity/README.md)
+add_executable(av_parity_cli parity/av_parity_cli.c)
+target_link_libraries(av_parity_cli PRIVATE av_core av3p_yyjson)
+target_compile_options(av_parity_cli PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare)

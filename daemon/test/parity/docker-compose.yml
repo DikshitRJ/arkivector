@@ -1,0 +1,18 @@
+# PostgreSQL 17 + pgvector v0.8.7 for the parity suite.
+#   docker compose -f daemon/test/parity/docker-compose.yml up -d --wait
+# Password comes from PARITY_PG_PASSWORD (default: parity). Port 54329 on localhost.
+# Fallback if the image tag is ever unavailable: build from the repo's pgvector/ directory
+#   build: { context: ../../../pgvector, args: { PG_MAJOR: 17 } }
+services:
+  pg:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_PASSWORD: ${PARITY_PG_PASSWORD:-parity}
+      POSTGRES_DB: parity
+    ports:
+      - "127.0.0.1:54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d parity"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
