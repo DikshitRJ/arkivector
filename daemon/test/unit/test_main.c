@@ -6,6 +6,7 @@
 extern SUITE(pgcompat);
 extern SUITE(kernels);
 extern SUITE(vectorbytes);
+extern SUITE(text_io);
 #ifdef AV_HAVE_HNSW_TEST
 extern SUITE(hnsw);
 #endif
@@ -18,6 +19,7 @@ int main(int argc, char **argv)
     RUN_SUITE(pgcompat);
     RUN_SUITE(kernels);
     RUN_SUITE(vectorbytes);
+    RUN_SUITE(text_io);
 #ifdef AV_HAVE_HNSW_TEST
     RUN_SUITE(hnsw);
 #endif
