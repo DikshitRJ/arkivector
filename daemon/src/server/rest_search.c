@@ -347,6 +347,11 @@ static av_status handle_consistency(yyjson_val *root, av_collection *c, const ch
             av_problem_from_err(e, resp, path);
             return AV_ERR;
         }
+    } else if (av_collection_is_bootstrapping(c)) {
+        av_err_set(e, "not_ready", "collection is bootstrapping; retry shortly");
+        resp->retry_after = "1";
+        av_problem_from_err(e, resp, path);
+        return AV_ERR;
     }
     return AV_OK;
 }
@@ -1076,6 +1081,7 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
                 yyjson_mut_obj_add_strcpy(doc, eo, "key", khex);
 
                 const char *id_val = NULL;
+                size_t id_len = 0;
                 const char *doc_val = NULL;
                 size_t doc_len = 0;
                 const uint8_t *vec_val = NULL;
@@ -1086,6 +1092,7 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
                     const av_attr *at = &attrs[a];
                     if (strcmp(at->name, AV_ATTR_ID) == 0) {
                         id_val = (const char *) at->val;
+                        id_len = at->len;
                     } else if (strcmp(at->name, AV_ATTR_DOC) == 0) {
                         doc_val = (const char *) at->val;
                         doc_len = at->len;
@@ -1101,7 +1108,7 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
                 }
 
                 if (id_val != NULL) {
-                    yyjson_mut_obj_add_strcpy(doc, eo, "id", id_val);
+                    yyjson_mut_obj_add_strncpy(doc, eo, "id", id_val, id_len);
                 } else {
                     yyjson_mut_obj_add_null(doc, eo, "id");
                 }
@@ -1289,13 +1296,222 @@ static void h_count(const av_http_req *req, const char *const *params, size_t n_
 static void h_search_batch(const av_http_req *req, const char *const *params, size_t n_params,
                            av_http_resp *resp, void *ctx)
 {
-    (void) params;
     (void) n_params;
     (void) ctx;
 
+    const char *coll_name = params[0];
+    av_registry *reg = av_rest_get_registry();
+    if (reg == NULL) {
+        fail_internal(resp, "registry service not available", req->path);
+        return;
+    }
+
+    av_collection *c = av_registry_get(reg, coll_name);
+    if (c == NULL) {
+        av_err e;
+        av_err_set(&e, "collection_not_found", "collection '%s' does not exist", coll_name);
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+
+    const av_coldef *coldef = av_collection_def(c);
     av_err e;
-    av_err_set(&e, "not_implemented", "search:batch is supported in Phase D4");
-    av_problem_from_err(&e, resp, req->path);
+    av_err_clear(&e);
+
+    yyjson_doc *req_doc = NULL;
+    if (av_json_parse(req->body, req->body_len, &req_doc, &e) != AV_OK) {
+        av_collection_release(c);
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+
+    yyjson_val *root = av_json_root_object(req_doc, &e);
+    if (root == NULL) {
+        av_collection_release(c);
+        yyjson_doc_free(req_doc);
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+
+    static const char *const allowed_batch[] = {"searches", "consistency"};
+    if (av_json_check_fields(root, allowed_batch, sizeof(allowed_batch) / sizeof(allowed_batch[0]), "", &e) != AV_OK) {
+        av_collection_release(c);
+        yyjson_doc_free(req_doc);
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+
+    /* Consistency wait */
+    if (handle_consistency(root, c, req->path, resp, &e) != AV_OK) {
+        av_collection_release(c);
+        yyjson_doc_free(req_doc);
+        return;
+    }
+
+    yyjson_val *searches_arr = yyjson_obj_get(root, "searches");
+    if (searches_arr == NULL || !yyjson_is_arr(searches_arr)) {
+        av_collection_release(c);
+        yyjson_doc_free(req_doc);
+        av_err_set(&e, "invalid_argument", "'searches' must be an array");
+        av_err_field(&e, "/searches");
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+
+    size_t n_searches = yyjson_arr_size(searches_arr);
+    if (n_searches < 1 || n_searches > 64) {
+        av_collection_release(c);
+        yyjson_doc_free(req_doc);
+        av_err_set(&e, "invalid_argument", "searches array size must be in 1..64");
+        av_err_field(&e, "/searches");
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+
+    av_store *store = av_rest_get_store();
+    av_collection_read_lock(c);
+    uint64_t as_of = av_collection_as_of(c);
+    const roaring_bitmap_t *live = av_collection_live(c);
+    const av_docmap *docmap = av_collection_docmap(c);
+    const av_attr_index *ix = av_collection_attr_index(c);
+
+    yyjson_mut_doc *resp_doc = yyjson_mut_doc_new(NULL);
+    if (resp_doc == NULL) {
+        av_collection_read_unlock(c);
+        av_collection_release(c);
+        yyjson_doc_free(req_doc);
+        fail_internal(resp, "out of memory", req->path);
+        return;
+    }
+    yyjson_mut_val *resp_root = yyjson_mut_obj(resp_doc);
+    yyjson_mut_doc_set_root(resp_doc, resp_root);
+
+    yyjson_mut_obj_add_uint(resp_doc, resp_root, "as_of_block", as_of);
+    yyjson_mut_obj_add_strcpy(resp_doc, resp_root, "sync_state", as_of == 0 ? "bootstrap" : "live");
+    yyjson_mut_val *resp_arr = yyjson_mut_arr(resp_doc);
+
+    size_t sidx, smax;
+    yyjson_val *sitem;
+    yyjson_arr_foreach(searches_arr, sidx, smax, sitem) {
+        yyjson_val *vec_val = yyjson_obj_get(sitem, "vector");
+        yyjson_val *vb_val = yyjson_obj_get(sitem, "vector_bytes");
+
+        void *query_vec = NULL;
+        if (parse_query_vector(vec_val, vb_val, coldef, req->arena, &query_vec, &e) != AV_OK) {
+            continue;
+        }
+
+        size_t k = 10;
+        yyjson_val *k_val = yyjson_obj_get(sitem, "k");
+        if (k_val != NULL && yyjson_is_int(k_val)) {
+            int64_t kv = yyjson_get_int(k_val);
+            if (kv >= 1 && kv <= 1000) k = (size_t) kv;
+        }
+
+        size_t offset = 0;
+        yyjson_val *off_val = yyjson_obj_get(sitem, "offset");
+        if (off_val != NULL && yyjson_is_int(off_val)) {
+            int64_t ov = yyjson_get_int(off_val);
+            if (ov >= 0 && ov <= 999) offset = (size_t) ov;
+        }
+
+        const av_opclass *oc = coldef->opclass;
+        yyjson_val *op_val = yyjson_obj_get(sitem, "operator");
+        if (op_val != NULL && yyjson_is_str(op_val)) {
+            const av_opclass *found_oc = av_opclass_for_operator(coldef->vtype, yyjson_get_str(op_val));
+            if (found_oc != NULL) oc = found_oc;
+        }
+
+        int inc_flags = AV_INCLUDE_ATTRIBUTES;
+        yyjson_val *inc_val = yyjson_obj_get(sitem, "include");
+        if (inc_val != NULL && yyjson_is_arr(inc_val)) {
+            inc_flags = 0;
+            size_t ii, imax;
+            yyjson_val *ielem;
+            yyjson_arr_foreach(inc_val, ii, imax, ielem) {
+                const char *is = yyjson_get_str(ielem);
+                if (is != NULL) {
+                    if (strcmp(is, "attributes") == 0) inc_flags |= AV_INCLUDE_ATTRIBUTES;
+                    else if (strcmp(is, "document") == 0) inc_flags |= AV_INCLUDE_DOCUMENT;
+                    else if (strcmp(is, "vector") == 0) inc_flags |= AV_INCLUDE_VECTOR;
+                }
+            }
+        }
+
+        bool exact = false;
+        yyjson_val *ex_val = yyjson_obj_get(sitem, "exact");
+        if (ex_val != NULL && yyjson_is_bool(ex_val)) exact = yyjson_get_bool(ex_val);
+
+        bool explain = false;
+        yyjson_val *exp_val = yyjson_obj_get(sitem, "explain");
+        if (exp_val != NULL && yyjson_is_bool(exp_val)) explain = yyjson_get_bool(exp_val);
+
+        av_filter *ast = NULL;
+        uint64_t fhash = 0;
+        (void) parse_filter_or_where(sitem, coldef, req->arena, &ast, &fhash, &e);
+
+        roaring_bitmap_t *cand = av_filter_eval(ast, ix, docmap, live, as_of, &e);
+
+        av_search_params sparams;
+        memset(&sparams, 0, sizeof(sparams));
+        sparams.query_vec = query_vec;
+        sparams.oc = oc;
+        sparams.k = k;
+        sparams.offset = offset;
+        sparams.exact = exact;
+        sparams.include_flags = inc_flags;
+        sparams.explain = explain;
+
+        av_search_result sres;
+        memset(&sres, 0, sizeof(sres));
+        if (av_execute_search(c, store, &sparams, cand, &sres, &e) == AV_OK) {
+            yyjson_mut_val *item_resp = yyjson_mut_obj(resp_doc);
+            yyjson_mut_val *res_arr = yyjson_mut_arr(resp_doc);
+
+            for (size_t hi = 0; hi < sres.n_hits; hi++) {
+                const av_search_hit *h = &sres.hits[hi];
+                yyjson_mut_val *ho = yyjson_mut_obj(resp_doc);
+                char khex[67];
+                av_key_to_hex(h->key, khex);
+                yyjson_mut_obj_add_strcpy(resp_doc, ho, "key", khex);
+                if (h->has_id) yyjson_mut_obj_add_strcpy(resp_doc, ho, "id", h->id);
+                else yyjson_mut_obj_add_null(resp_doc, ho, "id");
+                yyjson_mut_obj_add_real(resp_doc, ho, "distance", h->distance);
+                yyjson_mut_obj_add_real(resp_doc, ho, "score", h->score);
+                char ahex[43];
+                av_addr_to_hex(h->owner, ahex);
+                yyjson_mut_obj_add_strcpy(resp_doc, ho, "owner", ahex);
+                av_addr_to_hex(h->creator, ahex);
+                yyjson_mut_obj_add_strcpy(resp_doc, ho, "creator", ahex);
+                yyjson_mut_obj_add_uint(resp_doc, ho, "expires_at_block", h->expires_at);
+                yyjson_mut_arr_append(res_arr, ho);
+            }
+            yyjson_mut_obj_add_val(resp_doc, item_resp, "results", res_arr);
+
+            if (explain) {
+                yyjson_mut_val *plan_obj = yyjson_mut_obj(resp_doc);
+                yyjson_mut_obj_add_str(resp_doc, plan_obj, "strategy", av_plan_strategy_name(sres.plan.strategy));
+                yyjson_mut_obj_add_bool(resp_doc, plan_obj, "exact", sres.plan.exact);
+                yyjson_mut_obj_add_real(resp_doc, plan_obj, "elapsed_ms", sres.plan.elapsed_ms);
+                yyjson_mut_obj_add_val(resp_doc, item_resp, "plan", plan_obj);
+            }
+
+            yyjson_mut_arr_append(resp_arr, item_resp);
+            av_search_result_free(&sres);
+        }
+
+        if (cand != NULL) roaring_bitmap_free(cand);
+    }
+
+    av_collection_read_unlock(c);
+    yyjson_doc_free(req_doc);
+
+    yyjson_mut_obj_add_val(resp_doc, resp_root, "responses", resp_arr);
+
+    resp->has_as_of = true;
+    resp->as_of_block = as_of;
+    (void) av_resp_json(resp, 200, resp_doc);
+    av_collection_release(c);
 }
 
 /* Debug routes */
