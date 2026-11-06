@@ -234,7 +234,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 - **C++** *(deferred)* (after C S3): `filter.hpp` (`F::eq`, …, value semantics), `SearchRequest` fluent builder, `search`, `search_batch`, `scroll` returning an input range (`begin()/end()` with lazy paging), `count`, `get`. Commits: `feat(sdk-cpp): filter builder and request builders` · `feat(sdk-cpp): read ops and scroll range` · `feat(sdk-cpp): golden_check online and quickstart`.
 
 ### Exit → M2 (each language)
-- [ ] Against Prism: all read ops parse the examples.
+- [x] Against Prism: all read ops parse the examples.
 - [ ] Once `milestone/M2-daemon` exists: `daemon/tools/dev-up.sh` → `ARKIVECTOR_URL=http://127.0.0.1:8080 golden_check` → all 4 queries + counts PASS. Tag `milestone/M2-sdk-<lang>`. If the daemon isn't at M2 yet, record "pending M2" and come back.
 
 ---
@@ -323,8 +323,8 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | S0 | S1 (M1) | S2 | S3 (M2) | S4 (M3) | S5 | S6 (M4) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Python | done | done | done | | | | |
-| Node | done | done | done | | | | |
+| Python | done | done | done | done | | | |
+| Node | done | done | done | done | | | |
 | C | deferred | | | | | | |
 | C++ | deferred | | | | | | |
 | Rust | deferred | | | | | | |
