@@ -63,13 +63,13 @@ typedef enum { C_IN, C_DIST } case_kind;
 typedef struct {
     av_vtype t;
     case_kind kind;
-    const char *sql;  /* original statement (test name) */
-    const char *fn;   /* C_DIST: copied function name */
-    const char *a;    /* literal (first operand) */
-    const char *b;    /* C_DIST: second operand literal */
-    int typmod;       /* C_IN: dimension from ::T(n), else -1 */
-    int is_err;       /* 1: expect ERROR with message exp */
-    const char *exp;  /* expected text output, float8 text, or ERROR message */
+    const char *sql; /* original statement (test name) */
+    const char *fn;  /* C_DIST: copied function name */
+    const char *a;   /* literal (first operand) */
+    const char *b;   /* C_DIST: second operand literal */
+    int typmod;      /* C_IN: dimension from ::T(n), else -1 */
+    int is_err;      /* 1: expect ERROR with message exp */
+    const char *exp; /* expected text output, float8 text, or ERROR message */
 } text_case;
 
 static const struct {
@@ -417,7 +417,8 @@ TEST run_case(const text_case *c)
         av_status st = av_text_to_pgvec(c->t, c->a, c->typmod, ar, &v, &e);
         if (c->is_err) {
             if (st != AV_ERR || strcmp(e.code, "invalid_vector") != 0 || strcmp(e.msg, c->exp) != 0) {
-                fprintf(stderr, "\n  want ERROR: %s\n  got  st=%d code=%s msg=%s\n", c->exp, (int) st, e.code, e.msg);
+                fprintf(stderr, "\n  want ERROR: %s\n  got  st=%d code=%s msg=%s\n", c->exp, (int) st, e.code,
+                        e.msg);
                 av_arena_destroy(ar);
                 FAILm("input error mismatch");
             }
@@ -453,7 +454,8 @@ TEST run_case(const text_case *c)
                 FAILm("distance error mismatch");
             }
         } else if (failed || !float_matches(c->exp, r)) {
-            fprintf(stderr, "\n  want: %s\n  got:  %.17g%s%s\n", c->exp, r, failed ? " ERROR " : "", failed ? msg : "");
+            fprintf(stderr, "\n  want: %s\n  got:  %.17g%s%s\n", c->exp, r, failed ? " ERROR " : "",
+                    failed ? msg : "");
             av_arena_destroy(ar);
             FAILm("distance mismatch");
         }
