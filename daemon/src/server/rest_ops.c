@@ -33,6 +33,53 @@ static bool g_writes_enabled;
 static char *g_caps[MAX_CAPABILITIES];
 static size_t g_n_caps;
 
+static struct av_registry *g_reg_svc = NULL;
+static struct av_store *g_store_svc = NULL;
+static struct av_rpc *g_rpc_svc = NULL;
+static struct av_sync *g_sync_svc = NULL;
+
+void av_rest_set_services(struct av_registry *reg, struct av_store *store, struct av_rpc *rpc, struct av_sync *sync)
+{
+    pthread_mutex_lock(&g_mu);
+    g_reg_svc = reg;
+    g_store_svc = store;
+    g_rpc_svc = rpc;
+    g_sync_svc = sync;
+    pthread_mutex_unlock(&g_mu);
+}
+
+struct av_registry *av_rest_get_registry(void)
+{
+    pthread_mutex_lock(&g_mu);
+    struct av_registry *r = g_reg_svc;
+    pthread_mutex_unlock(&g_mu);
+    return r;
+}
+
+struct av_store *av_rest_get_store(void)
+{
+    pthread_mutex_lock(&g_mu);
+    struct av_store *s = g_store_svc;
+    pthread_mutex_unlock(&g_mu);
+    return s;
+}
+
+struct av_rpc *av_rest_get_rpc(void)
+{
+    pthread_mutex_lock(&g_mu);
+    struct av_rpc *r = g_rpc_svc;
+    pthread_mutex_unlock(&g_mu);
+    return r;
+}
+
+struct av_sync *av_rest_get_sync(void)
+{
+    pthread_mutex_lock(&g_mu);
+    struct av_sync *s = g_sync_svc;
+    pthread_mutex_unlock(&g_mu);
+    return s;
+}
+
 av_status av_rest_add_registrar(av_rest_registrar fn, void *ctx, av_err *e)
 {
     av_status st = AV_OK;
@@ -293,7 +340,22 @@ static void h_metrics(const av_http_req *req, const char *const *params, size_t 
 
 av_status av_rest_register_all(av_router *r, bool debug_routes, av_err *e)
 {
-    static const char *const initial_caps[] = {"ops.version", "ops.sync", "ops.metrics"};
+    static const char *const initial_caps[] = {
+        "ops.version",
+        "ops.sync",
+        "ops.metrics",
+        "collections.read",
+        "collections.write",
+        "collections.follow",
+        "entities.read",
+        "search.exact",
+        "search.filter.json",
+        "search.filter.where",
+        "search.explain",
+        "scroll",
+        "count",
+        "consistency.min_block"
+    };
     for (size_t i = 0; i < sizeof(initial_caps) / sizeof(initial_caps[0]); i++) {
         if (av_rest_add_capability(initial_caps[i], e) != AV_OK) {
             return AV_ERR;
@@ -306,6 +368,10 @@ av_status av_rest_register_all(av_router *r, bool debug_routes, av_err *e)
         av_router_add(r, "GET", "/metrics", h_metrics, NULL, e) != AV_OK) {
         return AV_ERR;
     }
+    av_rest_register_collections(r, debug_routes, NULL);
+    av_rest_register_entities(r, debug_routes, NULL);
+    av_rest_register_search(r, debug_routes, NULL);
+
     pthread_mutex_lock(&g_mu);
     size_t n = g_n_registrars;
     pthread_mutex_unlock(&g_mu);

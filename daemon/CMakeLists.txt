@@ -190,7 +190,14 @@ set(AV_CORE_SOURCES
     src/server/json_io.c
     src/server/problem.c
     src/server/metrics.c
-    src/server/rest_ops.c)
+    src/server/rest_ops.c
+    src/filter/eval.c
+    src/index/flat.c
+    src/query/planner.c
+    src/query/executor.c
+    src/server/rest_collections.c
+    src/server/rest_entities.c
+    src/server/rest_search.c)
 
 # Build-time generated headers (no runtime JSON reading, no runtime licence file lookup).
 find_package(Python3 REQUIRED COMPONENTS Interpreter)

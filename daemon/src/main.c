@@ -336,6 +336,7 @@ int main(int argc, char **argv)
         goto out;
     }
     services_up = true;
+    av_rest_set_services(g_registry, g_store, g_rpc, g_sync);
 
     router = av_router_create();
     if (router == NULL || av_rest_register_all(router, cfg.debug_routes, &e) != AV_OK) {
