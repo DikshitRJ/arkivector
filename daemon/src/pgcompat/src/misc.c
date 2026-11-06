@@ -62,14 +62,17 @@ int pg_ltoa(int32 value, char *a)
 void float_overflow_error(void)
 {
     ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE), errmsg("value out of range: overflow")));
+    pg_unreachable();
 }
 
 void float_underflow_error(void)
 {
     ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE), errmsg("value out of range: underflow")));
+    pg_unreachable();
 }
 
 void float_zero_divide_error(void)
 {
     ereport(ERROR, (errcode(ERRCODE_DIVISION_BY_ZERO), errmsg("division by zero")));
+    pg_unreachable();
 }

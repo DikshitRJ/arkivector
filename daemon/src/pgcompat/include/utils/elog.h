@@ -84,6 +84,15 @@ extern int errhidecontext(bool hide_ctx);
 
 #define elog(elevel, ...) ereport(elevel, errmsg_internal(__VA_ARGS__))
 
+/* Soft errors (PostgreSQL 16+): Arkivector never passes an ErrorSaveContext, so
+ * ereturn is always a hard ERROR. */
+#define ereturn(context, dummy_value, ...) \
+    do {                                   \
+        (void) (context);                  \
+        ereport(ERROR, __VA_ARGS__);       \
+        return dummy_value;                \
+    } while (0)
+
 /* ---- PG_TRY ----
  * _setjmp/_longjmp: same semantics as PostgreSQL's sigsetjmp(buf, 0) (signal mask not
  * saved), and the only variant ThreadSanitizer can follow with glibc 2.44. On glibc
