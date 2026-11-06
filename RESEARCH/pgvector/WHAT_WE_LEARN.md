@@ -54,7 +54,13 @@
    - [Safe Evolution Across PostgreSQL Major Versions (12 to 17)](#safe-evolution-across-postgresql-major-versions-12-to-17)
    - [Non-Breaking SQL DDL & Deprecation Patterns](#non-breaking-sql-ddl--deprecation-patterns)
    - [Feature Flag Evolution Over 5 Historical Epochs](#feature-flag-evolution-over-5-historical-epochs)
-10. [Summary: The Engine Builder's Blueprint](#10-summary-the-engine-builders-blueprint)
+10. [Lesson 9: Node.js & Multi-Runtime Client Architecture](#10-lesson-9-nodejs--multi-runtime-client-architecture)
+   - [Zero-Runtime-Dependency ESM Architecture](#zero-runtime-dependency-esm-architecture)
+   - [In-Process WebAssembly PostgreSQL (PGlite)](#in-process-webassembly-postgresql-pglite)
+   - [In-Process Neural Inference via Transformers.js](#in-process-neural-inference-via-transformersjs)
+   - [Driver Type Registration: Dynamic OID Querying vs. Tagged Templates](#driver-type-registration-dynamic-oid-querying-vs-tagged-templates)
+   - [Query Builder Paradigms: Prototype Augmentation vs. Pure AST Helpers](#query-builder-paradigms-prototype-augmentation-vs-pure-ast-helpers)
+11. [Summary: The Engine Builder's Blueprint](#11-summary-the-engine-builders-blueprint)
 
 ---
 
@@ -658,7 +664,38 @@ When evolving SQL operators and functions:
 
 ---
 
-## 10. Summary: The Engine Builder's Blueprint
+## 10. Lesson 9: Node.js & Multi-Runtime Client Architecture
+
+Analyzing `pgvector-node` reveals how a database extension client can achieve maximum ergonomic integration across JavaScript and TypeScript runtimes:
+
+### Zero-Runtime-Dependency ESM Architecture
+The `pgvector-node` package maintains **zero runtime dependencies** (`dependencies: {}` in `package.json`), relying purely on native ECMAScript features and Node.js built-in modules (`node:util`).
+- **Subpath Exports Map:** Uses modern Node.js subpath exports (`./pg`, `./postgres`, `./knex`, `./kysely`, `./sequelize`, `./mikro-orm`) allowing consumers to import only the adapters matching their stack without loading unnecessary code.
+- **Cross-Runtime Portability:** The single codebase executes seamlessly across Node.js (>=22), Bun (via native `bun:sql`), Deno (via `npm:pgvector`), and WebAssembly runtimes.
+
+### In-Process WebAssembly PostgreSQL (PGlite)
+One of the most profound innovations demonstrated in the Node.js ecosystem is **PGlite (ElectricSQL)**: PostgreSQL 16 compiled to WebAssembly (WASM) with `pgvector` embedded (`@electric-sql/pglite/vector`).
+- **Zero-Daemon Vector Database:** Runs a full PostgreSQL instance with native C `vector` types and HNSW indexing **in-process** in Node.js or directly inside a web browser worker thread.
+- **Eliminating IPC Overhead:** By running inside the V8 memory heap, vector queries execute with zero network serialization latency, zero TCP/UNIX socket overhead, and instant transactional state.
+
+### In-Process Neural Inference via Transformers.js
+`pgvector-node` pairs with `@xenova/transformers` (Transformers.js) to achieve completely autonomous, local vector retrieval pipelines:
+- Local ONNX embedding models (e.g., `Xenova/all-MiniLM-L6-v2`) run directly in Node.js.
+- Feature extraction, mean pooling, and L2 unit normalization occur entirely in-process before passing arrays to pgvector, removing cloud embedding API costs and network latency bottlenecks.
+
+### Driver Type Registration: Dynamic OID Querying vs. Tagged Templates
+JavaScript drivers handle custom PostgreSQL types through two distinct paradigms:
+1. **Dynamic OID Registry (`pg` / `node-postgres`):** Queries `pg_type` at connection establishment (`SELECT typname, oid FROM pg_type WHERE typname IN (...)`) and binds parsers dynamically via `client.setTypeParser(oid, 'text', parser)`. Requires `pgvector.toSql(value)` for parameter serialization.
+2. **Declarative Tagged Templates (`postgres.js`):** Declarative type objects (`{ to: 0, from: ['vector'], serialize: ..., parse: ... }`) allow passing raw JavaScript arrays directly into `sql` tagged template literals without manual serialization helpers.
+
+### Query Builder Paradigms: Prototype Augmentation vs. Pure AST Helpers
+Node.js query builders integrate with pgvector using contrasting architectural philosophies:
+- **Prototype Augmentation (Knex & Objection.js):** Mutates the shared prototype (`TableBuilder.extend`, `QueryBuilder.extend`) to introduce first-class `.vector('col', 3)` DDL methods and `.l2Distance()` operators.
+- **Pure Functional AST Helpers (Kysely):** Adopts a non-intrusive approach, providing pure functions returning `RawBuilder` AST nodes via `sql`${sql.ref(column)} <-> ${toSql(value)}``. Preserves zero side-effects and guarantees strict compile-time type safety.
+
+---
+
+## 11. Summary: The Engine Builder's Blueprint
 
 Building high-performance specialized compute engines inside a relational database kernel requires adhering to five golden rules:
 

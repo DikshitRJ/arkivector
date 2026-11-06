@@ -1,6 +1,6 @@
 # pgvector Research: A Complete Technical Reference
 
-> **The definitive internals, kernel architecture, indexing algorithms, and ecosystem guide for `pgvector` and `pgvector-python`.**
+> **The definitive internals, kernel architecture, indexing algorithms, and ecosystem guide for `pgvector`, `pgvector-python`, and `pgvector-node`.**
 
 ---
 
@@ -18,6 +18,7 @@
    - [Index Engines & Algorithms (Phase 2)](#index-engines--algorithms-phase-2)
    - [Python Client SDK & Integrations (Phase 3)](#python-client-sdk--integrations-phase-3)
    - [Kernel Architecture & Build Infrastructure (Phase 4)](#kernel-architecture--build-infrastructure-phase-4)
+   - [Node.js & TypeScript Client SDK (Phase 6)](#nodejs--typescript-client-sdk-phase-6)
 7. [10 Key Technical Insights & Surprises](#7-10-key-technical-insights--surprises)
 8. [Getting Started: Recommended Learning Paths](#8-getting-started-recommended-learning-paths)
 
@@ -170,13 +171,15 @@ flowchart LR
     Core["Core Data Types (Phase 1)"]
     SQL["SQL Layer & Catalogs (Phase 1)"]
     Indexes["Index Engines (Phase 2)"]
-    SDK["Python Client SDK (Phase 3)"]
+    SDK_Py["Python Client SDK (Phase 3)"]
+    SDK_Node["Node.js Client SDK (Phase 6)"]
 
     Root --> Arch
     Root --> Core
     Root --> SQL
     Root --> Indexes
-    Root --> SDK
+    Root --> SDK_Py
+    Root --> SDK_Node
 ```
 
 ### Architectural Synthesis & Meta-Lessons
@@ -232,6 +235,21 @@ flowchart LR
 - [`architecture/postgres_extension_model.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/architecture/postgres_extension_model.md) — 1,034 lines: The extension triad, `PG_MODULE_MAGIC`, calling conventions, Generic WAL, and shared buffer management.
 - [`architecture/build_system.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/architecture/build_system.md) — 651 lines: PGXS build harness, compiler flags (`-O3`, `-march`), multi-version CI test matrix, and release packaging.
 
+### Node.js & TypeScript Client SDK (Phase 6)
+
+- [`node-sdk/overview.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/overview.md) — 1,024 lines: ESM-first architecture, zero runtime dependencies, subpath exports map, and 14-tool ecosystem compatibility matrix.
+- [`node-sdk/core_types.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/core_types.md) — 781 lines: `fromSql`, `toSql`, `SparseVector` class (4 constructor modes, 0-based to 1-based indexing), and string serialization mechanics.
+- [`node-sdk/pg_driver.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/pg_driver.md) — 732 lines: `node-postgres` (`pg`) integration, dynamic `pg_type` catalog query, `client.setTypeParser()`, and parameter formatting.
+- [`node-sdk/postgres_driver.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/postgres_driver.md) — 614 lines: `postgres.js` tagged template literal engine, custom type specification objects (`pgvectorTypes`), and connection handshake.
+- [`node-sdk/pg_promise_driver.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/pg_promise_driver.md) — 657 lines: `pg-promise` event-driven connection registration, Slonik strict type-safety boundaries, and custom type presets.
+- [`node-sdk/knex_integration.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/knex_integration.md) — 711 lines: Prototype extension (`TableBuilder.extend`, `QueryBuilder.extend`), column definition helpers, identifier escaping, and TypeScript augmentations.
+- [`node-sdk/kysely_integration.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/kysely_integration.md) — 642 lines: Pure functional AST helpers, `sql` tagged template literals, type-safe distance expressions, and zero prototype mutation.
+- [`node-sdk/objection_integration.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/objection_integration.md) — 709 lines: Objection.js model lifecycle integration, transitive Knex loading, `$parseDatabaseJson` / `$formatDatabaseJson` automation, and relation graph k-NN queries.
+- [`node-sdk/sequelize_integration.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/sequelize_integration.md) — 756 lines: Custom `DataTypes.ABSTRACT` subclasses (`VECTOR`, `HALFVEC`, `SPARSEVEC`), identifier sanitization, and SQL literal distance operators.
+- [`node-sdk/mikro_orm_integration.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/mikro_orm_integration.md) — 658 lines: Custom `Type<T>` classes (`VectorType`, `HalfvecType`, `SparsevecType`, `BitType`), dimension property decorators, and QueryBuilder raw fragment sorting.
+- [`node-sdk/prisma_drizzle_typeorm.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/prisma_drizzle_typeorm.md) — 634 lines: Modern TypeScript ORMs: Prisma `Unsupported("vector(3)")`, Drizzle native & custom types, TypeORM parameter binding, and 10-point cross-ORM matrix.
+- [`node-sdk/examples_analysis.md`](file:///mnt/Data/Coding/arkivector/RESEARCH/pgvector/node-sdk/examples_analysis.md) — 1,096 lines: Analysis of all 12 Node.js production examples (PGlite WebAssembly embedded vector search, Transformers.js in-process ONNX embeddings, Bun native SQL, Deno JSR, Cohere binary quantization, Hybrid Search RRF, Citus sharding, and RDKit molecular similarity).
+
 ---
 
 ## 7. 10 Key Technical Insights & Surprises
@@ -280,10 +298,12 @@ flowchart TD
     Path1["1. Database Kernel Engineer"]
     Path2["2. Search Architect / DBA"]
     Path3["3. ML / Python Application Developer"]
+    Path4["4. Fullstack / Node.js & TypeScript Engineer"]
 
     Start --> Path1
     Start --> Path2
     Start --> Path3
+    Start --> Path4
 
     Path1 --> P1_Docs["Read:
     - architecture/overview.md
@@ -302,4 +322,10 @@ flowchart TD
     - python-sdk/psycopg_adapter.md
     - python-sdk/examples_analysis.md
     - core/halfvec_type.md"]
+
+    Path4 --> P4_Docs["Read:
+    - node-sdk/overview.md
+    - node-sdk/core_types.md
+    - node-sdk/kysely_integration.md
+    - node-sdk/examples_analysis.md"]
 ```
