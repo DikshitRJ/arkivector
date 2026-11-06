@@ -28,6 +28,14 @@
     "lint": "eslint src/ examples/",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\""
   },
+  "peerDependencies": {
+    "@langchain/core": ">=0.1.0 <1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/core": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "eslint": "^9.14.0",
