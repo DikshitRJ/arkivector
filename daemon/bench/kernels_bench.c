@@ -128,7 +128,8 @@ static double bench_raw_half(void **objs, size_t n, int dim, int use_proto)
         double t0 = now_ns();
         for (long it = 0; it < g_iters; it++) {
             size_t j = i + 1 == n ? 0 : i + 1;
-            acc += (double) (use_proto ? proto_l2sq_4acc : HalfvecL2SquaredDistance)(dim, ((HalfVector *) objs[i])->x, ((HalfVector *) objs[j])->x);
+            acc += (double) (use_proto ? proto_l2sq_4acc : HalfvecL2SquaredDistance)(
+                dim, ((HalfVector *) objs[i])->x, ((HalfVector *) objs[j])->x);
             i = j;
         }
         double t1 = now_ns();
@@ -208,7 +209,9 @@ int main(int argc, char **argv)
     printf("| no-op via DirectFunctionCall2 | %.1f |\n", bench(f, h, 16, MODE_NOOP));
     printf("| halfvec 1536 l2sq via DirectFunctionCall2 | %.1f |\n", bench(f, h, 16, MODE_DFC));
     printf("| halfvec 1536 l2sq via prebuilt fcinfo | %.1f |\n", bench(f, h, 16, MODE_FCINFO));
-    printf("| halfvec 1536 l2sq raw kernel pointer (HalfvecL2SquaredDistance) | %.1f |\n", bench_raw_half(h, 16, 1536, 0));
-    printf("| halfvec 1536 l2sq PROTOTYPE 4-accumulator F16C (bench-only) | %.1f |\n", bench_raw_half(h, 16, 1536, 1));
+    printf("| halfvec 1536 l2sq raw kernel pointer (HalfvecL2SquaredDistance) | %.1f |\n",
+           bench_raw_half(h, 16, 1536, 0));
+    printf("| halfvec 1536 l2sq PROTOTYPE 4-accumulator F16C (bench-only) | %.1f |\n",
+           bench_raw_half(h, 16, 1536, 1));
     return 0;
 }

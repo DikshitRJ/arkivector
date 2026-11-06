@@ -45,6 +45,10 @@ Kinds: **V** verbatim PostgreSQL file · **S** PostgreSQL subset (struct/macros 
 | `storage/bufmgr.h` | stub | `BufferIsValid` in dead disk branches | `BufferIsValid` | D0 |
 | `access/genam.h` | stub | hnsw.h gets `List` through it | includes `nodes/pg_list.h` | D0 |
 | `access/{parallel,generic_xlog,relscan}.h`, `nodes/execnodes.h`, `utils/{sampling,fmgrprotos,rel,relcache,snapmgr,builtins,lsyscache,array}.h`, `storage/{freespace,lmgr}.h`, `pgstat.h`, `catalog/pg_type.h`, `libpq/pqformat.h`, `parser/scansup.h` | stub (empty) | included by copied files for disk/SQL code that is compiled out | nothing (include `postgres.h`) | D0 |
+| `parser/scansup.h` | S | `scanner_isspace` (body copied from PostgreSQL scansup.c) | D1 |
+| `utils/builtins.h` | stub | `pg_ltoa` (sparsevec_out) | D1 |
+| `utils/float.h` | stub | `float_overflow_error` & co. | D1 |
+| `mb/pg_wchar.h` | stub | `pg_mblen_cstr` (UTF-8) for bit_in error messages | D1 |
 | `nodes/nodes.h` | stub | Node header for pg_list.h | `NodeTag` (list tags only), `Node`, `IsA`, `castNode`, `makeNode` | D0 |
 
 ## Sources (`src/`)
@@ -55,8 +59,10 @@ Kinds: **V** verbatim PostgreSQL file · **S** PostgreSQL subset (struct/macros 
 | `elog.c` | stub | `errstart/errfinish`, thread-local `PG_exception_stack`, `LWLockReleaseAll()` before unwinding | D0 |
 | `lwlock.c` | stub | atomic RW lock, per-thread held-lock stack, spinlock slow path | D0 |
 | `fmgr.c` | stub | `DirectFunctionCall*`, `FunctionCall*Coll` | D0 |
-| `misc.c` | stub | `qsort_arg`, `pg_strong_random`, `copyObjectImpl`/`equal` (raise ERROR) | D0 |
+| `misc.c` | stub | `qsort_arg`, `pg_strong_random`, `copyObjectImpl`/`equal` (raise ERROR), `pg_ltoa`, `float_overflow/underflow/zero_divide_error` (PostgreSQL bodies) | D0/D1 |
 | `list.c` | V | `src/backend/nodes/list.c` | D0 |
 | `pairingheap.c` | V | `src/backend/lib/pairingheap.c` | D0 |
 | `pg_prng.c` | V | `src/common/pg_prng.c` | D0 |
+| `f2s.c`, `digit_table.h`, `ryu_common.h` | V | `src/common/f2s.c` (+ headers): shortest float output for `*_out` | D1 |
+| `varbit_io.c` | F (PostgreSQL) | `varbit.c`: HEXDIG, VARBIT_CORRECTLY_PADDED, bit_in, varbit_out, bit_out | D1 |
 | `pg_bitutils.c` | V | `src/port/pg_bitutils.c` (portable popcount path; `HAVE_X86_64_POPCNTQ` undefined) | D0 |

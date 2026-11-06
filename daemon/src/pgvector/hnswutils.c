@@ -924,8 +924,8 @@ HnswReadStreamNextBlock(ReadStream *stream, void *callback_private_data, void *p
 
 	return blkno;
 }
-#endif							/* ARKIVECTOR */
 #endif
+#endif							/* ARKIVECTOR */
 
 /*
  * Initialize the search state

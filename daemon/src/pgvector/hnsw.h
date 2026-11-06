@@ -381,8 +381,8 @@ void		AvHnswInitGraph(HnswGraph * graph, char *base, Size memoryTotal);
 void		AvHnswInitAllocator(HnswAllocator * allocator, void *(*alloc) (Size size, void *state), void *state);
 void		AvHnswInsertTupleInMemory(HnswMemBuildState * buildstate, HnswElement element);
 void	   *AvHnswArenaAlloc(Size size, void *state);
-#endif
 
+#endif
 typedef struct HnswMetaPageData
 {
 	uint32		magicNumber;
