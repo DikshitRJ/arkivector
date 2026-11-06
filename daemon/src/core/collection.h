@@ -62,6 +62,8 @@ void av_collection_mark_dropped(av_collection *c);
 
 const av_coldef *av_collection_def(const av_collection *c);
 uint64_t av_collection_as_of(const av_collection *c);
+bool av_collection_is_bootstrapping(const av_collection *c);
+void av_collection_set_bootstrapping(av_collection *c, bool b);
 bool av_collection_has_key(const av_collection *c, const uint8_t key[32]);
 void av_collection_read_lock(av_collection *c);
 void av_collection_read_unlock(av_collection *c);
@@ -105,6 +107,7 @@ const roaring_bitmap_t *av_collection_live(const av_collection *c);
 const av_docmap *av_collection_docmap(const av_collection *c);
 const av_attr_index *av_collection_attr_index(const av_collection *c);
 const av_segment *av_collection_segment(const av_collection *c);
+av_status av_collection_swap_segment(av_collection *c, av_segment *new_seg, av_err *e);
 
 /*
  * Exact search: scores (filter AND live), or all live docids when filter is NULL. The caller

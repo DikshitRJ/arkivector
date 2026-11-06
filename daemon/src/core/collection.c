@@ -57,6 +57,7 @@ struct av_collection {
     pthread_cond_t wait_cv;
     _Atomic uint64_t as_of;
     _Atomic size_t pub_count;
+    _Atomic bool bootstrapping;
 
     /* reader-visible, mutated only in publish under the write lock */
     av_docmap *docmap;
@@ -434,6 +435,19 @@ uint64_t av_collection_as_of(const av_collection *c)
     return atomic_load_explicit(&c->as_of, memory_order_acquire);
 }
 
+bool av_collection_is_bootstrapping(const av_collection *c)
+{
+    if (c == NULL)
+        return false;
+    return atomic_load_explicit(&c->bootstrapping, memory_order_acquire);
+}
+
+void av_collection_set_bootstrapping(av_collection *c, bool b)
+{
+    if (c != NULL)
+        atomic_store_explicit(&c->bootstrapping, b, memory_order_release);
+}
+
 bool av_collection_has_key(const av_collection *c, const uint8_t key[32])
 {
     if (c == NULL || c->docmap == NULL)
@@ -529,6 +543,22 @@ const av_attr_index *av_collection_attr_index(const av_collection *c)
 const av_segment *av_collection_segment(const av_collection *c)
 {
     return c->seg;
+}
+
+av_status av_collection_swap_segment(av_collection *c, av_segment *new_seg, av_err *e)
+{
+    if (c == NULL || new_seg == NULL) {
+        av_err_set(e, "invalid_argument", "collection and segment required");
+        return AV_ERR;
+    }
+    pthread_rwlock_wrlock(&c->lock);
+    av_segment *old = c->seg;
+    c->seg = new_seg;
+    pthread_rwlock_unlock(&c->lock);
+    if (old != NULL) {
+        av_segment_destroy(old);
+    }
+    return AV_OK;
 }
 
 av_status av_collection_scan_exact(const av_collection *c, const void *query, const roaring_bitmap_t *filter, size_t k,

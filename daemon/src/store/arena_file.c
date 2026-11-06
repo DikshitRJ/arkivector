@@ -197,6 +197,8 @@ av_status av_arena_file_sync(av_arena_file *f, av_err *e)
     if (f->fd < 0 || f->read_only)
         return AV_OK;
     size_t used = av_arena_file_used(f);
+    if (ftruncate(f->fd, (off_t) used) != 0)
+        return sys_fail(e, "ftruncate", NULL);
     size_t ps = page_size();
     size_t len = (used + ps - 1) / ps * ps;
     if (len > 0 && msync(f->base, len, MS_SYNC) != 0)

@@ -77,6 +77,9 @@ static void set_state(av_sync *s, coll_state *cs, av_sync_state st, const char *
 {
     pthread_mutex_lock(&s->mu);
     cs->state = st;
+    if (cs->c != NULL) {
+        av_collection_set_bootstrapping(cs->c, (st == AV_SYNC_BOOTSTRAP));
+    }
     if (err != NULL) {
         snprintf(cs->last_error, sizeof(cs->last_error), "%s", err);
     } else if (st == AV_SYNC_LIVE || st == AV_SYNC_CATCH_UP) {
