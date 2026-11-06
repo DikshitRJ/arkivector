@@ -115,7 +115,8 @@ set(AV_PGVECTOR_SOURCES
 set(AV_PGVECTOR_OPTIONAL
     src/pgvector/vector_kernels.c
     src/pgvector/hnswutils.c
-    src/pgvector/hnswbuild_mem.c)
+    src/pgvector/hnswbuild_mem.c
+    src/pgvector/av_hnsw_glue.c)
 foreach(f ${AV_PGVECTOR_OPTIONAL})
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/${f} _sz)
   if(_sz GREATER 0)
