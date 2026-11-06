@@ -239,10 +239,10 @@ TEST test_entities_endpoint(void)
     ASSERT(strstr(resp.body, "entity_not_found") != NULL);
     free(resp.body);
 
-    /* Verify=true -> 501 */
+    /* Verify=true in D6: for non-existent entity -> 404 */
     dispatch_req("GET", "/v1/collections/ent.col/entities/doc-1", "verify=true", NULL, &resp);
-    ASSERT_EQ(501, resp.status);
-    ASSERT(strstr(resp.body, "Phase D6") != NULL);
+    ASSERT_EQ(404, resp.status);
+    ASSERT(strstr(resp.body, "entity_not_found") != NULL);
     free(resp.body);
 
     /* D5 write endpoints (signer not configured -> 403 write_disabled) */
