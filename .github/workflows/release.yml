@@ -3,6 +3,7 @@ name: release
 # Tag vX.Y.Z (or daemon-vX.Y.Z) to publish:
 #   - GitHub Release: arkivectord linux-x86_64 tarball (libcurl bundled), Python wheel + sdist, npm tarball
 #   - GitHub Packages (npm): @dikshitrj/arkivector-client
+#   - GHCR: ghcr.io/<owner>/arkivectord:<version>, :<major>, :latest (linux/amd64)
 #   - PyPI: trusted publishing from job pypi-publish (environment `pypi`; GitHub Packages has no pip registry)
 on:
   push:
@@ -56,7 +57,7 @@ jobs:
         env:
           PKG_CONFIG_PATH: ${{ env.CURL_PREFIX }}/lib/pkgconfig
         run: |
-          cmake --preset release -DAV_BUILD_TESTS=OFF -DAV_BUILD_BENCH=OFF
+          cmake --preset release -DAV_BUILD_TESTS=OFF -DAV_BUILD_BENCH=OFF -DAV_VERSION=${{ needs.version.outputs.v }}
           cmake --build --preset release --target arkivectord
       - name: Package (bundle libcurl, RPATH $ORIGIN/../lib)
         run: |
@@ -148,10 +149,54 @@ jobs:
           name: sdk-node
           path: dist/*.tgz
 
+  docker:
+    name: Container image (ghcr.io)
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image name (lowercase owner)
+        id: img
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/arkivectord" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.img.outputs.name }}
+          tags: |
+            type=raw,value=${{ needs.version.outputs.v }}
+            type=semver,pattern={{major}},value=${{ needs.version.outputs.v }}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=arkivectord
+            org.opencontainers.image.description=pgvector for Arkiv: off-chain vector co-processor daemon
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: daemon/Dockerfile
+          platforms: linux/amd64
+          build-args: VERSION=${{ needs.version.outputs.v }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test pushed image
+        run: |
+          docker run -d --name av -p 127.0.0.1:8080:8080 ${{ steps.img.outputs.name }}:${{ needs.version.outputs.v }}
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8080/v1/version | grep '"daemon_version":"${{ needs.version.outputs.v }}"'
+          docker rm -f av
+
   release:
     name: GitHub Release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [daemon, sdk-python, sdk-node]
+    needs: [daemon, docker, sdk-python, sdk-node]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -161,7 +206,28 @@ jobs:
       - name: SHA256SUMS
         working-directory: dist
         run: sha256sum * > SHA256SUMS
+      - name: Install notes
+        run: |
+          v="${GITHUB_REF_NAME#daemon-}"; v="${v#v}"; owner="${GITHUB_REPOSITORY_OWNER,,}"
+          cat > notes.md <<EOF
+          ## Install
+
+          **Daemon (binary, Linux x86_64; needs libuv and OpenSSL 3)**
+          \`\`\`
+          curl -LO https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/arkivectord-${v}-linux-x86_64.tar.gz
+          tar xzf arkivectord-${v}-linux-x86_64.tar.gz && ./arkivectord-${v}-linux-x86_64/bin/arkivectord --help
+          \`\`\`
+          **Daemon (container)**
+          \`\`\`
+          docker run -p 8080:8080 -v arkivector-data:/data -e ARKIVECTOR_ARKIV_ACCESS_KEY=... ghcr.io/${owner}/arkivectord:${v}
+          \`\`\`
+          Writes need a funded wallet key in \`ARKIV_PRIVATE_KEY\`. Configuration: \`arkivector.example.toml\`.
+
+          **Python SDK**: \`pip install arkivector==${v}\` (or the wheel attached below)
+          **Node SDK**: \`npm install @${owner}/arkivector-client@${v} --registry=https://npm.pkg.github.com\`
+          EOF
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          body_path: notes.md
           generate_release_notes: true

@@ -1,0 +1,11 @@
+# Keep the image build context small and free of host build state.
+.git
+.venv
+**/node_modules
+**/__pycache__
+daemon/build
+daemon/test/fuzz/corpus
+sdk
+RESEARCH
+docs
+openspec

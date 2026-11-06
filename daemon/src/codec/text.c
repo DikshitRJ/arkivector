@@ -72,7 +72,7 @@ static bool within_limits(av_vtype t, const void *v)
 av_status av_text_to_pgvecn(av_vtype t, const char *s, size_t len, int32_t typmod_dim, av_arena *a,
                             void **out, av_err *e)
 {
-    PGFunction fn = in_fn(t);
+    PGFunction volatile fn = in_fn(t);
     if (fn == NULL || s == NULL) {
         av_err_set(e, "invalid_vector", "unknown vector type");
         return AV_ERR;
@@ -136,7 +136,7 @@ av_status av_text_to_pgvec(av_vtype t, const char *s, int32_t typmod_dim, av_are
 
 av_status av_pgvec_to_text(av_vtype t, const void *v, av_arena *a, char **out, av_err *e)
 {
-    PGFunction fn = out_fn(t);
+    PGFunction volatile fn = out_fn(t);
     if (fn == NULL || v == NULL) {
         av_err_set(e, "invalid_vector", "unknown vector type");
         return AV_ERR;
