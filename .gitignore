@@ -1,5 +1,6 @@
 *.serena*
-.envdaemon/build/
+.env
+daemon/build/
 sdk/*/build/
 sdk/rust/target/
 node_modules/

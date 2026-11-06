@@ -1,0 +1,27 @@
+# Unit tests (greatest.h). One executable, av_unit; ctest runs each suite as a test.
+set(AV_UNIT_SOURCES
+    unit/test_main.c
+    unit/test_pgcompat.c
+    unit/test_kernels.c)
+set(AV_UNIT_SUITES pgcompat kernels)
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
+  file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)
+  if(_hnsw_sz GREATER 0)
+    list(APPEND AV_UNIT_SOURCES unit/test_hnsw.c)
+    list(APPEND AV_UNIT_SUITES hnsw)
+    set(AV_HAVE_HNSW_TEST ON)
+  endif()
+endif()
+
+add_executable(av_unit ${AV_UNIT_SOURCES})
+target_link_libraries(av_unit PRIVATE av_core av3p_greatest av3p_yyjson)
+target_compile_options(av_unit PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare)
+if(AV_HAVE_HNSW_TEST)
+  target_compile_definitions(av_unit PRIVATE AV_HAVE_HNSW_TEST=1)
+endif()
+
+foreach(suite ${AV_UNIT_SUITES})
+  add_test(NAME unit_${suite} COMMAND av_unit -s ${suite})
+  set_tests_properties(unit_${suite} PROPERTIES TIMEOUT 600)
+endforeach()
