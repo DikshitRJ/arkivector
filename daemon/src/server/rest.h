@@ -71,7 +71,8 @@ struct av_sync;
 struct av_writer;
 struct av_idempotency_store;
 
-void av_rest_set_services(struct av_registry *reg, struct av_store *store, struct av_rpc *rpc, struct av_sync *sync);
+void av_rest_set_services(struct av_registry *reg, struct av_store *store, struct av_rpc *rpc,
+                          struct av_sync *sync);
 struct av_registry *av_rest_get_registry(void);
 struct av_store *av_rest_get_store(void);
 struct av_rpc *av_rest_get_rpc(void);

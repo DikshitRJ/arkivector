@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "core/fileio.h"
 #include "toml.h"
 #include "yyjson.h"
 
@@ -607,45 +608,11 @@ av_status av_config_load_string(av_config *c, const char *toml_text, const char 
 
 static av_status read_file(const char *path, char **out, av_err *e)
 {
-    FILE *f = fopen(path, "rb");
-    if (f == NULL) {
-        av_err_set(e, "invalid_argument", "config: cannot open %s: %s", path, strerror(errno));
-        return AV_ERR;
-    }
-    size_t cap = 4096;
     size_t len = 0;
-    char *buf = malloc(cap);
-    while (buf != NULL) {
-        size_t n = fread(buf + len, 1, cap - len - 1, f);
-        len += n;
-        if (n == 0) {
-            break;
-        }
-        if (len + 1 >= cap) {
-            if (cap > (size_t) 16 * 1024 * 1024) {
-                free(buf);
-                fclose(f);
-                av_err_set(e, "invalid_argument", "config: %s is larger than 16 MiB", path);
-                return AV_ERR;
-            }
-            cap *= 2;
-            char *nb = realloc(buf, cap);
-            if (nb == NULL) {
-                free(buf);
-                buf = NULL;
-                break;
-            }
-            buf = nb;
-        }
-    }
-    bool bad = ferror(f) != 0;
-    fclose(f);
-    if (buf == NULL || bad) {
-        free(buf);
-        av_err_set(e, "invalid_argument", "config: cannot read %s", path);
+    char *buf = av_read_file(path, "config", (size_t) 16 * 1024 * 1024, &len, e);
+    if (buf == NULL) {
         return AV_ERR;
     }
-    buf[len] = '\0';
     if (strlen(buf) != len) {
         free(buf);
         av_err_set(e, "invalid_argument", "config: %s contains a NUL byte", path);

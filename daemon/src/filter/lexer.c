@@ -58,7 +58,7 @@ bool av_lexer_next(av_lexer *lx, av_token *t, av_err *e)
         return true;
     }
     char c = s[i];
-    size_t j = i;
+    size_t j;
     if (c == '\'') {
         j = i + 1;
         for (;;) {

@@ -63,13 +63,15 @@ TEST entity_parse(void)
     ASSERT_EQ(9, e.n_attrs);
     const av_attr *a = av_entity_attr(&e, "arkiv.schema");
     ASSERT(a != NULL && a->type == AV_AT_STR && a->len == 12 && memcmp(a->val, "my-app.posts", 12) == 0);
-    ASSERT(word_is(av_entity_attr(&e, "score"), Z48 "3e73362871420000")); /* 4.5e18 (the doc example 0x3e7104b2a8d60000 is a typo) */
+    ASSERT(word_is(av_entity_attr(&e, "score"),
+                   Z48 "3e73362871420000")); /* 4.5e18 (the doc example 0x3e7104b2a8d60000 is a typo) */
     ASSERT(word_is(av_entity_attr(&e, "neg"), F48 "e2db4d2053ae0000"));
     ASSERT(word_is(av_entity_attr(&e, "pub"), Z56 "00000001"));
     ASSERT(word_is(av_entity_attr(&e, "rep"), F56 "ffffffd6"));
     ASSERT(word_is(av_entity_attr(&e, "ts"), Z56 "65b3f210"));
     ASSERT(word_is(av_entity_attr(&e, "bal"), Z48 "0de0b6b3a7640000"));
-    ASSERT(word_is(av_entity_attr(&e, "who"), "000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"));
+    ASSERT(word_is(av_entity_attr(&e, "who"),
+                   "000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"));
     a = av_entity_attr(&e, "av.vec");
     ASSERT(a != NULL && a->type == AV_AT_BYTES && a->len == 3 && a->val[2] == 0xff && !a->indexed);
     ASSERT(av_entity_attr(&e, "missing") == NULL);
@@ -91,14 +93,21 @@ TEST entity_rejects(void)
         "[]",
         "{}",
         "{\"key\":\"0x12\"}",
-        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"createdAt\":\"12\"}",
+        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"createdAt\":"
+        "\"12\"}",
         "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":{}}",
-        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{\"name\":\"a\",\"type\":\"zzz\",\"value\":1}]}",
-        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{\"name\":\"\",\"type\":\"bool\",\"value\":true}]}",
-        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{\"name\":\"a\",\"type\":\"i32\",\"value\":4294967296}]}",
-        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{\"name\":\"a\",\"type\":\"dec\",\"value\":\"1.0000000000000000001\"}]}",
-        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{\"name\":\"a\",\"type\":\"u64\",\"value\":\"0x10000000000000000\"}]}",
-        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{\"name\":\"a\",\"type\":\"bytes\",\"value\":\"0xabc\"}]}",
+        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{"
+        "\"name\":\"a\",\"type\":\"zzz\",\"value\":1}]}",
+        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{"
+        "\"name\":\"\",\"type\":\"bool\",\"value\":true}]}",
+        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{"
+        "\"name\":\"a\",\"type\":\"i32\",\"value\":4294967296}]}",
+        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{"
+        "\"name\":\"a\",\"type\":\"dec\",\"value\":\"1.0000000000000000001\"}]}",
+        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{"
+        "\"name\":\"a\",\"type\":\"u64\",\"value\":\"0x10000000000000000\"}]}",
+        "{\"key\":\"0x9f2c100000000000000000000000000000000000000000000000000000000001\",\"attributes\":[{"
+        "\"name\":\"a\",\"type\":\"bytes\",\"value\":\"0xabc\"}]}",
     };
     av_arena *ar = av_arena_create("t", 4096, 0);
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
@@ -130,9 +139,10 @@ TEST logs_decode(void)
     bool known;
     static const char *key = "0x9f2c100000000000000000000000000000000000000000000000000000000001";
     static const char *own = "0x000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045";
-    static const char *common = "\"blockNumber\":\"0x10\",\"logIndex\":\"0x2\",\"removed\":true,"
-                                "\"blockHash\":\"0x1111111111111111111111111111111111111111111111111111111111111111\","
-                                "\"transactionHash\":\"0x2222222222222222222222222222222222222222222222222222222222222222\"";
+    static const char *common =
+        "\"blockNumber\":\"0x10\",\"logIndex\":\"0x2\",\"removed\":true,"
+        "\"blockHash\":\"0x1111111111111111111111111111111111111111111111111111111111111111\","
+        "\"transactionHash\":\"0x2222222222222222222222222222222222222222222222222222222222222222\"";
 
     topic_hex(AV_EV_CREATED, t0);
     snprintf(json, sizeof json, "{\"topics\":[\"%s\",\"%s\",\"%s\"],\"data\":\"0x%s%s\",%s}", t0, key, own,
@@ -140,7 +150,8 @@ TEST logs_decode(void)
     yyjson_doc *d = J(json);
     ASSERT_EQ(AV_OK, av_event_parse(yyjson_doc_get_root(d), &ev, &known, &err));
     ASSERT(known && ev.kind == AV_EV_CREATED && ev.expires_at == 0x7b && ev.flags == 2);
-    ASSERT(ev.block == 16 && ev.log_index == 2 && ev.removed && ev.owner[0] == 0xd8 && ev.block_hash[0] == 0x11);
+    ASSERT(ev.block == 16 && ev.log_index == 2 && ev.removed && ev.owner[0] == 0xd8 &&
+           ev.block_hash[0] == 0x11);
     yyjson_doc_free(d);
 
     topic_hex(AV_EV_TRANSFERRED, t0);
@@ -153,18 +164,21 @@ TEST logs_decode(void)
 
     /* wrong data length for a known event: error; unknown topic0: skipped */
     topic_hex(AV_EV_CREATED, t0);
-    snprintf(json, sizeof json, "{\"topics\":[\"%s\",\"%s\",\"%s\"],\"data\":\"0x\",%s}", t0, key, own, common);
+    snprintf(json, sizeof json, "{\"topics\":[\"%s\",\"%s\",\"%s\"],\"data\":\"0x\",%s}", t0, key, own,
+             common);
     d = J(json);
     ASSERT_EQ(AV_ERR, av_event_parse(yyjson_doc_get_root(d), &ev, &known, &err));
     yyjson_doc_free(d);
-    d = J("{\"topics\":[\"0x1111111111111111111111111111111111111111111111111111111111111111\"],\"data\":\"0x\"}");
+    d = J("{\"topics\":[\"0x1111111111111111111111111111111111111111111111111111111111111111\"],\"data\":"
+          "\"0x\"}");
     ASSERT_EQ(AV_OK, av_event_parse(yyjson_doc_get_root(d), &ev, &known, &err));
     ASSERT(!known);
     yyjson_doc_free(d);
 
     av_event *evs;
     size_t n;
-    d = J("[{\"topics\":[\"0x1111111111111111111111111111111111111111111111111111111111111111\"],\"data\":\"0x\"}]");
+    d = J("[{\"topics\":[\"0x1111111111111111111111111111111111111111111111111111111111111111\"],\"data\":"
+          "\"0x\"}]");
     ASSERT_EQ(AV_OK, av_events_parse(yyjson_doc_get_root(d), ar, &evs, &n, &err));
     ASSERT_EQ(0, n);
     yyjson_doc_free(d);
@@ -200,7 +214,8 @@ TEST query_builder_literals(void)
     ASSERT_EQ(AV_ERR, av_qb_lit_u256("12a", out, sizeof out, &err));
     ASSERT_EQ(AV_OK, av_qb_lit_u256("1000000000000000000", out, sizeof out, &err));
     ASSERT(av_qb_valid_name("arkiv.schema") && av_qb_valid_name("a-b_c9"));
-    ASSERT(!av_qb_valid_name("a b") && !av_qb_valid_name("1a") && !av_qb_valid_name("a--b") && !av_qb_valid_name(""));
+    ASSERT(!av_qb_valid_name("a b") && !av_qb_valid_name("1a") && !av_qb_valid_name("a--b") &&
+           !av_qb_valid_name(""));
     PASS();
 }
 
@@ -244,7 +259,7 @@ TEST budget_blocks(void)
     for (int i = 0; i < 10; i++) /* 10 x 5 CU = 50 CU: 20 burst, 30 more at 20/s = 1.5 s */
         av_budget_acquire(b, av_budget_cost("arkiv_query"));
     clock_gettime(CLOCK_MONOTONIC, &t1);
-    double s = (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
+    double s = (double) (t1.tv_sec - t0.tv_sec) + (double) (t1.tv_nsec - t0.tv_nsec) / 1e9;
     ASSERT(s > 1.2 && s < 3.0);
     ASSERT_EQ(50, av_budget_consumed(b));
     ASSERT_EQ(1, av_budget_cost("eth_blockNumber"));

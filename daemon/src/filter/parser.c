@@ -111,7 +111,7 @@ static bool type_from_token(const parser *p, av_attr_type *t)
     if (p->tok.kind != AV_TOK_IDENT || p->tok.len > 5) {
         return false;
     }
-    char low[8];
+    char low[8] = {0};
     for (size_t i = 0; i < p->tok.len; i++) {
         char c = tok_text(p)[i];
         low[i] = (char) ((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c);
@@ -237,13 +237,15 @@ static av_filter *p_predicate(parser *p)
     int start = (int) p->tok.pos;
     av_field f;
     if (kw(p, "exists")) {
-        if (!adv(p) || !expect(p, AV_TOK_LPAREN, "'('") || !p_field(p, &f) || !expect(p, AV_TOK_RPAREN, "')'")) {
+        if (!adv(p) || !expect(p, AV_TOK_LPAREN, "'('") || !p_field(p, &f) ||
+            !expect(p, AV_TOK_RPAREN, "')'")) {
             return NULL;
         }
         return av_fb_exists(&p->fb, start, &f, p->e);
     }
     if (kw(p, "typeof")) {
-        if (!adv(p) || !expect(p, AV_TOK_LPAREN, "'('") || !p_field(p, &f) || !expect(p, AV_TOK_RPAREN, "')'")) {
+        if (!adv(p) || !expect(p, AV_TOK_LPAREN, "'('") || !p_field(p, &f) ||
+            !expect(p, AV_TOK_RPAREN, "')'")) {
             return NULL;
         }
         av_cmp_op op;

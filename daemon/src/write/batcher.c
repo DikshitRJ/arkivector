@@ -7,8 +7,7 @@
 #include <string.h>
 
 av_status av_batcher_pack(const av_mutation_op *ops, size_t n_ops, const av_batcher_config *cfg,
-                          av_arena *arena, av_op_batch **out_batches, size_t *out_n_batches,
-                          av_err *e)
+                          av_arena *arena, av_op_batch **out_batches, size_t *out_n_batches, av_err *e)
 {
     *out_batches = NULL;
     *out_n_batches = 0;

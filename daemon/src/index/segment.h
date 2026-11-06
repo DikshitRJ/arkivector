@@ -38,9 +38,8 @@ av_status av_segment_create_flat(const char *path, av_vtype type, int dim, size_
 /*
  * Create an empty HNSW segment backed by an arena_file.
  */
-av_status av_segment_create_hnsw(const char *path, av_vtype type, int dim, const av_opclass *oc,
-                                 int m, int ef_construction, size_t reserve_bytes,
-                                 av_segment **out, av_err *e);
+av_status av_segment_create_hnsw(const char *path, av_vtype type, int dim, const av_opclass *oc, int m,
+                                 int ef_construction, size_t reserve_bytes, av_segment **out, av_err *e);
 
 /* Open an existing sealed HNSW segment (read-only mmap with footer validation). */
 av_status av_segment_open_sealed(const char *path, av_segment **out, av_err *e);
@@ -72,33 +71,33 @@ typedef struct {
  * Errors: dimension_mismatch (query dim), invalid_argument (opclass type).
  */
 av_status av_segment_scan_exact(const av_segment *s, const void *query, const av_opclass *oc,
-                                const roaring_bitmap_t *cand, size_t k, av_hit *out, size_t *n_out, av_err *e);
+                                const roaring_bitmap_t *cand, size_t k, av_hit *out, size_t *n_out,
+                                av_err *e);
 
 /*
  * Approximate HNSW search. Runs GetScanItems (and ResumeScanItems if iterative != off)
  * over the in-memory/sealed graph, rechecking cand.
  */
-av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_search,
-                                 int iterative_mode, int max_scan_tuples,
-                                 const roaring_bitmap_t *cand, size_t offset, size_t k,
+av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_search, int iterative_mode,
+                                 int max_scan_tuples, const roaring_bitmap_t *cand, size_t offset, size_t k,
                                  av_hit *out, size_t *n_out, av_err *e);
 
 #define AV_SEG_MAGIC "AVSEG1"
 
 typedef struct {
-    char magic[8];             /* "AVSEG1\0\0" */
-    char pgvector_tag[32];     /* AV_PGVECTOR_TAG */
-    char opclass_name[32];     /* opclass->name */
+    char magic[8];         /* "AVSEG1\0\0" */
+    char pgvector_tag[32]; /* AV_PGVECTOR_TAG */
+    char opclass_name[32]; /* opclass->name */
     uint32_t m;
     uint32_t ef_construction;
     uint32_t dimensions;
-    uint32_t vtype;            /* av_vtype */
+    uint32_t vtype;              /* av_vtype */
     uint64_t entry_point_offset; /* relptr offset to entryPoint */
-    uint64_t count;            /* number of elements/vectors */
+    uint64_t count;              /* number of elements/vectors */
     uint32_t min_docid;
     uint32_t max_docid;
     uint64_t prng_seed;
-    uint64_t arena_bytes;      /* size of arena data up to footer */
+    uint64_t arena_bytes; /* size of arena data up to footer */
     uint32_t footer_crc;
 } av_seg_footer;
 

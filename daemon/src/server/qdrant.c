@@ -46,7 +46,8 @@ static void qdrant_resp(av_http_resp *resp, int status, yyjson_mut_val *result, 
     yyjson_mut_doc_set_root(doc, root);
 
     double elapsed = time_sec() - t0;
-    if (elapsed < 0.0001) elapsed = 0.0001;
+    if (elapsed < 0.0001)
+        elapsed = 0.0001;
 
     if (status >= 200 && status < 300) {
         if (result != NULL) {
@@ -101,7 +102,10 @@ static bool qdrant_list_cb(av_collection *c, void *ctx)
 static void h_qdrant_list_collections(const av_http_req *req, const char *const *params, size_t n_params,
                                       av_http_resp *resp, void *ctx)
 {
-    (void) req; (void) params; (void) n_params; (void) ctx;
+    (void) req;
+    (void) params;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
 
     av_registry *reg = av_rest_get_registry();
@@ -115,7 +119,7 @@ static void h_qdrant_list_collections(const av_http_req *req, const char *const 
     yyjson_mut_val *arr = yyjson_mut_arr(doc);
     yyjson_mut_obj_add_val(doc, res, "collections", arr);
 
-    qdrant_list_acc acc = { doc, arr };
+    qdrant_list_acc acc = {doc, arr};
     av_registry_each(reg, qdrant_list_cb, &acc);
 
     qdrant_resp(resp, 200, res, t0);
@@ -126,7 +130,9 @@ static void h_qdrant_list_collections(const av_http_req *req, const char *const 
 static void h_qdrant_get_collection(const av_http_req *req, const char *const *params, size_t n_params,
                                     av_http_resp *resp, void *ctx)
 {
-    (void) req; (void) n_params; (void) ctx;
+    (void) req;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
     const char *name = params[0];
 
@@ -147,9 +153,12 @@ static void h_qdrant_get_collection(const av_http_req *req, const char *const *p
 
     const char *dist = "Cosine";
     if (d->opclass != NULL && d->opclass->name != NULL) {
-        if (strstr(d->opclass->name, "l2") != NULL) dist = "Euclid";
-        else if (strstr(d->opclass->name, "ip") != NULL) dist = "Dot";
-        else if (strstr(d->opclass->name, "l1") != NULL) dist = "Manhattan";
+        if (strstr(d->opclass->name, "l2") != NULL)
+            dist = "Euclid";
+        else if (strstr(d->opclass->name, "ip") != NULL)
+            dist = "Dot";
+        else if (strstr(d->opclass->name, "l1") != NULL)
+            dist = "Manhattan";
     }
 
     yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
@@ -176,7 +185,8 @@ static void h_qdrant_get_collection(const av_http_req *req, const char *const *p
 static void h_qdrant_create_collection(const av_http_req *req, const char *const *params, size_t n_params,
                                        av_http_resp *resp, void *ctx)
 {
-    (void) n_params; (void) ctx;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
     const char *name = params[0];
 
@@ -207,7 +217,8 @@ static void h_qdrant_create_collection(const av_http_req *req, const char *const
     if (yyjson_is_obj(vectors)) {
         size = yyjson_get_int(yyjson_obj_get(vectors, "size"));
         const char *d = yyjson_get_str(yyjson_obj_get(vectors, "distance"));
-        if (d != NULL) distance = d;
+        if (d != NULL)
+            distance = d;
     }
 
     if (size <= 0 || size > 16000) {
@@ -217,9 +228,12 @@ static void h_qdrant_create_collection(const av_http_req *req, const char *const
     }
 
     const char *opclass_name = "halfvec_cosine_ops";
-    if (strcasecmp(distance, "Euclid") == 0) opclass_name = "halfvec_l2_ops";
-    else if (strcasecmp(distance, "Dot") == 0) opclass_name = "halfvec_ip_ops";
-    else if (strcasecmp(distance, "Manhattan") == 0) opclass_name = "halfvec_l1_ops";
+    if (strcasecmp(distance, "Euclid") == 0)
+        opclass_name = "halfvec_l2_ops";
+    else if (strcasecmp(distance, "Dot") == 0)
+        opclass_name = "halfvec_ip_ops";
+    else if (strcasecmp(distance, "Manhattan") == 0)
+        opclass_name = "halfvec_l1_ops";
 
     const av_opclass *oc = av_opclass_find(opclass_name);
     if (oc == NULL) {
@@ -259,7 +273,9 @@ static void h_qdrant_create_collection(const av_http_req *req, const char *const
 static void h_qdrant_delete_collection(const av_http_req *req, const char *const *params, size_t n_params,
                                        av_http_resp *resp, void *ctx)
 {
-    (void) req; (void) n_params; (void) ctx;
+    (void) req;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
     const char *name = params[0];
 
@@ -286,7 +302,9 @@ static void h_qdrant_delete_collection(const av_http_req *req, const char *const
 static void h_qdrant_upsert_points(const av_http_req *req, const char *const *params, size_t n_params,
                                    av_http_resp *resp, void *ctx)
 {
-    (void) req; (void) n_params; (void) ctx;
+    (void) req;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
     const char *name = params[0];
 
@@ -315,7 +333,8 @@ static void h_qdrant_upsert_points(const av_http_req *req, const char *const *pa
 static void h_qdrant_search_points(const av_http_req *req, const char *const *params, size_t n_params,
                                    av_http_resp *resp, void *ctx)
 {
-    (void) n_params; (void) ctx;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
     const char *name = params[0];
 
@@ -341,7 +360,8 @@ static void h_qdrant_search_points(const av_http_req *req, const char *const *pa
 
     yyjson_val *root = yyjson_doc_get_root(req_doc);
     yyjson_val *vec_val = yyjson_obj_get(root, "vector");
-    if (vec_val == NULL) vec_val = yyjson_obj_get(root, "query");
+    if (vec_val == NULL)
+        vec_val = yyjson_obj_get(root, "query");
 
     if (vec_val == NULL || !yyjson_is_arr(vec_val)) {
         yyjson_doc_free(req_doc);
@@ -354,14 +374,16 @@ static void h_qdrant_search_points(const av_http_req *req, const char *const *pa
     yyjson_val *limit_val = yyjson_obj_get(root, "limit");
     if (limit_val != NULL && yyjson_is_int(limit_val)) {
         int l = yyjson_get_int(limit_val);
-        if (l > 0) k = (size_t) l;
+        if (l > 0)
+            k = (size_t) l;
     }
 
     size_t offset = 0;
     yyjson_val *off_val = yyjson_obj_get(root, "offset");
     if (off_val != NULL && yyjson_is_int(off_val)) {
         int o = yyjson_get_int(off_val);
-        if (o > 0) offset = (size_t) o;
+        if (o > 0)
+            offset = (size_t) o;
     }
 
     /* Convert vector array */
@@ -395,7 +417,8 @@ static void h_qdrant_search_points(const av_http_req *req, const char *const *pa
     buf[pos] = '\0';
 
     void *query_pgvec = NULL;
-    if (av_text_to_pgvec(coldef->vtype, buf, (int32_t) coldef->dimensions, req->arena, &query_pgvec, &e) != AV_OK) {
+    if (av_text_to_pgvec(coldef->vtype, buf, (int32_t) coldef->dimensions, req->arena, &query_pgvec, &e) !=
+        AV_OK) {
         yyjson_doc_free(req_doc);
         av_collection_release(c);
         qdrant_error(resp, 400, "invalid vector values", t0);
@@ -457,7 +480,9 @@ static void h_qdrant_search_points(const av_http_req *req, const char *const *pa
 static void h_qdrant_count_points(const av_http_req *req, const char *const *params, size_t n_params,
                                   av_http_resp *resp, void *ctx)
 {
-    (void) req; (void) n_params; (void) ctx;
+    (void) req;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
     const char *name = params[0];
 
@@ -487,7 +512,9 @@ static void h_qdrant_count_points(const av_http_req *req, const char *const *par
 static void h_qdrant_delete_points(const av_http_req *req, const char *const *params, size_t n_params,
                                    av_http_resp *resp, void *ctx)
 {
-    (void) req; (void) n_params; (void) ctx;
+    (void) req;
+    (void) n_params;
+    (void) ctx;
     double t0 = time_sec();
 
     yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
@@ -501,7 +528,8 @@ static void h_qdrant_delete_points(const av_http_req *req, const char *const *pa
 
 void av_rest_register_qdrant(av_router *r, bool debug_routes, void *ctx)
 {
-    (void) debug_routes; (void) ctx;
+    (void) debug_routes;
+    (void) ctx;
     av_err e;
     av_err_clear(&e);
 
@@ -510,8 +538,12 @@ void av_rest_register_qdrant(av_router *r, bool debug_routes, void *ctx)
     (void) av_router_add(r, "PUT", "/qdrant/collections/{name}", h_qdrant_create_collection, NULL, &e);
     (void) av_router_add(r, "DELETE", "/qdrant/collections/{name}", h_qdrant_delete_collection, NULL, &e);
     (void) av_router_add(r, "PUT", "/qdrant/collections/{name}/points", h_qdrant_upsert_points, NULL, &e);
-    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/search", h_qdrant_search_points, NULL, &e);
-    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/query", h_qdrant_search_points, NULL, &e);
-    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/count", h_qdrant_count_points, NULL, &e);
-    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/delete", h_qdrant_delete_points, NULL, &e);
+    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/search", h_qdrant_search_points, NULL,
+                         &e);
+    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/query", h_qdrant_search_points, NULL,
+                         &e);
+    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/count", h_qdrant_count_points, NULL,
+                         &e);
+    (void) av_router_add(r, "POST", "/qdrant/collections/{name}/points/delete", h_qdrant_delete_points, NULL,
+                         &e);
 }

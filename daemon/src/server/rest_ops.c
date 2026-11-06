@@ -42,7 +42,8 @@ static struct av_sync *g_sync_svc = NULL;
 static struct av_writer *g_writer_svc = NULL;
 static struct av_idempotency_store *g_idem_svc = NULL;
 
-void av_rest_set_services(struct av_registry *reg, struct av_store *store, struct av_rpc *rpc, struct av_sync *sync)
+void av_rest_set_services(struct av_registry *reg, struct av_store *store, struct av_rpc *rpc,
+                          struct av_sync *sync)
 {
     pthread_mutex_lock(&g_mu);
     g_reg_svc = reg;
@@ -368,32 +369,30 @@ static void h_metrics(const av_http_req *req, const char *const *params, size_t 
 
 av_status av_rest_register_all(av_router *r, bool debug_routes, av_err *e)
 {
-    static const char *const initial_caps[] = {
-        "ops.version",
-        "ops.sync",
-        "ops.metrics",
-        "collections.read",
-        "collections.write",
-        "collections.follow",
-        "entities.read",
-        "search.exact",
-        "search.hnsw",
-        "search.filter.json",
-        "search.filter.where",
-        "search.batch",
-        "search.explain",
-        "scroll",
-        "count",
-        "consistency.min_block",
-        "collections.manifest",
-        "entities.write",
-        "entities.prepare",
-        "entities.verify",
-        "idempotency",
-        "auth.api_keys",
-        "qdrant",
-        "mcp"
-    };
+    static const char *const initial_caps[] = {"ops.version",
+                                               "ops.sync",
+                                               "ops.metrics",
+                                               "collections.read",
+                                               "collections.write",
+                                               "collections.follow",
+                                               "entities.read",
+                                               "search.exact",
+                                               "search.hnsw",
+                                               "search.filter.json",
+                                               "search.filter.where",
+                                               "search.batch",
+                                               "search.explain",
+                                               "scroll",
+                                               "count",
+                                               "consistency.min_block",
+                                               "collections.manifest",
+                                               "entities.write",
+                                               "entities.prepare",
+                                               "entities.verify",
+                                               "idempotency",
+                                               "auth.api_keys",
+                                               "qdrant",
+                                               "mcp"};
     for (size_t i = 0; i < sizeof(initial_caps) / sizeof(initial_caps[0]); i++) {
         if (av_rest_add_capability(initial_caps[i], e) != AV_OK) {
             return AV_ERR;

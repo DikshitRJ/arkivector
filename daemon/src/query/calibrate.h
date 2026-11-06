@@ -11,9 +11,9 @@
 #include "log.h"
 
 typedef struct {
-    double c_d_ns;     /* time in ns for one distance call */
-    double rho;        /* random-access penalty rho (~2.0 - 4.0) */
-    double gamma;      /* sqrt(rho), default 1.7 */
+    double c_d_ns; /* time in ns for one distance call */
+    double rho;    /* random-access penalty rho (~2.0 - 4.0) */
+    double gamma;  /* sqrt(rho), default 1.7 */
 } av_calibration;
 
 /* Run startup calibration */

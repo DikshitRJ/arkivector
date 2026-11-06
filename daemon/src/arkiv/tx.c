@@ -55,8 +55,8 @@ av_status av_tx_sighash(const av_tx_desc *tx, uint8_t out_hash[32], av_err *e)
 }
 
 av_status av_tx_encode_signed(const av_tx_desc *tx, uint8_t v_parity, const uint8_t r[32],
-                             const uint8_t s[32], av_arena *arena, uint8_t **out_raw,
-                             size_t *out_len, uint8_t out_tx_hash[32], av_err *e)
+                              const uint8_t s[32], av_arena *arena, uint8_t **out_raw, size_t *out_len,
+                              uint8_t out_tx_hash[32], av_err *e)
 {
     if (tx == NULL || r == NULL || s == NULL || out_raw == NULL || out_len == NULL) {
         av_err_set(e, "invalid_argument", "invalid arguments to av_tx_encode_signed");
@@ -111,8 +111,7 @@ av_status av_tx_encode_signed(const av_tx_desc *tx, uint8_t v_parity, const uint
 }
 
 av_status av_tx_sign_and_encode(const av_tx_desc *tx, const av_signer *signer, av_arena *arena,
-                                uint8_t **out_raw, size_t *out_len, uint8_t out_tx_hash[32],
-                                av_err *e)
+                                uint8_t **out_raw, size_t *out_len, uint8_t out_tx_hash[32], av_err *e)
 {
     if (signer == NULL) {
         av_err_set(e, "invalid_argument", "signer required to sign transaction");

@@ -86,7 +86,10 @@ static void handle(const char *line, av_arena *ar)
     MemoryContext old = MemoryContextSwitchTo(ctx);
     PG_TRY();
     {
-        double dist = oc->distance(va, vb);
+        /* Call pgvector's own function (not oc->distance, which returns NaN on a dimension
+         * mismatch instead of raising) so CheckDims errors match PostgreSQL verbatim. */
+        PGFunction fn = (PGFunction) av_kernel_fn(t, oc->metric);
+        double dist = DatumGetFloat8(DirectFunctionCall2(fn, PointerGetDatum(va), PointerGetDatum(vb)));
         snprintf(out, sizeof out, "%.17g", dist);
     }
     PG_CATCH();

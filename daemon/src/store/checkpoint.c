@@ -35,7 +35,8 @@ static bool row_trampoline(const uint8_t key[32], const av_row *row, void *p)
     return c->cb(&lr, c->ctx);
 }
 
-av_status av_checkpoint_load_rows(av_store *s, const char *coll, av_checkpoint_row_cb cb, void *ctx, av_err *e)
+av_status av_checkpoint_load_rows(av_store *s, const char *coll, av_checkpoint_row_cb cb, void *ctx,
+                                  av_err *e)
 {
     load_ctx c = {av_arena_create("checkpoint", (size_t) 1 << 20, 0), cb, ctx, e, AV_OK};
     if (c.arena == NULL) {

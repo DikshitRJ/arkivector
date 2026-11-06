@@ -1,6 +1,7 @@
 /*
  * server/rest_entities.c: REST entity endpoints (point lookup, write stubs).
  */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,7 @@
 #include "filter/json_filter.h"
 #include "filter/parser.h"
 #include "filter/value.h"
+#include "filter/value_json.h"
 #include "query/executor.h"
 #include "server/idempotency.h"
 #include "server/json_io.h"
@@ -30,6 +32,17 @@ static void fail_internal(av_http_resp *resp, const char *msg, const char *insta
     av_err e;
     av_err_set(&e, "internal", "%s", msg);
     av_problem_from_err(&e, resp, instance);
+}
+
+/* Parse a decimal integer query value; returns def when malformed, clamps to [lo, hi]. */
+static long parse_long_clamped(const char *s, long lo, long hi, long def)
+{
+    char *end = NULL;
+    errno = 0;
+    long v = strtol(s, &end, 10);
+    if (end == s || *end != '\0' || errno != 0)
+        return def;
+    return v < lo ? lo : (v > hi ? hi : v);
 }
 
 /* Parse a parameter value from a query string */
@@ -58,49 +71,6 @@ static bool get_query_param(const char *query, const char *key, char *out, size_
         p = *amp == '&' ? amp + 1 : amp;
     }
     return false;
-}
-
-static yyjson_mut_val *format_typed_val(yyjson_mut_doc *doc, const av_attr *at, av_arena *arena)
-{
-    yyjson_mut_val *obj = yyjson_mut_obj(doc);
-    const char *tname = av_type_name((av_attr_type) at->type);
-    yyjson_mut_obj_add_str(doc, obj, "type", tname);
-
-    if (at->type == AV_AT_BOOL) {
-        bool val = (at->len >= 32 && at->val[31] != 0);
-        yyjson_mut_obj_add_bool(doc, obj, "value", val);
-    } else if (at->type == AV_AT_I32) {
-        av_value v;
-        if (av_value_from_stored(AV_AT_I32, at->val, at->len, &v)) {
-            char buf[64];
-            av_value_format(&v, buf, sizeof(buf));
-            yyjson_mut_obj_add_int(doc, obj, "value", atoi(buf));
-        } else {
-            yyjson_mut_obj_add_int(doc, obj, "value", 0);
-        }
-    } else if (at->type == AV_AT_STR) {
-        yyjson_mut_obj_add_strncpy(doc, obj, "value", (const char *) at->val, at->len);
-    } else if (at->type == AV_AT_BYTES) {
-        char *b64 = NULL;
-        size_t b64_len = 0;
-        av_err err;
-        av_err_clear(&err);
-        if (av_base64_encode(at->val, at->len, arena, &b64, &b64_len, &err) == AV_OK) {
-            yyjson_mut_obj_add_strncpy(doc, obj, "value", b64, b64_len);
-        } else {
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", "");
-        }
-    } else {
-        av_value v;
-        if (av_value_from_stored((av_attr_type) at->type, at->val, at->len, &v)) {
-            char buf[AV_VALUE_FORMAT_MAX];
-            av_value_format(&v, buf, sizeof(buf));
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", buf);
-        } else {
-            yyjson_mut_obj_add_strcpy(doc, obj, "value", "");
-        }
-    }
-    return obj;
 }
 
 static void h_get_entity(const av_http_req *req, const char *const *params, size_t n_params,
@@ -154,9 +124,11 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
 
     int timeout_ms = 5000;
     if (get_query_param(req->query, "timeout_ms", buf, sizeof(buf))) {
-        timeout_ms = atoi(buf);
-        if (timeout_ms < 0) timeout_ms = 0;
-        if (timeout_ms > 60000) timeout_ms = 60000;
+        timeout_ms = (int) parse_long_clamped(buf, 0, 60000, 5000);
+        if (timeout_ms < 0)
+            timeout_ms = 0;
+        if (timeout_ms > 60000)
+            timeout_ms = 60000;
     }
 
     if (get_query_param(req->query, "min_block", buf, sizeof(buf))) {
@@ -189,7 +161,8 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
             bool found_id = false;
             av_err e;
             av_err_clear(&e);
-            if (av_store_get_id(store, coll_name, ref, strlen(ref), key, &found_id, &e) == AV_OK && found_id) {
+            if (av_store_get_id(store, coll_name, ref, strlen(ref), key, &found_id, &e) == AV_OK &&
+                found_id) {
                 resolved = true;
             }
         }
@@ -284,7 +257,7 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
             vec_len = at->len;
         } else if (strncmp(at->name, "av.", 3) != 0 && strcmp(at->name, AV_ATTR_SCHEMA) != 0) {
             if (include_flags & AV_INCLUDE_ATTRIBUTES) {
-                yyjson_mut_val *tv = format_typed_val(doc, at, req->arena);
+                yyjson_mut_val *tv = av_attr_to_typed_json(doc, at, req->arena);
                 yyjson_mut_obj_add_val(doc, attrs_obj, at->name, tv);
             }
         }
@@ -306,8 +279,7 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
             av_err rpc_err;
             av_err_clear(&rpc_err);
             if (av_rpc_get_entity(rpc, key, req->arena, &onchain_ent, &found, &rpc_err) == AV_OK && found) {
-                if (memcmp(onchain_ent.key, key, 32) == 0 &&
-                    memcmp(onchain_ent.owner, row.owner, 20) == 0 &&
+                if (memcmp(onchain_ent.key, key, 32) == 0 && memcmp(onchain_ent.owner, row.owner, 20) == 0 &&
                     onchain_ent.updated_at == row.updated_at) {
                     verified = true;
                 }
@@ -353,8 +325,8 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
     av_collection_release(c);
 }
 
-static bool check_idempotency(const av_http_req *req, av_http_resp *resp,
-                             av_idempotency_store **out_idem, void **out_handle)
+static bool check_idempotency(const av_http_req *req, av_http_resp *resp, av_idempotency_store **out_idem,
+                              void **out_handle)
 {
     *out_idem = av_rest_get_idempotency();
     *out_handle = NULL;
@@ -367,8 +339,8 @@ static bool check_idempotency(const av_http_req *req, av_http_resp *resp,
     av_err e;
     av_err_clear(&e);
 
-    if (av_idempotency_check(*out_idem, req->idempotency_key, req->method, req->path,
-                             req->body, req->body_len, &action, &cached, out_handle, &e) != AV_OK) {
+    if (av_idempotency_check(*out_idem, req->idempotency_key, req->method, req->path, req->body,
+                             req->body_len, &action, &cached, out_handle, &e) != AV_OK) {
         av_problem_from_err(&e, resp, req->path);
         return false;
     }
@@ -453,7 +425,8 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
 
     yyjson_doc *req_doc = yyjson_read_opts((char *) req->body, req->body_len, 0, NULL, NULL);
     if (req_doc == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "bad_request", "invalid JSON request body");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -466,7 +439,8 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
 
     if (from_str == NULL || ents_val == NULL || !yyjson_is_arr(ents_val)) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "invalid_argument", "request must contain 'from' address and 'entities' array");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -475,7 +449,8 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
     uint8_t from_addr[20];
     if (!av_addr_from_hex(from_str, from_addr)) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "invalid_argument", "'from' must be a valid 20-byte hex address");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -486,7 +461,8 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
     av_collection *c = reg != NULL ? av_registry_get(reg, coll_name) : NULL;
     if (c == NULL) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "collection_not_found", "collection '%s' does not exist", coll_name);
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -504,10 +480,12 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
     av_prepare_result out;
     memset(&out, 0, sizeof(out));
     if (av_writer_prepare(w, c, ents_val, from_addr, req->arena, &out, &e) != AV_OK) {
-        if (temp_writer) av_writer_destroy(w);
+        if (temp_writer)
+            av_writer_destroy(w);
         av_collection_release(c);
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_problem_from_err(&e, resp, req->path);
         return;
     }
@@ -548,7 +526,8 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
     (void) av_resp_json(resp, 200, res_doc);
     complete_idempotency(idem, idem_handle, resp);
 
-    if (temp_writer) av_writer_destroy(w);
+    if (temp_writer)
+        av_writer_destroy(w);
     av_collection_release(c);
     yyjson_doc_free(req_doc);
 }
@@ -569,7 +548,8 @@ static void h_upsert_entities(const av_http_req *req, const char *const *params,
 
     av_writer *w = av_rest_get_writer();
     if (w == NULL || av_writer_get_signer(w) == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "write_disabled", "managed entity writes require a configured signer");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -577,7 +557,8 @@ static void h_upsert_entities(const av_http_req *req, const char *const *params,
 
     yyjson_doc *req_doc = yyjson_read_opts((char *) req->body, req->body_len, 0, NULL, NULL);
     if (req_doc == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "bad_request", "invalid JSON request body");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -587,7 +568,8 @@ static void h_upsert_entities(const av_http_req *req, const char *const *params,
     yyjson_val *ents_val = yyjson_obj_get(root, "entities");
     if (ents_val == NULL || !yyjson_is_arr(ents_val)) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "invalid_argument", "request must contain 'entities' array");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -596,36 +578,44 @@ static void h_upsert_entities(const av_http_req *req, const char *const *params,
     char buf[64];
     av_write_wait_mode wait_mode = AV_WAIT_RECEIPT;
     if (get_query_param(req->query, "wait", buf, sizeof(buf))) {
-        if (strcmp(buf, "none") == 0) wait_mode = AV_WAIT_NONE;
-        else if (strcmp(buf, "receipt") == 0) wait_mode = AV_WAIT_RECEIPT;
-        else if (strcmp(buf, "indexed") == 0) wait_mode = AV_WAIT_INDEXED;
+        if (strcmp(buf, "none") == 0)
+            wait_mode = AV_WAIT_NONE;
+        else if (strcmp(buf, "receipt") == 0)
+            wait_mode = AV_WAIT_RECEIPT;
+        else if (strcmp(buf, "indexed") == 0)
+            wait_mode = AV_WAIT_INDEXED;
     } else {
         yyjson_val *wval = yyjson_obj_get(root, "wait");
         if (wval != NULL && yyjson_is_str(wval)) {
             const char *ws = yyjson_get_str(wval);
-            if (strcmp(ws, "none") == 0) wait_mode = AV_WAIT_NONE;
-            else if (strcmp(ws, "receipt") == 0) wait_mode = AV_WAIT_RECEIPT;
-            else if (strcmp(ws, "indexed") == 0) wait_mode = AV_WAIT_INDEXED;
+            if (strcmp(ws, "none") == 0)
+                wait_mode = AV_WAIT_NONE;
+            else if (strcmp(ws, "receipt") == 0)
+                wait_mode = AV_WAIT_RECEIPT;
+            else if (strcmp(ws, "indexed") == 0)
+                wait_mode = AV_WAIT_INDEXED;
         }
     }
 
     int timeout_ms = 60000;
     if (get_query_param(req->query, "timeout_ms", buf, sizeof(buf))) {
-        timeout_ms = atoi(buf);
+        timeout_ms = (int) parse_long_clamped(buf, 0, 600000, 60000);
     } else {
         yyjson_val *tval = yyjson_obj_get(root, "timeout_ms");
         if (tval != NULL && yyjson_is_num(tval)) {
             timeout_ms = (int) yyjson_get_num(tval);
         }
     }
-    if (timeout_ms <= 0) timeout_ms = 60000;
+    if (timeout_ms <= 0)
+        timeout_ms = 60000;
 
     const char *coll_name = params[0];
     av_registry *reg = av_rest_get_registry();
     av_collection *c = reg != NULL ? av_registry_get(reg, coll_name) : NULL;
     if (c == NULL) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "collection_not_found", "collection '%s' does not exist", coll_name);
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -636,7 +626,8 @@ static void h_upsert_entities(const av_http_req *req, const char *const *params,
     if (av_writer_upsert(w, c, ents_val, wait_mode, timeout_ms, req->arena, &out, &e) != AV_OK) {
         av_collection_release(c);
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_problem_from_err(&e, resp, req->path);
         return;
     }
@@ -697,7 +688,8 @@ static void h_delete_entity(const av_http_req *req, const char *const *params, s
 
     av_writer *w = av_rest_get_writer();
     if (w == NULL || av_writer_get_signer(w) == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "write_disabled", "managed entity delete requires a configured signer");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -709,7 +701,8 @@ static void h_delete_entity(const av_http_req *req, const char *const *params, s
     av_registry *reg = av_rest_get_registry();
     av_collection *c = reg != NULL ? av_registry_get(reg, coll_name) : NULL;
     if (c == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "collection_not_found", "collection '%s' does not exist", coll_name);
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -721,7 +714,8 @@ static void h_delete_entity(const av_http_req *req, const char *const *params, s
 
     if (av_writer_delete_refs(w, c, refs, 1, req->arena, &out, &e) != AV_OK) {
         av_collection_release(c);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_problem_from_err(&e, resp, req->path);
         return;
     }
@@ -759,7 +753,8 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
 
     av_writer *w = av_rest_get_writer();
     if (w == NULL || av_writer_get_signer(w) == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "write_disabled", "managed entity delete requires a configured signer");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -767,7 +762,8 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
 
     yyjson_doc *req_doc = yyjson_read_opts((char *) req->body, req->body_len, 0, NULL, NULL);
     if (req_doc == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "bad_request", "invalid JSON request body");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -781,7 +777,8 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
     int selectors_set = (refs_val != NULL) + (filt_val != NULL) + (where_val != NULL);
     if (selectors_set != 1) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "invalid_argument", "must specify exactly one of 'refs', 'filter', or 'where'");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -792,7 +789,8 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
     av_collection *c = reg != NULL ? av_registry_get(reg, coll_name) : NULL;
     if (c == NULL) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "collection_not_found", "collection '%s' does not exist", coll_name);
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -805,7 +803,8 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
         if (!yyjson_is_arr(refs_val)) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_err_set(&e, "invalid_argument", "'refs' must be an array");
             av_problem_from_err(&e, resp, req->path);
             return;
@@ -814,7 +813,8 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
         if (n_refs > 1000) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_err_set(&e, "invalid_argument", "refs exceeds limit of 1000 entities");
             av_problem_from_err(&e, resp, req->path);
             return;
@@ -822,12 +822,14 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
         const char **refs = av_arena_alloc(req->arena, n_refs * sizeof(char *), 0);
         for (size_t i = 0; i < n_refs; i++) {
             refs[i] = yyjson_get_str(yyjson_arr_get(refs_val, i));
-            if (refs[i] == NULL) refs[i] = "";
+            if (refs[i] == NULL)
+                refs[i] = "";
         }
         if (av_writer_delete_refs(w, c, refs, n_refs, req->arena, &out, &e) != AV_OK) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
@@ -837,7 +839,8 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
         if (parse_filter_or_where(root, coldef, req->arena, &ast, &e) != AV_OK) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
@@ -854,31 +857,38 @@ static void h_delete_entities(const av_http_req *req, const char *const *params,
         if (cand == NULL && ast != NULL && ast->kind != AV_F_TRUE) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
 
         uint64_t count = (cand != NULL) ? roaring_bitmap_get_cardinality(cand) : 0;
         if (count > 10000) {
-            if (cand != NULL) roaring_bitmap_free(cand);
+            if (cand != NULL)
+                roaring_bitmap_free(cand);
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
-            av_err_set(&e, "invalid_argument", "filter matches %lu entities, exceeding 10000 cap", (unsigned long) count);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
+            av_err_set(&e, "invalid_argument", "filter matches %lu entities, exceeding 10000 cap",
+                       (unsigned long) count);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
 
         if (av_writer_delete_filter(w, c, cand, req->arena, &out, &e) != AV_OK) {
-            if (cand != NULL) roaring_bitmap_free(cand);
+            if (cand != NULL)
+                roaring_bitmap_free(cand);
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
-        if (cand != NULL) roaring_bitmap_free(cand);
+        if (cand != NULL)
+            roaring_bitmap_free(cand);
     }
 
     yyjson_mut_doc *res_doc = yyjson_mut_doc_new(NULL);
@@ -915,7 +925,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
 
     av_writer *w = av_rest_get_writer();
     if (w == NULL || av_writer_get_signer(w) == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "write_disabled", "managed entity extend requires a configured signer");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -923,7 +934,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
 
     yyjson_doc *req_doc = yyjson_read_opts((char *) req->body, req->body_len, 0, NULL, NULL);
     if (req_doc == NULL) {
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "bad_request", "invalid JSON request body");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -933,7 +945,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
     yyjson_val *ttl_val = yyjson_obj_get(root, "ttl");
     if (ttl_val == NULL) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "invalid_argument", "extend request requires 'ttl' object");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -942,7 +955,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
     uint64_t expires_at = 0, min_lifetime = 0;
     if (!av_writer_parse_ttl(ttl_val, &expires_at, &min_lifetime, &e)) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_problem_from_err(&e, resp, req->path);
         return;
     }
@@ -954,7 +968,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
     int selectors_set = (refs_val != NULL) + (filt_val != NULL) + (where_val != NULL);
     if (selectors_set != 1) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "invalid_argument", "must specify exactly one of 'refs', 'filter', or 'where'");
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -965,7 +980,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
     av_collection *c = reg != NULL ? av_registry_get(reg, coll_name) : NULL;
     if (c == NULL) {
         yyjson_doc_free(req_doc);
-        if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+        if (idem_handle != NULL)
+            av_idempotency_abort(idem, idem_handle);
         av_err_set(&e, "collection_not_found", "collection '%s' does not exist", coll_name);
         av_problem_from_err(&e, resp, req->path);
         return;
@@ -978,7 +994,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
         if (!yyjson_is_arr(refs_val)) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_err_set(&e, "invalid_argument", "'refs' must be an array");
             av_problem_from_err(&e, resp, req->path);
             return;
@@ -987,7 +1004,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
         if (n_refs > 1000) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_err_set(&e, "invalid_argument", "refs exceeds limit of 1000 entities");
             av_problem_from_err(&e, resp, req->path);
             return;
@@ -995,12 +1013,15 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
         const char **refs = av_arena_alloc(req->arena, n_refs * sizeof(char *), 0);
         for (size_t i = 0; i < n_refs; i++) {
             refs[i] = yyjson_get_str(yyjson_arr_get(refs_val, i));
-            if (refs[i] == NULL) refs[i] = "";
+            if (refs[i] == NULL)
+                refs[i] = "";
         }
-        if (av_writer_extend_refs(w, c, refs, n_refs, expires_at, min_lifetime, req->arena, &out, &e) != AV_OK) {
+        if (av_writer_extend_refs(w, c, refs, n_refs, expires_at, min_lifetime, req->arena, &out, &e) !=
+            AV_OK) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
@@ -1010,7 +1031,8 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
         if (parse_filter_or_where(root, coldef, req->arena, &ast, &e) != AV_OK) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
@@ -1027,31 +1049,38 @@ static void h_extend_entities(const av_http_req *req, const char *const *params,
         if (cand == NULL && ast != NULL && ast->kind != AV_F_TRUE) {
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
 
         uint64_t count = (cand != NULL) ? roaring_bitmap_get_cardinality(cand) : 0;
         if (count > 10000) {
-            if (cand != NULL) roaring_bitmap_free(cand);
+            if (cand != NULL)
+                roaring_bitmap_free(cand);
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
-            av_err_set(&e, "invalid_argument", "filter matches %lu entities, exceeding 10000 cap", (unsigned long) count);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
+            av_err_set(&e, "invalid_argument", "filter matches %lu entities, exceeding 10000 cap",
+                       (unsigned long) count);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
 
         if (av_writer_extend_filter(w, c, cand, expires_at, min_lifetime, req->arena, &out, &e) != AV_OK) {
-            if (cand != NULL) roaring_bitmap_free(cand);
+            if (cand != NULL)
+                roaring_bitmap_free(cand);
             av_collection_release(c);
             yyjson_doc_free(req_doc);
-            if (idem_handle != NULL) av_idempotency_abort(idem, idem_handle);
+            if (idem_handle != NULL)
+                av_idempotency_abort(idem, idem_handle);
             av_problem_from_err(&e, resp, req->path);
             return;
         }
-        if (cand != NULL) roaring_bitmap_free(cand);
+        if (cand != NULL)
+            roaring_bitmap_free(cand);
     }
 
     yyjson_mut_doc *res_doc = yyjson_mut_doc_new(NULL);

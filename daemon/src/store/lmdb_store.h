@@ -58,8 +58,8 @@ av_status av_store_put_entity(av_txn *t, const char *coll, const uint8_t key[32]
                               av_err *e);
 av_status av_store_del_entity(av_txn *t, const char *coll, const uint8_t key[32], av_err *e);
 /* out->attrs_blob is copied into arena a. */
-av_status av_store_get_entity(av_store *s, const char *coll, const uint8_t key[32], av_arena *a,
-                              av_row *out, bool *found, av_err *e);
+av_status av_store_get_entity(av_store *s, const char *coll, const uint8_t key[32], av_arena *a, av_row *out,
+                              bool *found, av_err *e);
 av_status av_store_txn_get_entity(av_txn *t, const char *coll, const uint8_t key[32], av_arena *a,
                                   av_row *out, bool *found, av_err *e);
 typedef bool (*av_store_row_cb)(const uint8_t key[32], const av_row *row, void *ctx); /* false stops */
@@ -97,7 +97,7 @@ av_status av_store_ring_get(av_store *s, const char *coll, uint64_t block, uint8
                             uint8_t (**keys)[32], size_t *n_keys, bool *found, av_err *e);
 /* Lists ring entries newest-first. entries and their keys are allocated in arena a. */
 av_status av_store_ring_list(av_store *s, const char *coll, av_arena *a, av_ring_entry **out, size_t *n_out,
-                            av_err *e);
+                             av_err *e);
 /* Keep only the newest keep_last blocks. */
 av_status av_store_ring_trim(av_txn *t, const char *coll, size_t keep_last, av_err *e);
 /* Delete all ring entries with block > from_block (after a reorg reset). */

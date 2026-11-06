@@ -27,9 +27,8 @@ const char *av_plan_strategy_name(av_plan_strategy s)
     return "exact_flat";
 }
 
-av_status av_plan_query(const av_collection *col, const void *query, const av_opclass *oc,
-                        bool force_exact, const roaring_bitmap_t *cand, size_t live_total,
-                        av_query_plan *out, av_err *e)
+av_status av_plan_query(const av_collection *col, const void *query, const av_opclass *oc, bool force_exact,
+                        const roaring_bitmap_t *cand, size_t live_total, av_query_plan *out, av_err *e)
 {
     (void) query;
     (void) e;

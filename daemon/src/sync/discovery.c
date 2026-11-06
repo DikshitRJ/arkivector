@@ -74,7 +74,7 @@ void av_discovery_destroy(av_discovery *d)
 }
 
 void av_discovery_cache_not_mine(av_discovery *d, const char *coll_name, const uint8_t key[32],
-                                uint64_t expires_at)
+                                 uint64_t expires_at)
 {
     if (d == NULL || coll_name == NULL || key == NULL) {
         return;
@@ -104,7 +104,7 @@ void av_discovery_cache_not_mine(av_discovery *d, const char *coll_name, const u
 }
 
 bool av_discovery_is_not_mine(av_discovery *d, const char *coll_name, const uint8_t key[32],
-                             uint64_t current_block)
+                              uint64_t current_block)
 {
     if (d == NULL || coll_name == NULL || key == NULL) {
         return false;
@@ -127,9 +127,8 @@ bool av_discovery_is_not_mine(av_discovery *d, const char *coll_name, const uint
     return found;
 }
 
-static av_status probe_strategy_c(av_discovery *d, const av_coldef *coldef,
-                                  const uint8_t (*cand_keys)[32], size_t n_cand,
-                                  uint8_t (*out_keys)[32], size_t *n_out, size_t max_out,
+static av_status probe_strategy_c(av_discovery *d, const av_coldef *coldef, const uint8_t (*cand_keys)[32],
+                                  size_t n_cand, uint8_t (*out_keys)[32], size_t *n_out, size_t max_out,
                                   uint64_t block_num, av_err *e)
 {
     if (n_cand == 0) {
@@ -140,7 +139,8 @@ static av_status probe_strategy_c(av_discovery *d, const av_coldef *coldef,
     size_t chunk_size = 32;
     for (size_t offset = 0; offset < n_cand; offset += chunk_size) {
         size_t count = n_cand - offset;
-        if (count > chunk_size) count = chunk_size;
+        if (count > chunk_size)
+            count = chunk_size;
 
         char lit[128];
         if (av_qb_lit_str(coldef->schema_tag, strlen(coldef->schema_tag), lit, sizeof(lit), e) != AV_OK) {
@@ -150,13 +150,13 @@ static av_status probe_strategy_c(av_discovery *d, const av_coldef *coldef,
         char qbuf[8192];
         av_qb qb;
         av_qb_init(&qb, qbuf, sizeof(qbuf));
-        if (av_qb_cmp(&qb, AV_ATTR_SCHEMA, "=", lit, e) != AV_OK ||
-            av_qb_and(&qb, e) != AV_OK) {
+        if (av_qb_cmp(&qb, AV_ATTR_SCHEMA, "=", lit, e) != AV_OK || av_qb_and(&qb, e) != AV_OK) {
             return AV_ERR;
         }
 
         char or_buf[4096];
-        if (av_qb_or_keys(or_buf, sizeof(or_buf), (const uint8_t (*)[32]) &cand_keys[offset], count, e) != AV_OK) {
+        if (av_qb_or_keys(or_buf, sizeof(or_buf), (const uint8_t (*)[32]) & cand_keys[offset], count, e) !=
+            AV_OK) {
             return AV_ERR;
         }
         if (av_qb_raw(&qb, or_buf, e) != AV_OK) {
@@ -207,12 +207,11 @@ static av_status probe_strategy_c(av_discovery *d, const av_coldef *coldef,
 }
 
 av_status av_discovery_filter_keys(av_discovery *d, const av_coldef *coldef, uint64_t block_num,
-                                   const uint8_t (*cand_keys)[32], size_t n_cand,
-                                   uint8_t (*out_keys)[32], size_t *n_out, size_t max_out,
-                                   av_err *e)
+                                   const uint8_t (*cand_keys)[32], size_t n_cand, uint8_t (*out_keys)[32],
+                                   size_t *n_out, size_t max_out, av_err *e)
 {
     *n_out = 0;
-    if (coldef == NULL || n_cand == 0) {
+    if (coldef == NULL || cand_keys == NULL || n_cand == 0) {
         return AV_OK;
     }
 
@@ -244,5 +243,6 @@ av_status av_discovery_filter_keys(av_discovery *d, const av_coldef *coldef, uin
     }
 
     /* Run Strategy C probe (or calldata decode fallback) */
-    return probe_strategy_c(d, coldef, (const uint8_t (*)[32]) unk, n_unk, out_keys, n_out, max_out, block_num, e);
+    return probe_strategy_c(d, coldef, (const uint8_t (*)[32]) unk, n_unk, out_keys, n_out, max_out,
+                            block_num, e);
 }

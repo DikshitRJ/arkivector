@@ -35,8 +35,8 @@
 #include "filter/value.h"
 #include "log.h"
 
-#define AV_FILTER_MAX_DEPTH      16   /* docs/api/filters.md section 2 */
-#define AV_FILTER_MAX_LEAVES     256  /* docs/api/filters.md section 2 */
+#define AV_FILTER_MAX_DEPTH       16    /* docs/api/filters.md section 2 */
+#define AV_FILTER_MAX_LEAVES      256   /* docs/api/filters.md section 2 */
 #define AV_FILTER_MAX_WHERE_BYTES 16384 /* size of a `where` string (mock/Arkiv query limit) */
 
 typedef enum {
@@ -69,15 +69,15 @@ typedef struct {
 typedef struct av_filter av_filter;
 struct av_filter {
     av_filter_kind kind;
-    int pos;      /* byte offset in the `where` text of the node start; -1 for JSON/API-built nodes */
-    int depth;    /* 1 for a leaf, 1 + max(child depth) for AND/OR/NOT */
+    int pos;          /* byte offset in the `where` text of the node start; -1 for JSON/API-built nodes */
+    int depth;        /* 1 for a leaf, 1 + max(child depth) for AND/OR/NOT */
     av_filter **kids; /* AND/OR: n_kids >= 2 ; NOT: exactly 1 ; else NULL */
     size_t n_kids;
-    av_field field;     /* leaves except TRUE */
-    av_cmp_op op;       /* CMP */
-    av_value value;     /* CMP operand, BETWEEN low, STARTSWITH prefix */
-    av_value high;      /* BETWEEN high */
-    av_attr_type type;  /* TYPEOF */
+    av_field field;    /* leaves except TRUE */
+    av_cmp_op op;      /* CMP */
+    av_value value;    /* CMP operand, BETWEEN low, STARTSWITH prefix */
+    av_value high;     /* BETWEEN high */
+    av_attr_type type; /* TYPEOF */
 };
 
 /*
@@ -127,7 +127,8 @@ av_filter *av_fb_exists(av_fbuild *fb, int pos, const av_field *f, av_err *e);
 av_filter *av_fb_typeof(av_fbuild *fb, int pos, const av_field *f, av_attr_type t, av_err *e);
 av_filter *av_fb_not(av_fbuild *fb, int pos, av_filter *kid, av_err *e);
 /* kind AND or OR; kids (n >= 1) is copied. A single kid is returned as is. */
-av_filter *av_fb_group(av_fbuild *fb, av_filter_kind kind, int pos, av_filter *const *kids, size_t n, av_err *e);
+av_filter *av_fb_group(av_fbuild *fb, av_filter_kind kind, int pos, av_filter *const *kids, size_t n,
+                       av_err *e);
 
 /* Set code "invalid_filter" with printf-style message and position (pos < 0: unset). */
 void av_filter_err(av_err *e, int pos, const char *fmt, ...) __attribute__((format(printf, 3, 4)));

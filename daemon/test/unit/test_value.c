@@ -89,21 +89,26 @@ TEST dec_limits(void)
     const char *mn = "-57896044618658097711785492504343953926634992332820282019728.792003956564819968";
     ASSERT(roundtrip(AV_AT_DEC, mx, mx));
     ASSERT(roundtrip(AV_AT_DEC, mn, mn));
-    ASSERT(!P(AV_AT_DEC, "57896044618658097711785492504343953926634992332820282019728.792003956564819968", &v));
-    ASSERT(!P(AV_AT_DEC, "-57896044618658097711785492504343953926634992332820282019728.792003956564819969", &v));
-    ASSERT(!P(AV_AT_DEC, "99999999999999999999999999999999999999999999999999999999999999999999999999999999", &v));
+    ASSERT(
+        !P(AV_AT_DEC, "57896044618658097711785492504343953926634992332820282019728.792003956564819968", &v));
+    ASSERT(
+        !P(AV_AT_DEC, "-57896044618658097711785492504343953926634992332820282019728.792003956564819969", &v));
+    ASSERT(!P(AV_AT_DEC, "99999999999999999999999999999999999999999999999999999999999999999999999999999999",
+              &v));
     /* 18 fraction digits ok, 19 rejected (even when the 19th is 0) */
     ASSERT(P(AV_AT_DEC, "1.123456789012345678", &v));
     ASSERT(!P(AV_AT_DEC, "1.1234567890123456780", &v));
     ASSERT(!P(AV_AT_DEC, "0.0000000000000000000", &v));
     /* leading zeros never overflow */
-    ASSERT(P(AV_AT_DEC, "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", &v));
+    ASSERT(P(AV_AT_DEC,
+             "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", &v));
     PASS();
 }
 
 TEST dec_rejects_malformed(void)
 {
-    static const char *bad[] = {"", "-", ".5", "5.", "+1", " 1", "1 ", "1e3", "1.2.3", "0x10", "--1", "1,5", "abc", "-.5", "1_0"};
+    static const char *bad[] = {"",      "-",    ".5",  "5.",  "+1",  " 1",  "1 ", "1e3",
+                                "1.2.3", "0x10", "--1", "1,5", "abc", "-.5", "1_0"};
     av_value v;
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
         ASSERTm(bad[i], !P(AV_AT_DEC, bad[i], &v));
@@ -113,9 +118,18 @@ TEST dec_rejects_malformed(void)
 
 TEST dec_ordering(void)
 {
-    static const char *asc[] = {"-57896044618658097711785492504343953926634992332820282019728.792003956564819968",
-                                "-1000", "-1", "-0.5", "-0.000000000000000001", "0", "0.000000000000000001", "0.5",
-                                "1", "1000", "57896044618658097711785492504343953926634992332820282019728.792003956564819967"};
+    static const char *asc[] = {
+        "-57896044618658097711785492504343953926634992332820282019728.792003956564819968",
+        "-1000",
+        "-1",
+        "-0.5",
+        "-0.000000000000000001",
+        "0",
+        "0.000000000000000001",
+        "0.5",
+        "1",
+        "1000",
+        "57896044618658097711785492504343953926634992332820282019728.792003956564819967"};
     for (size_t i = 0; i + 1 < sizeof(asc) / sizeof(asc[0]); i++) {
         av_value a, b;
         ASSERT(P(AV_AT_DEC, asc[i], &a));
@@ -132,7 +146,8 @@ TEST u256_parse_print(void)
     const char *mx = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
     av_value v;
     ASSERT(roundtrip(AV_AT_U256, mx, mx));
-    ASSERT(!P(AV_AT_U256, "115792089237316195423570985008687907853269984665640564039457584007913129639936", &v));
+    ASSERT(
+        !P(AV_AT_U256, "115792089237316195423570985008687907853269984665640564039457584007913129639936", &v));
     ASSERT(roundtrip(AV_AT_U256, "0", "0"));
     ASSERT(roundtrip(AV_AT_U256, "1000000000000000000", "1000000000000000000"));
     ASSERT(roundtrip(AV_AT_U256, "0xff", "255"));
@@ -140,7 +155,8 @@ TEST u256_parse_print(void)
     ASSERT(roundtrip(AV_AT_U256, "0x0", "0"));
     ASSERT(roundtrip(AV_AT_U256, "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", mx));
     ASSERT(!P(AV_AT_U256, "0x", &v));
-    ASSERT(!P(AV_AT_U256, "0x1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", &v)); /* 65 digits */
+    ASSERT(!P(AV_AT_U256, "0x1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              &v)); /* 65 digits */
     ASSERT(!P(AV_AT_U256, "0xzz", &v));
     ASSERT(!P(AV_AT_U256, "-1", &v));
     ASSERT(!P(AV_AT_U256, "", &v));

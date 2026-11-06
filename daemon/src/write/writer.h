@@ -19,11 +19,7 @@
 #include "write/nonce.h"
 #include "yyjson.h"
 
-typedef enum {
-    AV_WAIT_NONE = 0,
-    AV_WAIT_RECEIPT = 1,
-    AV_WAIT_INDEXED = 2
-} av_write_wait_mode;
+typedef enum { AV_WAIT_NONE = 0, AV_WAIT_RECEIPT = 1, AV_WAIT_INDEXED = 2 } av_write_wait_mode;
 
 typedef struct {
     uint64_t chain_id;
@@ -36,8 +32,8 @@ typedef struct {
 
 typedef struct av_writer av_writer;
 
-av_writer *av_writer_create(const av_writer_config *cfg, av_signer *signer, av_rpc *rpc,
-                            av_store *store, av_registry *reg, av_err *e);
+av_writer *av_writer_create(const av_writer_config *cfg, av_signer *signer, av_rpc *rpc, av_store *store,
+                            av_registry *reg, av_err *e);
 void av_writer_destroy(av_writer *w);
 
 const av_signer *av_writer_get_signer(const av_writer *w);
@@ -64,8 +60,8 @@ bool av_writer_parse_ttl(yyjson_val *ttl_val, uint64_t *expires_at, uint64_t *mi
 
 /* Managed upsert */
 av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entities_arr,
-                           av_write_wait_mode wait_mode, int timeout_ms,
-                           av_arena *arena, av_upsert_batch_result *out, av_err *e);
+                           av_write_wait_mode wait_mode, int timeout_ms, av_arena *arena,
+                           av_upsert_batch_result *out, av_err *e);
 
 /* Tx result for delete / extend */
 typedef struct {
@@ -83,16 +79,16 @@ av_status av_writer_delete_filter(av_writer *w, av_collection *col, const roarin
 
 /* Extend operations */
 av_status av_writer_extend_refs(av_writer *w, av_collection *col, const char *const *refs, size_t n_refs,
-                                uint64_t expires_at, uint64_t min_lifetime,
-                                av_arena *arena, av_tx_response *out, av_err *e);
+                                uint64_t expires_at, uint64_t min_lifetime, av_arena *arena,
+                                av_tx_response *out, av_err *e);
 av_status av_writer_extend_filter(av_writer *w, av_collection *col, const roaring_bitmap_t *matching,
-                                  uint64_t expires_at, uint64_t min_lifetime,
-                                  av_arena *arena, av_tx_response *out, av_err *e);
+                                  uint64_t expires_at, uint64_t min_lifetime, av_arena *arena,
+                                  av_tx_response *out, av_err *e);
 
 /* Unsigned prepare */
 typedef struct {
     char to[43];
-    char *data; /* hex calldata "0x49650044..." */
+    char *data;     /* hex calldata "0x49650044..." */
     char value[10]; /* "0x0" */
     uint64_t nonce;
     uint64_t gas_estimate;
@@ -107,7 +103,6 @@ typedef struct {
 } av_prepare_result;
 
 av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entities_arr,
-                            const uint8_t from_addr[20], av_arena *arena,
-                            av_prepare_result *out, av_err *e);
+                            const uint8_t from_addr[20], av_arena *arena, av_prepare_result *out, av_err *e);
 
 #endif /* AV_WRITE_WRITER_H */

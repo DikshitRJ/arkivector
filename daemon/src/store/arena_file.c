@@ -18,7 +18,7 @@
 struct av_arena_file {
     uint8_t *base;
     size_t reserved;
-    int fd;           /* -1 for anonymous */
+    int fd; /* -1 for anonymous */
     bool read_only;
     _Atomic size_t committed;
     _Atomic size_t used;
@@ -53,7 +53,8 @@ av_status av_arena_file_open(const char *path, size_t reserve, unsigned flags, a
     f->read_only = ro;
     size_t file_size = 0;
     if (path != NULL) {
-        f->fd = open(path, ro ? O_RDONLY : (O_RDWR | O_CREAT | ((flags & AV_AF_TRUNCATE) ? O_TRUNC : 0)), 0644);
+        f->fd =
+            open(path, ro ? O_RDONLY : (O_RDWR | O_CREAT | ((flags & AV_AF_TRUNCATE) ? O_TRUNC : 0)), 0644);
         if (f->fd < 0) {
             av_status st = sys_fail(e, "open", path);
             free(f);
@@ -76,8 +77,8 @@ av_status av_arena_file_open(const char *path, size_t reserve, unsigned flags, a
     void *p = MAP_FAILED;
     size_t sz = want;
     for (;;) {
-        p = mmap(NULL, sz, ro ? PROT_READ : PROT_NONE, ro ? MAP_SHARED : (MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE),
-                 ro ? f->fd : -1, 0);
+        p = mmap(NULL, sz, ro ? PROT_READ : PROT_NONE,
+                 ro ? MAP_SHARED : (MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE), ro ? f->fd : -1, 0);
         if (p != MAP_FAILED || ro)
             break;
         size_t half = sz / 2 / ps * ps;
@@ -142,8 +143,8 @@ av_status av_arena_file_ensure(av_arena_file *f, size_t n, av_err *e)
     if (f->fd >= 0) {
         if (ftruncate(f->fd, (off_t) target) != 0)
             return sys_fail(e, "ftruncate", NULL);
-        if (mmap(f->base + committed, target - committed, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, f->fd,
-                 (off_t) committed) == MAP_FAILED)
+        if (mmap(f->base + committed, target - committed, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
+                 f->fd, (off_t) committed) == MAP_FAILED)
             return sys_fail(e, "mmap grow", NULL);
     } else if (mprotect(f->base + committed, target - committed, PROT_READ | PROT_WRITE) != 0) {
         return sys_fail(e, "mprotect grow", NULL);

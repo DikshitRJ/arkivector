@@ -17,9 +17,9 @@
 static const struct {
     const char *name;
     av_attr_type type;
-} k_types[] = {{"bool", AV_AT_BOOL}, {"i32", AV_AT_I32},     {"u64", AV_AT_U64}, {"u256", AV_AT_U256},
-               {"dec", AV_AT_DEC},   {"str", AV_AT_STR},     {"addr", AV_AT_ADDR}, {"key", AV_AT_KEY},
-               {"bytes", AV_AT_BYTES}};
+} k_types[] = {{"bool", AV_AT_BOOL}, {"i32", AV_AT_I32}, {"u64", AV_AT_U64},
+               {"u256", AV_AT_U256}, {"dec", AV_AT_DEC}, {"str", AV_AT_STR},
+               {"addr", AV_AT_ADDR}, {"key", AV_AT_KEY}, {"bytes", AV_AT_BYTES}};
 
 const char *av_type_name(av_attr_type t)
 {
@@ -281,8 +281,10 @@ static const uint64_t k_rc[24] = {
     0x000000008000808bULL, 0x800000000000008bULL, 0x8000000000008089ULL, 0x8000000000008003ULL,
     0x8000000000008002ULL, 0x8000000000000080ULL, 0x000000000000800aULL, 0x800000008000000aULL,
     0x8000000080008081ULL, 0x8000000000008080ULL, 0x0000000080000001ULL, 0x8000000080008008ULL};
-static const unsigned k_rot[24] = {1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14, 27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44};
-static const unsigned k_pi[24] = {10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1};
+static const unsigned k_rot[24] = {1,  3,  6,  10, 15, 21, 28, 36, 45, 55, 2,  14,
+                                   27, 41, 56, 8,  25, 43, 62, 18, 39, 61, 20, 44};
+static const unsigned k_pi[24] = {10, 7,  11, 17, 18, 3, 5,  16, 8,  21, 24, 4,
+                                  15, 23, 19, 13, 12, 2, 20, 14, 22, 9,  6,  1};
 
 static uint64_t rotl64(uint64_t x, unsigned n)
 {
@@ -526,8 +528,8 @@ static bool parse_dec_text(const char *s, size_t n, uint8_t w[32], const char **
 }
 
 /* Parse digits (optional '-') into a magnitude <= max_mag. */
-static bool parse_small_int(const char *s, size_t n, bool allow_neg, uint64_t max_mag, uint64_t *mag, bool *neg,
-                            const char **why)
+static bool parse_small_int(const char *s, size_t n, bool allow_neg, uint64_t max_mag, uint64_t *mag,
+                            bool *neg, const char **why)
 {
     size_t i = 0;
     *neg = false;

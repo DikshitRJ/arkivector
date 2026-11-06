@@ -20,18 +20,18 @@
 #define AV_INCLUDE_VECTOR     (1 << 2)
 
 typedef struct {
-    const void *query_vec;        /* decoded pgvector struct */
-    const av_opclass *oc;         /* opclass matching operator */
-    size_t k;                     /* 1..1000 */
-    size_t offset;                /* offset + k <= 1000 */
+    const void *query_vec; /* decoded pgvector struct */
+    const av_opclass *oc;  /* opclass matching operator */
+    size_t k;              /* 1..1000 */
+    size_t offset;         /* offset + k <= 1000 */
     bool has_max_distance;
     double max_distance;
     bool has_min_score;
     double min_score;
-    bool exact;                   /* force exact */
-    int include_flags;            /* AV_INCLUDE_* */
-    int ef_search;                /* 1..1000 */
-    const char *iterative_scan;   /* "off" | "relaxed_order" | "strict_order" */
+    bool exact;                 /* force exact */
+    int include_flags;          /* AV_INCLUDE_* */
+    int ef_search;              /* 1..1000 */
+    const char *iterative_scan; /* "off" | "relaxed_order" | "strict_order" */
     size_t max_scan_tuples;
     bool explain;
 } av_search_params;

@@ -10,7 +10,6 @@
 #include <string.h>
 
 #include "fmgr.h"
-#include "hnsw.h"
 #include "miscadmin.h"
 #include "storage/lwlock.h"
 #include "utils/memutils.h"

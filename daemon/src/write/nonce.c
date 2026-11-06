@@ -64,7 +64,8 @@ av_status av_nonce_tracker_resync(av_nonce_tracker *nt, av_err *e)
     yyjson_doc *resp_doc = NULL;
     yyjson_val *res = NULL;
     int rpc_code = 0;
-    av_status st = av_rpc_call(nt->rpc, "eth_getTransactionCount", params_json, &resp_doc, &res, &rpc_code, e);
+    av_status st =
+        av_rpc_call(nt->rpc, "eth_getTransactionCount", params_json, &resp_doc, &res, &rpc_code, e);
     if (st != AV_OK || resp_doc == NULL) {
         pthread_mutex_unlock(&nt->mu);
         return AV_ERR;

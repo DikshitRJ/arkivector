@@ -33,7 +33,8 @@ typedef struct av_arena_file av_arena_file;
  * 1/64 of the request, and av_arena_file_reserved() reports what was obtained.
  * Ownership: caller closes with av_arena_file_close().
  */
-av_status av_arena_file_open(const char *path, size_t reserve, unsigned flags, av_arena_file **out, av_err *e);
+av_status av_arena_file_open(const char *path, size_t reserve, unsigned flags, av_arena_file **out,
+                             av_err *e);
 void av_arena_file_close(av_arena_file *f);
 
 /* Allocate n bytes aligned to align (power of two, 0 = 8). NULL (with e set) when the reservation is full. */

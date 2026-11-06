@@ -46,7 +46,7 @@ def pick_dim(rng: random.Random, i: int, t: str) -> int:
     if t in ("halfvec", "sparsevec") and i < 20:
         return rng.randint(2000, 16000)
     if t == "bit" and i < 6:
-        return rng.choice([65, 4096, 100000])
+        return rng.choice([65, 4096, 64000])  # contract max for bit (vectors.md §3.3)
     r = rng.random()
     if r < 0.5:
         return rng.choice(SMALL_DIMS)

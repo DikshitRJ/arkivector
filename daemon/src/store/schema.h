@@ -48,8 +48,8 @@
 #include "log.h"
 
 #define AV_STORE_SCHEMA_VERSION 1u
-#define AV_ROW_VERSION 1u
-#define AV_ROW_HEADER_SIZE 106u
+#define AV_ROW_VERSION          1u
+#define AV_ROW_HEADER_SIZE      106u
 
 /* Serialize attributes. *out is arena memory. */
 av_status av_attrs_pack(const av_attr *attrs, size_t n, av_arena *a, uint8_t **out, size_t *len, av_err *e);

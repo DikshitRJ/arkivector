@@ -49,7 +49,7 @@ static bool spawn_mock(void)
         dup2(pfd[1], STDOUT_FILENO);
         close(pfd[0]);
         close(pfd[1]);
-        execl(py, py, script, "--port", "0", "--seed", "7", (char *)NULL);
+        execl(py, py, script, "--port", "0", "--seed", "7", (char *) NULL);
         _exit(127);
     }
     close(pfd[1]);
@@ -99,7 +99,7 @@ typedef struct {
 
 static size_t cb_write(char *p, size_t s, size_t m, void *ud)
 {
-    cbuf *b = (cbuf *)ud;
+    cbuf *b = (cbuf *) ud;
     size_t n = s * m;
     if (b->len + n >= sizeof b->buf)
         return 0;
@@ -153,10 +153,10 @@ static av_rpc *mk_rpc(int retries, const char *key)
     return av_rpc_create(&cfg, &e);
 }
 
-#define NEED_MOCK()                                                                                                    \
-    do {                                                                                                               \
-        if (!g_ready)                                                                                                  \
-            SKIPm("mock-arkiv could not start (set AV_PYTHON)");                                                       \
+#define NEED_MOCK()                                              \
+    do {                                                         \
+        if (!g_ready)                                            \
+            SKIPm("mock-arkiv could not start (set AV_PYTHON)"); \
     } while (0)
 
 static int key_index(const uint8_t k[32])
@@ -175,13 +175,14 @@ TEST seed_chain(void)
     char body[4096];
     size_t w = 0;
     NEED_MOCK();
-    w += (size_t)snprintf(body + w, sizeof body - w, "[");
+    w += (size_t) snprintf(body + w, sizeof body - w, "[");
     for (int i = 0; i < NENT; i++)
-        w += (size_t)snprintf(body + w, sizeof body - w,
-                              "%s{\"min_lifetime\":100,\"attributes\":[{\"name\":\"arkiv.schema\",\"type\":\"str\","
-                              "\"value\":\"%s\"},{\"name\":\"score\",\"type\":\"dec\",\"value\":\"%d.5\"},"
-                              "{\"name\":\"av.vec\",\"type\":\"bytes\",\"value\":\"0x0%dff\"}]}",
-                              i ? "," : "", i < 4 ? "t.even" : "t.odd", i, i);
+        w += (size_t) snprintf(
+            body + w, sizeof body - w,
+            "%s{\"min_lifetime\":100,\"attributes\":[{\"name\":\"arkiv.schema\",\"type\":\"str\","
+            "\"value\":\"%s\"},{\"name\":\"score\",\"type\":\"dec\",\"value\":\"%d.5\"},"
+            "{\"name\":\"av.vec\",\"type\":\"bytes\",\"value\":\"0x0%dff\"}]}",
+            i ? "," : "", i < 4 ? "t.even" : "t.odd", i, i);
     snprintf(body + w, sizeof body - w, "]");
     ASSERT_EQ(200, ctl("POST", "/entities", body, &out));
     yyjson_doc *d = yyjson_read(out.buf, out.len, 0);
@@ -189,7 +190,8 @@ TEST seed_chain(void)
     yyjson_val *created = yyjson_obj_get(yyjson_doc_get_root(d), "created");
     ASSERT_EQ(NENT, yyjson_arr_size(created));
     for (size_t i = 0; i < NENT; i++) {
-        const char *k = yyjson_get_str(yyjson_arr_get_first(yyjson_obj_get(yyjson_arr_get(created, i), "keys")));
+        const char *k =
+            yyjson_get_str(yyjson_arr_get_first(yyjson_obj_get(yyjson_arr_get(created, i), "keys")));
         ASSERT(k != NULL && av_key_from_hex(k, g_keys[i]));
     }
     yyjson_doc_free(d);
@@ -327,7 +329,8 @@ TEST logs_by_kind(void)
     /* one of each other kind, then mine */
     av_key_to_hex(g_keys[0], hex);
     snprintf(path, sizeof path, "/entities/%s", hex);
-    ASSERT_EQ(200, ctl("PATCH", path, "{\"attributes\":[{\"name\":\"score\",\"type\":\"dec\",\"value\":\"9\"}]}", &out));
+    ASSERT_EQ(200, ctl("PATCH", path,
+                       "{\"attributes\":[{\"name\":\"score\",\"type\":\"dec\",\"value\":\"9\"}]}", &out));
     av_key_to_hex(g_keys[1], hex);
     snprintf(path, sizeof path, "/entities/%s/extend", hex);
     ASSERT_EQ(200, ctl("POST", path, "{\"min_lifetime\":500}", &out));

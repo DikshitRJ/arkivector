@@ -18,7 +18,8 @@
 static Vector *alloc_test_vec(int dim, float base_val)
 {
     Vector *v = malloc(VECTOR_SIZE((size_t) dim));
-    if (v == NULL) return NULL;
+    if (v == NULL)
+        return NULL;
     SET_VARSIZE(v, (uint32) VECTOR_SIZE((size_t) dim));
     v->dim = (int16) dim;
     v->unused = 0;

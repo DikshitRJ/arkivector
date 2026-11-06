@@ -134,7 +134,8 @@ av_status av_ratelimit_check(av_ratelimit *rl, const char *identifier, int *retr
     double needed = 1.0 - b->tokens;
     double wait_s = needed / rl->rps;
     int after = (int) (wait_s + 0.999);
-    if (after < 1) after = 1;
+    if (after < 1)
+        after = 1;
 
     if (retry_after_s != NULL) {
         *retry_after_s = after;

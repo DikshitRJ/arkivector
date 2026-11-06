@@ -162,12 +162,13 @@ static roaring_bitmap_t *eval_node(const av_filter *f, const av_attr_index *ix, 
             return f->type == AV_AT_KEY && live != NULL ? roaring_bitmap_copy(live) : roaring_bitmap_create();
         }
         if (f->field.kind == AV_FIELD_OWNER || f->field.kind == AV_FIELD_CREATOR) {
-            return f->type == AV_AT_ADDR && live != NULL ? roaring_bitmap_copy(live) : roaring_bitmap_create();
+            return f->type == AV_AT_ADDR && live != NULL ? roaring_bitmap_copy(live)
+                                                         : roaring_bitmap_create();
         }
         if (f->field.kind == AV_FIELD_EXPIRES) {
             return f->type == AV_AT_U64 && live != NULL ? roaring_bitmap_copy(live) : roaring_bitmap_create();
         }
-        const roaring_bitmap_t *p = av_attr_index_typed(ix, f->field.name, f->type);
+        const roaring_bitmap_t *p = av_attr_index_typed(ix, f->field.name, (uint8_t) f->type);
         return p != NULL ? roaring_bitmap_copy(p) : roaring_bitmap_create();
     }
 
@@ -268,7 +269,8 @@ static roaring_bitmap_t *eval_node(const av_filter *f, const av_attr_index *ix, 
             break;
         }
 
-        av_attr_index_scan(ix, attr_name, attr_type, lo, lo_len, lo_incl, hi, hi_len, hi_incl, scan_or_cb, &sc);
+        av_attr_index_scan(ix, attr_name, attr_type, lo, lo_len, lo_incl, hi, hi_len, hi_incl, scan_or_cb,
+                           &sc);
         return res;
     }
 
@@ -291,8 +293,8 @@ static roaring_bitmap_t *eval_node(const av_filter *f, const av_attr_index *ix, 
             return NULL;
         }
         scan_ctx sc = {res, NULL, 0};
-        av_attr_index_scan(ix, f->field.name, (uint8_t) f->value.type, f->value.b, f->value.len, true, f->high.b,
-                           f->high.len, true, scan_or_cb, &sc);
+        av_attr_index_scan(ix, f->field.name, (uint8_t) f->value.type, f->value.b, f->value.len, true,
+                           f->high.b, f->high.len, true, scan_or_cb, &sc);
         return res;
     }
 

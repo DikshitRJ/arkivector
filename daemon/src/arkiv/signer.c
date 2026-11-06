@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 
@@ -16,14 +17,11 @@
 #include "secp256k1_recovery.h"
 
 #include "arkiv/keccak.h"
+#include "core/fileio.h"
 #include "codec/hex.h"
 #include "yyjson.h"
 
-typedef enum {
-    SIGNER_BACKEND_ENV,
-    SIGNER_BACKEND_KEYSTORE,
-    SIGNER_BACKEND_REMOTE
-} signer_backend;
+typedef enum { SIGNER_BACKEND_ENV, SIGNER_BACKEND_KEYSTORE, SIGNER_BACKEND_REMOTE } signer_backend;
 
 struct av_signer {
     signer_backend backend;
@@ -35,9 +33,18 @@ struct av_signer {
 
 static bool hex_val(char c, uint8_t *out)
 {
-    if (c >= '0' && c <= '9') { *out = (uint8_t) (c - '0'); return true; }
-    if (c >= 'a' && c <= 'f') { *out = (uint8_t) (c - 'a' + 10); return true; }
-    if (c >= 'A' && c <= 'F') { *out = (uint8_t) (c - 'A' + 10); return true; }
+    if (c >= '0' && c <= '9') {
+        *out = (uint8_t) (c - '0');
+        return true;
+    }
+    if (c >= 'a' && c <= 'f') {
+        *out = (uint8_t) (c - 'a' + 10);
+        return true;
+    }
+    if (c >= 'A' && c <= 'F') {
+        *out = (uint8_t) (c - 'A' + 10);
+        return true;
+    }
     return false;
 }
 
@@ -50,6 +57,24 @@ static bool parse_hex_key(const char *hex_str, uint8_t out[32])
     if (strlen(hex_str) != 64)
         return false;
     for (int i = 0; i < 32; i++) {
+        uint8_t hi, lo;
+        if (!hex_val(hex_str[i * 2], &hi) || !hex_val(hex_str[i * 2 + 1], &lo))
+            return false;
+        out[i] = (uint8_t) ((hi << 4) | lo);
+    }
+    return true;
+}
+
+/* Decode exactly n bytes of hex (optional 0x prefix, no other characters). */
+static bool hex_fixed(const char *hex_str, uint8_t *out, size_t n)
+{
+    if (hex_str == NULL)
+        return false;
+    if (hex_str[0] == '0' && (hex_str[1] == 'x' || hex_str[1] == 'X'))
+        hex_str += 2;
+    if (strlen(hex_str) != n * 2)
+        return false;
+    for (size_t i = 0; i < n; i++) {
         uint8_t hi, lo;
         if (!hex_val(hex_str[i * 2], &hi) || !hex_val(hex_str[i * 2 + 1], &lo))
             return false;
@@ -96,7 +121,7 @@ av_status av_signer_create_env(const char *env_var, av_signer **out, av_err *e)
         return AV_ERR;
     }
 
-    secp256k1_context *ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
+    secp256k1_context *ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
     if (ctx == NULL) {
         explicit_bzero(priv, sizeof(priv));
         av_err_set(e, "internal", "failed to create secp256k1 context");
@@ -137,28 +162,11 @@ av_status av_signer_create_keystore(const char *path, const char *password, av_s
         return AV_ERR;
     }
 
-    FILE *f = fopen(path, "rb");
-    if (f == NULL) {
-        av_err_set(e, "invalid_argument", "cannot open keystore file: %s", path);
-        return AV_ERR;
-    }
-    fseek(f, 0, SEEK_END);
-    long fsz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (fsz <= 0 || fsz > 1024 * 1024) {
-        fclose(f);
-        av_err_set(e, "invalid_argument", "invalid keystore file size");
-        return AV_ERR;
-    }
-    char *buf = malloc((size_t) fsz + 1);
+    size_t rd = 0;
+    char *buf = av_read_file(path, "keystore", (size_t) 1024 * 1024, &rd, e);
     if (buf == NULL) {
-        fclose(f);
-        av_err_set(e, "internal", "out of memory reading keystore");
         return AV_ERR;
     }
-    size_t rd = fread(buf, 1, (size_t) fsz, f);
-    fclose(f);
-    buf[rd] = '\0';
 
     yyjson_doc *doc = yyjson_read(buf, rd, 0);
     free(buf);
@@ -191,110 +199,87 @@ av_status av_signer_create_keystore(const char *path, const char *password, av_s
         return AV_ERR;
     }
 
-    /* Decode ciphertext, iv, mac */
-    size_t ct_len = strlen(ciphertext_hex) / 2;
-    uint8_t *ct = malloc(ct_len);
+    /* Web3 Secret Storage v3: AES-128-CTR over a 32-byte private key, MAC = keccak256(dk[16..31] || ct). */
+    uint8_t ct[32];
     uint8_t iv[16];
     uint8_t mac[32];
-    if (ct == NULL || strlen(iv_hex) != 32 || strlen(mac_hex) != 64) {
-        free(ct);
-        yyjson_doc_free(doc);
-        av_err_set(e, "invalid_argument", "invalid hex lengths in keystore");
-        return AV_ERR;
-    }
-    for (size_t i = 0; i < ct_len; i++) {
-        uint8_t hi, lo;
-        hex_val(ciphertext_hex[i * 2], &hi);
-        hex_val(ciphertext_hex[i * 2 + 1], &lo);
-        ct[i] = (uint8_t) ((hi << 4) | lo);
-    }
-    for (int i = 0; i < 16; i++) {
-        uint8_t hi, lo;
-        hex_val(iv_hex[i * 2], &hi);
-        hex_val(iv_hex[i * 2 + 1], &lo);
-        iv[i] = (uint8_t) ((hi << 4) | lo);
-    }
-    for (int i = 0; i < 32; i++) {
-        uint8_t hi, lo;
-        hex_val(mac_hex[i * 2], &hi);
-        hex_val(mac_hex[i * 2 + 1], &lo);
-        mac[i] = (uint8_t) ((hi << 4) | lo);
-    }
-
-    /* Key derivation: 32 bytes derived key */
-    uint8_t derived[32];
-    memset(derived, 0, 32);
+    uint8_t salt[64];
     const char *salt_hex = yyjson_get_str(yyjson_obj_get(kdfparams, "salt"));
     size_t salt_len = salt_hex != NULL ? strlen(salt_hex) / 2 : 0;
-    uint8_t *salt = malloc(salt_len > 0 ? salt_len : 1);
-    for (size_t i = 0; i < salt_len; i++) {
-        uint8_t hi, lo;
-        hex_val(salt_hex[i * 2], &hi);
-        hex_val(salt_hex[i * 2 + 1], &lo);
-        salt[i] = (uint8_t) ((hi << 4) | lo);
+    if (strcmp(cipher, "aes-128-ctr") != 0 || !hex_fixed(ciphertext_hex, ct, sizeof(ct)) ||
+        !hex_fixed(iv_hex, iv, sizeof(iv)) || !hex_fixed(mac_hex, mac, sizeof(mac)) || salt_len == 0 ||
+        salt_len > sizeof(salt) || !hex_fixed(salt_hex, salt, salt_len)) {
+        yyjson_doc_free(doc);
+        av_err_set(e, "invalid_argument", "keystore: unsupported cipher or malformed ciphertext/iv/mac/salt");
+        return AV_ERR;
     }
 
+    /* Key derivation: 32-byte derived key. Parameters are bounded so a hostile file cannot exhaust memory/CPU. */
+    uint8_t derived[32];
+    memset(derived, 0, sizeof(derived));
     bool kdf_ok = false;
     if (strcmp(kdf, "scrypt") == 0) {
-        uint64_t n_scrypt = (uint64_t) yyjson_get_uint(yyjson_obj_get(kdfparams, "n"));
-        uint64_t r_scrypt = (uint64_t) yyjson_get_uint(yyjson_obj_get(kdfparams, "r"));
-        uint64_t p_scrypt = (uint64_t) yyjson_get_uint(yyjson_obj_get(kdfparams, "p"));
-        if (EVP_PBE_scrypt(password, strlen(password), salt, salt_len,
-                           n_scrypt, r_scrypt, p_scrypt, 0, derived, 32) == 1) {
-            kdf_ok = true;
+        uint64_t n_scrypt = yyjson_get_uint(yyjson_obj_get(kdfparams, "n"));
+        uint64_t r_scrypt = yyjson_get_uint(yyjson_obj_get(kdfparams, "r"));
+        uint64_t p_scrypt = yyjson_get_uint(yyjson_obj_get(kdfparams, "p"));
+        uint64_t dklen = yyjson_get_uint(yyjson_obj_get(kdfparams, "dklen"));
+        bool pow2 = n_scrypt >= 2 && (n_scrypt & (n_scrypt - 1)) == 0;
+        if (pow2 && n_scrypt <= ((uint64_t) 1 << 20) && r_scrypt >= 1 && r_scrypt <= 16 && p_scrypt >= 1 &&
+            p_scrypt <= 16 && dklen == 32) {
+            /* geth "standard" (n=2^18, r=8) needs 128*r*n = 256 MiB: OpenSSL's default cap is 32 MiB. */
+            uint64_t maxmem = 128 * r_scrypt * (n_scrypt + p_scrypt + 2) + ((uint64_t) 1 << 20);
+            kdf_ok = EVP_PBE_scrypt(password, strlen(password), salt, salt_len, n_scrypt, r_scrypt, p_scrypt,
+                                    maxmem, derived, sizeof(derived)) == 1;
         }
     } else if (strcmp(kdf, "pbkdf2") == 0) {
-        int c_pbkdf = (int) yyjson_get_int(yyjson_obj_get(kdfparams, "c"));
-        if (PKCS5_PBKDF2_HMAC(password, (int) strlen(password), salt, (int) salt_len,
-                              c_pbkdf, EVP_sha256(), 32, derived) == 1) {
-            kdf_ok = true;
+        int64_t c_pbkdf = yyjson_get_sint(yyjson_obj_get(kdfparams, "c"));
+        uint64_t dklen = yyjson_get_uint(yyjson_obj_get(kdfparams, "dklen"));
+        const char *prf = yyjson_get_str(yyjson_obj_get(kdfparams, "prf"));
+        if (c_pbkdf >= 1 && c_pbkdf <= 10000000 && dklen == 32 && prf != NULL && strcmp(prf, "hmac-sha256") == 0) {
+            kdf_ok = PKCS5_PBKDF2_HMAC(password, (int) strlen(password), salt, (int) salt_len, (int) c_pbkdf,
+                                       EVP_sha256(), (int) sizeof(derived), derived) == 1;
         }
     }
-    free(salt);
     yyjson_doc_free(doc);
 
     if (!kdf_ok) {
-        free(ct);
         explicit_bzero(derived, sizeof(derived));
-        av_err_set(e, "invalid_argument", "keystore key derivation failed");
+        av_err_set(e, "invalid_argument", "keystore key derivation failed (unsupported kdf or parameters)");
         return AV_ERR;
     }
 
-    /* MAC verification: keccak256(derived[16..31] || ct) */
-    uint8_t *mac_payload = malloc(16 + ct_len);
-    if (mac_payload == NULL) {
-        free(ct);
-        explicit_bzero(derived, sizeof(derived));
-        av_err_set(e, "internal", "out of memory");
-        return AV_ERR;
-    }
+    uint8_t mac_payload[16 + sizeof(ct)];
     memcpy(mac_payload, derived + 16, 16);
-    memcpy(mac_payload + 16, ct, ct_len);
+    memcpy(mac_payload + 16, ct, sizeof(ct));
     uint8_t computed_mac[32];
-    av_keccak256(mac_payload, 16 + ct_len, computed_mac);
-    free(mac_payload);
+    av_keccak256(mac_payload, sizeof(mac_payload), computed_mac);
+    explicit_bzero(mac_payload, sizeof(mac_payload));
 
-    if (memcmp(computed_mac, mac, 32) != 0) {
-        free(ct);
+    if (CRYPTO_memcmp(computed_mac, mac, sizeof(mac)) != 0) {
         explicit_bzero(derived, sizeof(derived));
         av_err_set(e, "invalid_argument", "keystore password incorrect (MAC mismatch)");
         return AV_ERR;
     }
 
-    /* Decrypt with AES-128-CTR using derived[0..15] and iv */
-    EVP_CIPHER_CTX *cctx = EVP_CIPHER_CTX_new();
-    EVP_DecryptInit_ex(cctx, EVP_aes_128_ctr(), NULL, derived, iv);
     uint8_t priv[32];
-    int out_len1 = 0, out_len2 = 0;
-    EVP_DecryptUpdate(cctx, priv, &out_len1, ct, (int) (ct_len < 32 ? ct_len : 32));
-    EVP_DecryptFinal_ex(cctx, priv + out_len1, &out_len2);
+    int out_len1 = 0;
+    int out_len2 = 0;
+    EVP_CIPHER_CTX *cctx = EVP_CIPHER_CTX_new();
+    bool dec_ok = cctx != NULL && EVP_DecryptInit_ex(cctx, EVP_aes_128_ctr(), NULL, derived, iv) == 1 &&
+                  EVP_DecryptUpdate(cctx, priv, &out_len1, ct, (int) sizeof(ct)) == 1 && out_len1 >= 0 &&
+                  out_len1 <= (int) sizeof(priv) && EVP_DecryptFinal_ex(cctx, priv + out_len1, &out_len2) == 1 &&
+                  out_len1 + out_len2 == (int) sizeof(priv);
     EVP_CIPHER_CTX_free(cctx);
-    free(ct);
     explicit_bzero(derived, sizeof(derived));
+    if (!dec_ok) {
+        explicit_bzero(priv, sizeof(priv));
+        av_err_set(e, "internal", "keystore decryption failed");
+        return AV_ERR;
+    }
 
-    secp256k1_context *ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
+    secp256k1_context *ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
     uint8_t addr[20];
-    if (!derive_address_from_privkey(ctx, priv, addr)) {
+    if (ctx == NULL || !derive_address_from_privkey(ctx, priv, addr)) {
         explicit_bzero(priv, sizeof(priv));
         secp256k1_context_destroy(ctx);
         av_err_set(e, "invalid_argument", "decrypted key is not a valid secp256k1 key");
@@ -364,14 +349,15 @@ const uint8_t *av_signer_get_address(const av_signer *s)
 void av_signer_get_address_hex(const av_signer *s, char out_hex[43])
 {
     if (s == NULL) {
-        if (out_hex != NULL) out_hex[0] = '\0';
+        if (out_hex != NULL)
+            out_hex[0] = '\0';
         return;
     }
     const uint8_t *addr = s->address;
     static const char hex_chars[] = "0123456789abcdef";
     char raw[41];
     for (int i = 0; i < 20; i++) {
-        raw[i * 2]     = hex_chars[(addr[i] >> 4) & 0x0f];
+        raw[i * 2] = hex_chars[(addr[i] >> 4) & 0x0f];
         raw[i * 2 + 1] = hex_chars[addr[i] & 0x0f];
     }
     raw[40] = '\0';
@@ -393,8 +379,8 @@ void av_signer_get_address_hex(const av_signer *s, char out_hex[43])
     out_hex[42] = '\0';
 }
 
-av_status av_signer_sign(const av_signer *s, const uint8_t hash32[32], uint8_t r[32],
-                         uint8_t s_sig[32], uint8_t *v_parity, av_err *e)
+av_status av_signer_sign(const av_signer *s, const uint8_t hash32[32], uint8_t r[32], uint8_t s_sig[32],
+                         uint8_t *v_parity, av_err *e)
 {
     if (s == NULL || hash32 == NULL || r == NULL || s_sig == NULL || v_parity == NULL) {
         av_err_set(e, "invalid_argument", "invalid arguments to av_signer_sign");

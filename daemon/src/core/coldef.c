@@ -14,10 +14,10 @@
 #include "codec/vectorbytes.h"
 #include "yyjson.h"
 
-#define MAX_BLOCK_TTL 7884000
+#define MAX_BLOCK_TTL   7884000
 #define MAX_SECONDS_TTL 15768000
-#define MAX_DAYS_TTL 182.5
-#define MAX_JSON_INT 9007199254740991LL
+#define MAX_DAYS_TTL    182.5
+#define MAX_JSON_INT    9007199254740991LL
 
 static av_status fail(av_err *e, const char *code, const char *field, const char *fmt, ...)
     __attribute__((format(printf, 4, 5)));
@@ -121,9 +121,9 @@ static bool parse_attr_type(const char *s, av_attr_type *t)
     static const struct {
         const char *n;
         av_attr_type t;
-    } tab[] = {{"bool", AV_AT_BOOL}, {"i32", AV_AT_I32},     {"u64", AV_AT_U64},   {"u256", AV_AT_U256},
-               {"dec", AV_AT_DEC},   {"str", AV_AT_STR},     {"addr", AV_AT_ADDR}, {"key", AV_AT_KEY},
-               {"bytes", AV_AT_BYTES}};
+    } tab[] = {{"bool", AV_AT_BOOL}, {"i32", AV_AT_I32}, {"u64", AV_AT_U64},
+               {"u256", AV_AT_U256}, {"dec", AV_AT_DEC}, {"str", AV_AT_STR},
+               {"addr", AV_AT_ADDR}, {"key", AV_AT_KEY}, {"bytes", AV_AT_BYTES}};
     for (size_t i = 0; i < sizeof tab / sizeof tab[0]; i++)
         if (strcmp(tab[i].n, s) == 0) {
             *t = tab[i].t;
@@ -265,8 +265,8 @@ static av_status parse_index(yyjson_val *ix, av_coldef *d, av_err *e)
         }
     }
     if (d->ef_construction < 2 * d->m)
-        return fail(e, "invalid_argument", "/index/with/ef_construction", "ef_construction must be at least 2*m (%d)",
-                    2 * d->m);
+        return fail(e, "invalid_argument", "/index/with/ef_construction",
+                    "ef_construction must be at least 2*m (%d)", 2 * d->m);
     return AV_OK;
 }
 
@@ -362,10 +362,12 @@ static av_status parse_attrs(yyjson_val *obj, av_arena *a, av_coldef *d, av_err 
         const char *name = yyjson_get_str(k);
         size_t nl = yyjson_get_len(k);
         if (nl == 0 || nl > AV_ATTR_NAME_MAX)
-            return fail(e, "invalid_argument", "/attributes", "attribute names must be 1..%d bytes", AV_ATTR_NAME_MAX);
+            return fail(e, "invalid_argument", "/attributes", "attribute names must be 1..%d bytes",
+                        AV_ATTR_NAME_MAX);
         for (size_t i = 0; i < nl; i++)
             if (!isprint((unsigned char) name[i]) || name[i] == '/')
-                return fail(e, "invalid_argument", "/attributes", "attribute name '%s' has invalid characters", name);
+                return fail(e, "invalid_argument", "/attributes",
+                            "attribute name '%s' has invalid characters", name);
         if (name[0] == '$')
             return fail(e, "invalid_argument", "/attributes", "attribute names must not start with '$'");
         const char *ts;
@@ -373,7 +375,8 @@ static av_status parse_attrs(yyjson_val *obj, av_arena *a, av_coldef *d, av_err 
             return fail(e, "bad_request", "/attributes", "attribute type must be a string");
         ts = yyjson_get_str(v);
         if (!parse_attr_type(ts, &d->attrs[idx].type))
-            return fail(e, "invalid_argument", "/attributes", "attribute '%s' has unknown type '%s'", name, ts);
+            return fail(e, "invalid_argument", "/attributes", "attribute '%s' has unknown type '%s'", name,
+                        ts);
         memcpy(d->attrs[idx].name, name, nl);
     }
     qsort(d->attrs, n, sizeof(av_schema_attr), attr_cmp);
@@ -384,7 +387,8 @@ static av_status parse_attrs(yyjson_val *obj, av_arena *a, av_coldef *d, av_err 
     return AV_OK;
 }
 
-av_status av_coldef_from_json_ex(struct yyjson_val *obj, av_arena *a, bool internal, av_coldef *out, av_err *e)
+av_status av_coldef_from_json_ex(struct yyjson_val *obj, av_arena *a, bool internal, av_coldef *out,
+                                 av_err *e)
 {
     av_err_clear(e);
     if (!yyjson_is_obj(obj))
@@ -392,8 +396,8 @@ av_status av_coldef_from_json_ex(struct yyjson_val *obj, av_arena *a, bool inter
     memset(out, 0, sizeof *out);
     out->membership = AV_MEMBERSHIP_CREATOR;
     out->mode = AV_MODE_FULL;
-    yyjson_val *name = NULL, *tag = NULL, *col = NULL, *ix = NULL, *writers = NULL, *memb = NULL, *attrs = NULL,
-               *ttl = NULL, *pm = NULL, *model = NULL, *mode = NULL, *mk = NULL;
+    yyjson_val *name = NULL, *tag = NULL, *col = NULL, *ix = NULL, *writers = NULL, *memb = NULL,
+               *attrs = NULL, *ttl = NULL, *pm = NULL, *model = NULL, *mode = NULL, *mk = NULL;
     size_t idx, max;
     yyjson_val *k, *v;
     yyjson_obj_foreach(obj, idx, max, k, v)
@@ -489,7 +493,8 @@ av_status av_coldef_from_json_ex(struct yyjson_val *obj, av_arena *a, bool inter
     }
     if (mk != NULL && !yyjson_is_null(mk)) {
         if (!yyjson_is_str(mk) || !parse_hex(yyjson_get_str(mk), 32, out->manifest_key))
-            return fail(e, "invalid_argument", "/manifest_key", "manifest_key must be 0x followed by 64 hex digits");
+            return fail(e, "invalid_argument", "/manifest_key",
+                        "manifest_key must be 0x followed by 64 hex digits");
         out->has_manifest_key = true;
     }
     return AV_OK;
@@ -500,7 +505,8 @@ av_status av_coldef_from_json(struct yyjson_val *obj, av_arena *a, av_coldef *ou
     return av_coldef_from_json_ex(obj, a, false, out, e);
 }
 
-av_status av_coldef_from_text(const char *json, size_t len, av_arena *a, bool internal, av_coldef *out, av_err *e)
+av_status av_coldef_from_text(const char *json, size_t len, av_arena *a, bool internal, av_coldef *out,
+                              av_err *e)
 {
     yyjson_read_err err;
     yyjson_doc *doc = yyjson_read_opts((char *) json, len, 0, NULL, &err);
@@ -579,7 +585,7 @@ char *av_coldef_to_json(const av_coldef *d, size_t *len)
     yyjson_mut_obj_add_str(doc, root, "membership",
                            d->membership == AV_MEMBERSHIP_CREATOR ? "creator"
                            : d->membership == AV_MEMBERSHIP_OWNER ? "owner"
-                                                                   : "open");
+                                                                  : "open");
     yyjson_mut_val *at = yyjson_mut_obj_add_obj(doc, root, "attributes");
     for (size_t i = 0; i < d->n_attrs; i++)
         yyjson_mut_obj_add(at, yyjson_mut_strcpy(doc, d->attrs[i].name),

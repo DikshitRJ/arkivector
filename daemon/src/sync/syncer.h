@@ -45,11 +45,11 @@ typedef struct {
     int poll_interval_ms;
     int reconcile_interval_s;
     int sweep_interval_s;
-    size_t ring_size;      /* K: reorg depth handled without re-bootstrap */
+    size_t ring_size; /* K: reorg depth handled without re-bootstrap */
     uint64_t live_lag_blocks;
-    size_t ttl_budget;     /* expired entities reclaimed per published block */
-    int fetch_chunk;       /* initial OR-chunk size for state fetches (halved on -32004) */
-    bool resync;           /* --resync: bootstrap every collection from scratch */
+    size_t ttl_budget; /* expired entities reclaimed per published block */
+    int fetch_chunk;   /* initial OR-chunk size for state fetches (halved on -32004) */
+    bool resync;       /* --resync: bootstrap every collection from scratch */
 } av_sync_config;
 
 typedef struct av_sync av_sync;

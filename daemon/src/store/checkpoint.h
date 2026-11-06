@@ -29,7 +29,8 @@ typedef struct {
 typedef bool (*av_checkpoint_row_cb)(const av_loaded_row *r, void *ctx);
 
 /* Stream every entity row of coll. A corrupt row fails the load (code "internal"). */
-av_status av_checkpoint_load_rows(av_store *s, const char *coll, av_checkpoint_row_cb cb, void *ctx, av_err *e);
+av_status av_checkpoint_load_rows(av_store *s, const char *coll, av_checkpoint_row_cb cb, void *ctx,
+                                  av_err *e);
 
 /* Persisted bookkeeping: sync cursor (found=false before the first block) and the docid counter. */
 typedef struct {

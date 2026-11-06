@@ -13,11 +13,7 @@
 #define IDEM_TABLE_BUCKETS 1024
 #define IDEM_TTL_SECONDS   86400
 
-typedef enum {
-    IDEM_STATE_IN_PROGRESS,
-    IDEM_STATE_COMPLETED,
-    IDEM_STATE_ABORTED
-} idem_state;
+typedef enum { IDEM_STATE_IN_PROGRESS, IDEM_STATE_COMPLETED, IDEM_STATE_ABORTED } idem_state;
 
 typedef struct idem_entry {
     char *key;
@@ -91,9 +87,8 @@ void av_idempotency_store_destroy(av_idempotency_store *s)
     free(s);
 }
 
-static void compute_request_hash(const char *method, const char *path,
-                                const char *request_body, size_t request_body_len,
-                                uint8_t out_hash[32])
+static void compute_request_hash(const char *method, const char *path, const char *request_body,
+                                 size_t request_body_len, uint8_t out_hash[32])
 {
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
@@ -110,12 +105,9 @@ static void compute_request_hash(const char *method, const char *path,
     EVP_MD_CTX_free(ctx);
 }
 
-av_status av_idempotency_check(av_idempotency_store *s, const char *key,
-                               const char *method, const char *path,
-                               const char *request_body, size_t request_body_len,
-                               av_idem_action *out_action,
-                               av_idem_cached_response *cached_out,
-                               void **out_handle, av_err *e)
+av_status av_idempotency_check(av_idempotency_store *s, const char *key, const char *method, const char *path,
+                               const char *request_body, size_t request_body_len, av_idem_action *out_action,
+                               av_idem_cached_response *cached_out, void **out_handle, av_err *e)
 {
     if (out_action == NULL || out_handle == NULL)
         return AV_ERR;
@@ -162,7 +154,8 @@ av_status av_idempotency_check(av_idempotency_store *s, const char *key,
         if (memcmp(entry->req_hash, req_hash, 32) != 0) {
             pthread_mutex_unlock(&s->mu);
             *out_action = AV_IDEM_CONFLICT;
-            av_err_set(e, "idempotency_conflict", "Idempotency key '%s' reused with different request payload", key);
+            av_err_set(e, "idempotency_conflict",
+                       "Idempotency key '%s' reused with different request payload", key);
             return AV_ERR;
         }
 
@@ -223,8 +216,7 @@ av_status av_idempotency_check(av_idempotency_store *s, const char *key,
     return AV_OK;
 }
 
-void av_idempotency_complete(av_idempotency_store *s, void *handle,
-                             int status_code, const char *content_type,
+void av_idempotency_complete(av_idempotency_store *s, void *handle, int status_code, const char *content_type,
                              const char *resp_body, size_t resp_body_len)
 {
     if (s == NULL || handle == NULL)

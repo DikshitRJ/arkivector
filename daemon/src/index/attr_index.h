@@ -52,9 +52,9 @@ const roaring_bitmap_t *av_attr_index_eq(const av_attr_index *ix, const char *na
 
 /* Ordered iteration over distinct values in [lo, hi] (NULL bound = unbounded). Return false to stop. */
 typedef bool (*av_attr_scan_cb)(const uint8_t *val, size_t len, const roaring_bitmap_t *postings, void *ctx);
-void av_attr_index_scan(const av_attr_index *ix, const char *name, uint8_t type, const uint8_t *lo, size_t lo_len,
-                        bool lo_incl, const uint8_t *hi, size_t hi_len, bool hi_incl, av_attr_scan_cb cb,
-                        void *ctx);
+void av_attr_index_scan(const av_attr_index *ix, const char *name, uint8_t type, const uint8_t *lo,
+                        size_t lo_len, bool lo_incl, const uint8_t *hi, size_t hi_len, bool hi_incl,
+                        av_attr_scan_cb cb, void *ctx);
 
 /* Number of distinct indexed values of (name, type). */
 size_t av_attr_index_value_count(const av_attr_index *ix, const char *name, uint8_t type);
