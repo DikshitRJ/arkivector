@@ -29,6 +29,13 @@ export function project(
 
 /* ---------- hooks ---------- */
 
+/** `?freeze=4500` in the URL renders every animation at that time (for screenshots and review). */
+export function frozenAt(): number | null {
+  if (typeof window === "undefined") return null;
+  const v = new URLSearchParams(window.location.search).get("freeze");
+  return v !== null && !Number.isNaN(Number(v)) ? Number(v) : null;
+}
+
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -59,7 +66,9 @@ export function useInView<T extends Element>(ref: RefObject<T | null>, margin = 
  * With reduced motion it returns `stillAt` (a representative frame) and never ticks.
  */
 export function useLoop<T extends Element>(ref: RefObject<T | null>, periodMs: number, stillAt = periodMs * 0.95): number {
-  const reduced = useReducedMotion();
+  const frozen = frozenAt();
+  const reduced = useReducedMotion() || frozen !== null;
+  if (frozen !== null) stillAt = frozen % periodMs;
   const inView = useInView(ref);
   const [t, setT] = useState(reduced ? stillAt : 0);
   const base = useRef<number | null>(null);
@@ -96,7 +105,7 @@ export type Timeline = {
 
 /** Seekable, pausable clock for the architecture film. Stops at `total`. */
 export function useTimeline(total: number): Timeline {
-  const [t, setT] = useState(0);
+  const [t, setT] = useState(() => frozenAt() ?? 0);
   const [playing, setPlaying] = useState(false);
   const tRef = useRef(0);
   tRef.current = t;
