@@ -209,7 +209,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 - **C++** *(deferred)* (after the C S2 merge: `arkivector.hpp` `Client` with `Config` struct (designated-initialiser friendly), RAII handle, exceptions per error category, `Collection` etc. as C++ structs converted from C results): commits `feat(sdk-cpp): client, config and exceptions over the c sdk` · `feat(sdk-cpp): version, ops and collections api`.
 
 ### Exit
-- [ ] Against Prism: every collections/ops call parses the example response. An invalid request (e.g. bad collection name) surfaces Prism's 422 as `ValidationError`. A retry test with a fake 503 server (inline in the example or a 20-line local server) shows backoff (manual check, logged in the PR).
+- [x] Against Prism: every collections/ops call parses the example response. An invalid request (e.g. bad collection name) surfaces Prism's 422 as `ValidationError`. A retry test with a fake 503 server (inline in the example or a 20-line local server) shows backoff (manual check, logged in the PR).
 
 ---
 
@@ -323,8 +323,8 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | S0 | S1 (M1) | S2 | S3 (M2) | S4 (M3) | S5 | S6 (M4) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Python | done | done | | | | | |
-| Node | done | done | | | | | |
+| Python | done | done | done | | | | |
+| Node | done | done | done | | | | |
 | C | deferred | | | | | | |
 | C++ | deferred | | | | | | |
 | Rust | deferred | | | | | | |
