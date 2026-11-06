@@ -83,7 +83,8 @@ set(AV_PGCOMPAT_VERBATIM
     src/pgcompat/src/list.c
     src/pgcompat/src/pairingheap.c
     src/pgcompat/src/pg_prng.c
-    src/pgcompat/src/pg_bitutils.c)
+    src/pgcompat/src/pg_bitutils.c
+    src/pgcompat/src/f2s.c)
 foreach(f ${AV_PGCOMPAT_VERBATIM})
   if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${f})
     list(REMOVE_ITEM AV_PGCOMPAT_VERBATIM ${f})
@@ -111,9 +112,18 @@ av_upstream_sources(${AV_PGCOMPAT_VERBATIM})
 # ---------------------------------------------------------------------------
 set(AV_PGVECTOR_SOURCES
     src/pgvector/halfutils.c
-    src/pgvector/bitutils.c)
+    src/pgvector/bitutils.c
+    src/pgvector/bitvec_kernels.c
+    src/pgvector/vector_io.c
+    src/pgvector/vector_funcs.c
+    src/pgvector/halfvec_io.c
+    src/pgvector/halfvec_funcs.c
+    src/pgvector/sparsevec_io.c
+    src/pgvector/sparsevec_funcs.c)
 set(AV_PGVECTOR_OPTIONAL
     src/pgvector/vector_kernels.c
+    src/pgvector/halfvec_kernels.c
+    src/pgvector/sparsevec_kernels.c
     src/pgvector/hnswutils.c
     src/pgvector/hnswbuild_mem.c
     src/pgvector/av_hnsw_glue.c)
