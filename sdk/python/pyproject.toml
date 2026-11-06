@@ -8,7 +8,24 @@ version = "0.1.0"
 description = "Arkivector Python SDK: Vector co-processor client for Arkiv"
 readme = "README.md"
 requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/arkivector/arkivector"
+Documentation = "https://github.com/arkivector/arkivector/tree/main/docs/api"
+Repository = "https://github.com/arkivector/arkivector"
 
 [project.optional-dependencies]
 numpy = ["numpy"]
