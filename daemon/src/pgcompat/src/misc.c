@@ -6,6 +6,9 @@
 #include "postgres.h"
 
 #include <fcntl.h>
+
+#include "utils/builtins.h"
+#include "utils/float.h"
 #include <unistd.h>
 
 /* qsort with a context argument: glibc's qsort_r has the same comparator shape. */
@@ -48,4 +51,25 @@ bool equal(const void *a, const void *b)
     (void) b;
     elog(ERROR, "equal() on nodes is not supported in pgcompat");
     return false;
+}
+
+int pg_ltoa(int32 value, char *a)
+{
+    return snprintf(a, 12, "%d", (int) value);
+}
+
+/* Bodies from PostgreSQL 17 src/backend/utils/adt/float.c. */
+void float_overflow_error(void)
+{
+    ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE), errmsg("value out of range: overflow")));
+}
+
+void float_underflow_error(void)
+{
+    ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE), errmsg("value out of range: underflow")));
+}
+
+void float_zero_divide_error(void)
+{
+    ereport(ERROR, (errcode(ERRCODE_DIVISION_BY_ZERO), errmsg("division by zero")));
 }
