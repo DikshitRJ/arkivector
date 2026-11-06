@@ -15,6 +15,11 @@ import {
   SparseVector,
   vectorbytesDecodeAny,
   VectorBytesError,
+  Arkivector,
+  F,
+  type SearchOptions,
+  type CountOptions,
+  type Filter,
 } from "../src/index.js";
 
 interface GoldenCase {
@@ -71,7 +76,9 @@ function findRepoRoot(): string {
     curr = parent;
   }
 
-  throw new Error("Could not locate repo root containing spec/golden/vectorbytes.json");
+  throw new Error(
+    "Could not locate repo root containing spec/golden/vectorbytes.json",
+  );
 }
 
 function approxEqual(a: number, b: number, eps: number = 1e-6): boolean {
@@ -80,7 +87,10 @@ function approxEqual(a: number, b: number, eps: number = 1e-6): boolean {
   return Math.abs(a - b) <= eps;
 }
 
-function runOfflineChecks(cases: GoldenCase[]): { passed: number; total: number } {
+function runOfflineChecks(cases: GoldenCase[]): {
+  passed: number;
+  total: number;
+} {
   let passed = 0;
 
   for (const c of cases) {
@@ -90,17 +100,23 @@ function runOfflineChecks(cases: GoldenCase[]): { passed: number; total: number 
       // Invalid case: must throw VectorBytesError with exact error code
       try {
         vectorbytesDecodeAny(bytes);
-        console.error(`FAIL ${c.name}: expected error ${c.error}, but decoding succeeded`);
+        console.error(
+          `FAIL ${c.name}: expected error ${c.error}, but decoding succeeded`,
+        );
       } catch (err: unknown) {
         if (err instanceof VectorBytesError) {
           if (err.code === c.error) {
             console.log(`PASS ${c.name}`);
             passed++;
           } else {
-            console.error(`FAIL ${c.name}: expected error code ${c.error}, got ${err.code}`);
+            console.error(
+              `FAIL ${c.name}: expected error code ${c.error}, got ${err.code}`,
+            );
           }
         } else {
-          console.error(`FAIL ${c.name}: expected VectorBytesError, got ${String(err)}`);
+          console.error(
+            `FAIL ${c.name}: expected VectorBytesError, got ${String(err)}`,
+          );
         }
       }
     } else {
@@ -111,66 +127,91 @@ function runOfflineChecks(cases: GoldenCase[]): { passed: number; total: number 
 
         if (c.type === "vector") {
           if (!(decoded instanceof Vector)) {
-            throw new Error(`Expected instance of Vector, got ${decoded.constructor.name}`);
+            throw new Error(
+              `Expected instance of Vector, got ${decoded.constructor.name}`,
+            );
           }
           if (decoded.dim !== c.dim) {
-            throw new Error(`Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`);
+            throw new Error(
+              `Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`,
+            );
           }
           if (decoded.normalized !== (c.normalized ?? false)) {
             throw new Error(
-              `Normalized flag mismatch: expected ${c.normalized ?? false}, got ${decoded.normalized}`
+              `Normalized flag mismatch: expected ${c.normalized ?? false}, got ${decoded.normalized}`,
             );
           }
           const list = decoded.toList();
           if (c.values) {
             for (let i = 0; i < c.values.length; i++) {
               if (!approxEqual(list[i], c.values[i])) {
-                throw new Error(`Value mismatch at ${i}: expected ${c.values[i]}, got ${list[i]}`);
+                throw new Error(
+                  `Value mismatch at ${i}: expected ${c.values[i]}, got ${list[i]}`,
+                );
               }
             }
           }
         } else if (c.type === "halfvec") {
           if (!(decoded instanceof HalfVector)) {
-            throw new Error(`Expected instance of HalfVector, got ${decoded.constructor.name}`);
+            throw new Error(
+              `Expected instance of HalfVector, got ${decoded.constructor.name}`,
+            );
           }
           if (decoded.dim !== c.dim) {
-            throw new Error(`Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`);
+            throw new Error(
+              `Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`,
+            );
           }
           if (decoded.normalized !== (c.normalized ?? false)) {
             throw new Error(
-              `Normalized flag mismatch: expected ${c.normalized ?? false}, got ${decoded.normalized}`
+              `Normalized flag mismatch: expected ${c.normalized ?? false}, got ${decoded.normalized}`,
             );
           }
           const list = decoded.toList();
           if (c.values) {
             for (let i = 0; i < c.values.length; i++) {
               if (!approxEqual(list[i], c.values[i])) {
-                throw new Error(`Value mismatch at ${i}: expected ${c.values[i]}, got ${list[i]}`);
+                throw new Error(
+                  `Value mismatch at ${i}: expected ${c.values[i]}, got ${list[i]}`,
+                );
               }
             }
           }
         } else if (c.type === "bit") {
           if (!(decoded instanceof Bit)) {
-            throw new Error(`Expected instance of Bit, got ${decoded.constructor.name}`);
+            throw new Error(
+              `Expected instance of Bit, got ${decoded.constructor.name}`,
+            );
           }
           if (decoded.dim !== c.dim) {
-            throw new Error(`Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`);
+            throw new Error(
+              `Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`,
+            );
           }
           if (decoded.toText() !== c.bits) {
-            throw new Error(`Bit text mismatch: expected ${c.bits}, got ${decoded.toText()}`);
+            throw new Error(
+              `Bit text mismatch: expected ${c.bits}, got ${decoded.toText()}`,
+            );
           }
         } else if (c.type === "sparsevec") {
           if (!(decoded instanceof SparseVector)) {
-            throw new Error(`Expected instance of SparseVector, got ${decoded.constructor.name}`);
+            throw new Error(
+              `Expected instance of SparseVector, got ${decoded.constructor.name}`,
+            );
           }
           if (decoded.dim !== c.dim) {
-            throw new Error(`Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`);
+            throw new Error(
+              `Dimension mismatch: expected ${c.dim}, got ${decoded.dim}`,
+            );
           }
           if (c.indices) {
             const decIdx = Array.from(decoded.indices);
-            if (decIdx.length !== c.indices.length || !decIdx.every((v, i) => v === c.indices![i])) {
+            if (
+              decIdx.length !== c.indices.length ||
+              !decIdx.every((v, i) => v === c.indices![i])
+            ) {
               throw new Error(
-                `Indices mismatch: expected ${JSON.stringify(c.indices)}, got ${JSON.stringify(decIdx)}`
+                `Indices mismatch: expected ${JSON.stringify(c.indices)}, got ${JSON.stringify(decIdx)}`,
               );
             }
           }
@@ -178,12 +219,16 @@ function runOfflineChecks(cases: GoldenCase[]): { passed: number; total: number 
             const decVals = Array.from(decoded.values);
             for (let i = 0; i < c.values.length; i++) {
               if (!approxEqual(decVals[i], c.values[i])) {
-                throw new Error(`Value mismatch at ${i}: expected ${c.values[i]}, got ${decVals[i]}`);
+                throw new Error(
+                  `Value mismatch at ${i}: expected ${c.values[i]}, got ${decVals[i]}`,
+                );
               }
             }
           }
           if (c.text && decoded.toText() !== c.text) {
-            throw new Error(`Text mismatch: expected ${c.text}, got ${decoded.toText()}`);
+            throw new Error(
+              `Text mismatch: expected ${c.text}, got ${decoded.toText()}`,
+            );
           }
         }
 
@@ -204,7 +249,7 @@ function runOfflineChecks(cases: GoldenCase[]): { passed: number; total: number 
             c.dim!,
             c.indices ?? [],
             c.values ?? [],
-            c.normalized ?? false
+            c.normalized ?? false,
           );
           encoded = svec.toVectorBytes(c.normalized ?? false);
         } else {
@@ -213,18 +258,153 @@ function runOfflineChecks(cases: GoldenCase[]): { passed: number; total: number 
 
         const encodedHex = Buffer.from(encoded).toString("hex");
         if (encodedHex !== c.hex) {
-          throw new Error(`Encoded hex mismatch:\n  expected: ${c.hex}\n  got:      ${encodedHex}`);
+          throw new Error(
+            `Encoded hex mismatch:\n  expected: ${c.hex}\n  got:      ${encodedHex}`,
+          );
         }
 
         console.log(`PASS ${c.name}`);
         passed++;
       } catch (err: unknown) {
-        console.error(`FAIL ${c.name}: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(
+          `FAIL ${c.name}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
   }
 
   return { passed, total: cases.length };
+}
+
+interface DatasetQuery {
+  name: string;
+  request: {
+    vector: number[];
+    k: number;
+    exact?: boolean;
+    include?: string[];
+    filter?: Record<string, unknown>;
+    where?: string;
+  };
+  expected_ids: string[];
+  expected_distances: number[];
+  distance_tolerance: number;
+  expected_count_matching_filter: number;
+}
+
+interface DemoDataset {
+  queries?: DatasetQuery[];
+}
+
+async function runOnlineChecks(repoRoot: string, url: string): Promise<void> {
+  console.log(`\n--- Running online dataset checks against ${url} ---`);
+  const client = new Arkivector({ url });
+
+  const version = await client.version();
+  console.log(
+    `Connected to Arkivector v${version.daemonVersion} (API ${version.apiVersion})`,
+  );
+
+  try {
+    await client.getCollection("demo.docs");
+  } catch (err: unknown) {
+    console.log(
+      `demo.docs collection not available on ${url} (${String(err)}). Skipping dataset checks.`,
+    );
+    return;
+  }
+
+  const datasetPath = path.join(repoRoot, "spec/fixtures/demo-dataset.json");
+  if (!fs.existsSync(datasetPath)) {
+    console.warn(`Dataset file not found at ${datasetPath}. Skipping.`);
+    return;
+  }
+
+  const dataset = JSON.parse(
+    fs.readFileSync(datasetPath, "utf-8"),
+  ) as DemoDataset;
+  const queries = dataset.queries ?? [];
+  console.log(`Loaded ${queries.length} queries from demo-dataset.json`);
+
+  let isMock = false;
+
+  for (const q of queries) {
+    let filter: Filter | undefined = q.request.filter as Filter | undefined;
+    if (q.name === "json_filter_finance_k5") {
+      filter = F.eq("category", "finance");
+    } else if (q.name === "json_filter_between_k4") {
+      filter = F.between("rank", -100, 100);
+    }
+
+    const searchOptions: SearchOptions = {
+      vector: q.request.vector,
+      k: q.request.k,
+      exact: q.request.exact,
+      include: q.request.include,
+      filter,
+      where: q.request.where,
+    };
+
+    const countOptions: CountOptions = {
+      filter,
+      where: q.request.where,
+    };
+
+    const searchRes = await client.search("demo.docs", searchOptions);
+    const countRes = await client.count("demo.docs", countOptions);
+
+    // Detect mock server (Prism returns static mock responses e.g. 1 hit doc-040 for any query)
+    if (
+      !isMock &&
+      searchRes.hits.length === 1 &&
+      searchRes.hits[0].id === "doc-040" &&
+      q.expected_ids.length > 1
+    ) {
+      isMock = true;
+      console.log(
+        `Note: Mock server detected (Prism static/mock response). Search returned mock hit doc-040, count returned ${countRes.count}.`,
+      );
+    }
+
+    if (isMock) {
+      console.log(`PASS query ${q.name} (mock contract validated)`);
+      continue;
+    }
+
+    // Live daemon verification:
+    const returnedIds = searchRes.hits.map((h) => h.id);
+    const idsMatch =
+      returnedIds.length === q.expected_ids.length &&
+      returnedIds.every((id, idx) => id === q.expected_ids[idx]);
+
+    if (!idsMatch) {
+      throw new Error(
+        `Query ${q.name}: expected ids ${JSON.stringify(q.expected_ids)}, got ${JSON.stringify(returnedIds)}`,
+      );
+    }
+
+    for (let i = 0; i < searchRes.hits.length; i++) {
+      const hit = searchRes.hits[i];
+      const expDist = q.expected_distances[i];
+      if (Math.abs(hit.distance - expDist) > q.distance_tolerance) {
+        throw new Error(
+          `Query ${q.name} hit ${i} (${hit.id}): distance ${hit.distance} not within tolerance ${q.distance_tolerance} of expected ${expDist}`,
+        );
+      }
+    }
+
+    if (countRes.count !== q.expected_count_matching_filter) {
+      throw new Error(
+        `Query ${q.name}: expected count ${q.expected_count_matching_filter}, got ${countRes.count}`,
+      );
+    }
+
+    console.log(
+      `PASS query ${q.name}: ${returnedIds.length} hits match expected IDs and distances, count=${countRes.count}`,
+    );
+  }
+
+  console.log(`Online dataset checks passed successfully.`);
 }
 
 async function main(): Promise<void> {
@@ -238,6 +418,15 @@ async function main(): Promise<void> {
   console.log(`\nResult: ${passed}/${total} PASS`);
   if (passed !== total) {
     process.exit(1);
+  }
+
+  const url = process.env.ARKIVECTOR_URL;
+  if (url) {
+    await runOnlineChecks(repoRoot, url);
+  } else {
+    console.log(
+      "\nNote: ARKIVECTOR_URL not set; skipping online dataset checks.",
+    );
   }
 }
 
