@@ -2,8 +2,9 @@
 set(AV_UNIT_SOURCES
     unit/test_main.c
     unit/test_pgcompat.c
-    unit/test_kernels.c)
-set(AV_UNIT_SUITES pgcompat kernels)
+    unit/test_kernels.c
+    unit/test_vectorbytes.c)
+set(AV_UNIT_SUITES pgcompat kernels vectorbytes)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)
@@ -25,3 +26,11 @@ foreach(suite ${AV_UNIT_SUITES})
   add_test(NAME unit_${suite} COMMAND av_unit -s ${suite})
   set_tests_properties(unit_${suite} PROPERTIES TIMEOUT 600)
 endforeach()
+
+# libFuzzer targets (clang, -DAV_FUZZ=ON)
+if(AV_FUZZ)
+  add_executable(fuzz_vectorbytes fuzz/fuzz_vectorbytes.c)
+  target_link_libraries(fuzz_vectorbytes PRIVATE av_core)
+  target_compile_options(fuzz_vectorbytes PRIVATE -fsanitize=fuzzer-no-link)
+  target_link_options(fuzz_vectorbytes PRIVATE -fsanitize=fuzzer)
+endif()
