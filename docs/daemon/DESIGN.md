@@ -1,6 +1,6 @@
-# Daemon design (generated sections, D0 and D1)
+# Daemon design (generated sections, D0 to D3)
 
-This file covers the daemon modules that exist after phases D0 and D1. It is generated from the source. Per-file details are in the mirror files under `docs/daemon/`.
+This file covers the daemon modules that exist after phases D0, D1, D2, and D3. It is generated from the source. Per-file details are in the mirror files under `docs/daemon/`.
 
 ## Build
 
@@ -50,3 +50,39 @@ This file covers the daemon modules that exist after phases D0 and D1. It is gen
 - `codec/vtype.c` maps the four types to their names and dimensions.
 
 All codec functions are reentrant. Output is arena memory. The caller owns the arena.
+
+## Filter Engine
+
+`daemon/src/filter/` parses and evaluates predicates against attribute index postings and document maps.
+
+- `filter/value.c` handles canonical representations of typed values (`dec`, `u256`, `u64`, `i32`, `bool`, `str`, `bytes`, `addr`, `key`). Fixed-point `dec` uses 256-bit two's complement scaled by $10^{18}$.
+- `filter/lexer.c` and `filter/parser.c` implement recursive-descent parsing for the Arkiv SQL-like `where` filter language, with position tracking and precedence rules.
+- `filter/json_filter.c` parses structured JSON filter objects into identical AST structures, typing shorthand values against the collection's schema.
+- `filter/eval.c` executes AST nodes against the collection's attribute index (`av_attr_index`) and document map (`av_docmap`), returning a Roaring bitmap of matching docids.
+- Predicates use set operations: `EQ` reads index postings, ranges (`LT`, `LE`, `GT`, `GE`) and `BETWEEN` perform ordered postings scans, `STARTSWITH` executes prefix scans, `NE` executes `typed ANDNOT eq`, and `NOT` executes `live ANDNOT child`.
+- Short-circuit optimization in `AND`: if an intermediate result becomes empty, remaining branches are skipped.
+- Evaluation always intersects the result with the collection's `live` bitmap and prunes expired entities where `expires_at_block <= as_of_block`.
+
+## Flat Scan
+
+`daemon/src/index/flat.c` performs exact brute-force vector search over memory-mapped segment vector data.
+
+- Constrained to a candidate Roaring bitmap produced by the filter engine, or scans all segment vectors if no filter is supplied.
+- Calculates distances using the dispatched pgvector kernel matching the collection's operator class (`av_opclass`).
+- Maintains a bounded max-heap of size `offset + k`. Newly evaluated candidates that are closer than the current heap worst replace the root and sift down.
+- Implements deterministic total ordering: ties on identical distance values are broken by ascending lexicographical comparison (`memcmp`) of 32-byte entity keys, then by ascending docid.
+- Performs heap sort over the retained entries to return results in strictly ascending distance order.
+- Guarantees exact recall of 1.0.
+
+## Query Executor
+
+`daemon/src/query/` coordinates query planning, flat vector scanning, storage retrieval, and result formatting.
+
+- `query/planner.c` determines the search strategy. In Phase D3, it always selects `AV_STRAT_EXACT_FLAT` with `exact = true`, calculates filter selectivity (`candidates / live_total`), and captures the active kernel tier name.
+- `query/executor.c` executes the full search pipeline:
+  - Invokes `av_flat_scan` to find top candidates.
+  - Derives similarity scores: `score = 1.0 - distance` for cosine distance; `score = -distance` for L2 and inner product metrics.
+  - Applies optional `max_distance` and `min_score` cutoff thresholds.
+  - Reads entity rows from LMDB (`av_store_get_entity`) and unpackages attribute binary blobs (`av_attrs_unpack`) using an ephemeral row arena.
+  - Applies projection bitflags (`AV_INCLUDE_ATTRIBUTES`, `AV_INCLUDE_DOCUMENT`, `AV_INCLUDE_VECTOR`): extracts string ID (`av.id`), document text (`av.doc`), base64 VectorBytes (`av.vec`), and builds typed attribute JSON values.
+  - Measures total monotonic elapsed execution time and attaches the query plan.
