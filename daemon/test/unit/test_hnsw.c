@@ -116,10 +116,10 @@ static void init_data(void)
         for (int j = 0; j < INTRINSIC; j++)
             proj[i][j] = (float) gauss(&seed);
     nvecs_total = NVEC * 3;
-    vecs = malloc(sizeof(Vector *) * (size_t) nvecs_total);
+    vecs = (Vector **) malloc(sizeof(Vector *) * (size_t) nvecs_total);
     for (int i = 0; i < nvecs_total; i++)
         vecs[i] = make_vector(&seed);
-    queries = malloc(sizeof(Vector *) * NQUERY);
+    queries = (Vector **) malloc(sizeof(Vector *) * NQUERY);
     for (int i = 0; i < NQUERY; i++)
         queries[i] = make_vector(&seed);
 }
@@ -409,6 +409,7 @@ TEST spike_mmap_relocation(void)
         ASSERT(n > 0);
         off += (Size) n;
     }
+    ASSERT(used > 0);
     /* Map read-only; keep the original mapping alive so the address must differ. */
     char *ro = mmap(NULL, used, PROT_READ, MAP_SHARED, fd, 0);
     ASSERT(ro != MAP_FAILED);
@@ -495,7 +496,7 @@ TEST spike_concurrent_insert_search(void)
 {
     init_data();
     const char *env = getenv("AV_HNSW_SPIKE_SECONDS");
-    int seconds = env ? atoi(env) : 3;
+    int seconds = env ? (int) strtol(env, NULL, 10) : 3;
     spike_index ix;
     char *base = map_anon(ARENA_BYTES);
     ASSERT(base != NULL);

@@ -1,0 +1,132 @@
+name: daemon
+
+on:
+  push:
+    branches: ['**']
+    paths: ['daemon/**', 'spec/**', '.github/workflows/daemon.yml']
+  pull_request:
+    branches: ['**']
+    paths: ['daemon/**', 'spec/**', '.github/workflows/daemon.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daemon-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CURL_VERSION: '8.23.0'
+  CURL_PREFIX: /opt/curl
+  CLANG_FORMAT_VERSION: '23.1.4'
+
+jobs:
+  # Phase 1: code quality and compilation.
+  quality:
+    name: "Phase 1: code quality & compilation (${{ matrix.cc }})"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libuv1-dev libssl-dev \
+            clang clang-tidy cppcheck pkg-config xz-utils
+      - name: Cache curl
+        id: curlcache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CURL_PREFIX }}
+          key: curl-${{ env.CURL_VERSION }}-ubuntu-24.04-openssl
+      - name: Build curl >= 8.11 from source
+        run: daemon/tools/ci-install-curl.sh
+      - name: Point build at the new curl
+        run: |
+          echo "PKG_CONFIG_PATH=$CURL_PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$CURL_PREFIX/lib" >> "$GITHUB_ENV"
+      - name: Configure
+        working-directory: daemon
+        run: cmake --preset dev -DCMAKE_C_COMPILER=$CC
+      - name: Build
+        working-directory: daemon
+        run: cmake --build --preset dev
+      - name: Install pinned clang-format
+        run: pip install "clang-format==$CLANG_FORMAT_VERSION"
+      - name: clang-format check
+        working-directory: daemon
+        run: tools/format-files.sh | xargs clang-format --dry-run --Werror
+      - name: clang-tidy
+        if: matrix.cc == 'gcc'
+        working-directory: daemon
+        run: tools/format-files.sh | grep '\.c$' | xargs clang-tidy -p build/dev --quiet
+      - name: cppcheck
+        if: matrix.cc == 'gcc'
+        working-directory: daemon
+        run: |
+          tools/format-files.sh | grep '\.c$' | xargs cppcheck --enable=warning,performance,portability \
+            --error-exitcode=1 --inline-suppr --suppress=missingIncludeSystem --quiet \
+            -Isrc -Isrc/pgcompat/include -Isrc/pgvector -Ibuild/dev/generated
+
+  verbatim:
+    name: Verbatim pgvector files are byte-identical
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          for f in halfutils.c halfutils.h bitutils.c bitutils.h halfvec.h vector.h bitvec.h sparsevec.h; do
+            cmp "pgvector/src/$f" "daemon/src/pgvector/$f"
+          done
+
+  # Phase 2: integration tests. Skipped (and so not green) if Phase 1 fails.
+  integration:
+    name: "Phase 2: integration tests"
+    needs: [quality, verbatim]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libuv1-dev libssl-dev \
+            clang pkg-config xz-utils
+      - name: Cache curl
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CURL_PREFIX }}
+          key: curl-${{ env.CURL_VERSION }}-ubuntu-24.04-openssl
+      - name: Build curl >= 8.11 from source
+        run: daemon/tools/ci-install-curl.sh
+      - name: Point build at the new curl
+        run: |
+          echo "PKG_CONFIG_PATH=$CURL_PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$CURL_PREFIX/lib" >> "$GITHUB_ENV"
+      - name: ASan + UBSan build
+        working-directory: daemon
+        run: cmake --preset asan && cmake --build --preset asan
+      - name: Unit tests (ASan + UBSan)
+        working-directory: daemon
+        run: ctest --preset asan
+      - name: TSan build (clang)
+        working-directory: daemon
+        run: cmake --preset tsan && cmake --build --preset tsan
+      - name: Unit tests (TSan)
+        working-directory: daemon
+        run: ctest --preset tsan
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install integration test requirements
+        run: pip install -r daemon/test/integration/requirements.txt -r daemon/testkit/mock-arkiv/requirements.txt
+      - name: mock-arkiv selftest
+        run: python daemon/testkit/mock-arkiv/selftest.py
+      - name: Integration tests
+        run: pytest -q daemon/test/integration

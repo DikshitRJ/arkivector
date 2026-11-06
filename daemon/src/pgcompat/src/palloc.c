@@ -116,6 +116,7 @@ static void run_reset_callbacks(MemoryContext ctx)
 void MemoryContextDeleteChildren(MemoryContext context)
 {
     while (context->firstchild != NULL) {
+        /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc): false positive, MemoryContextDelete unlinks the child from context->firstchild */
         MemoryContextDelete(context->firstchild);
     }
 }
