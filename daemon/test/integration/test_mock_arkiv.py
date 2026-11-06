@@ -852,7 +852,6 @@ _REVERT_NAME_BUG = (
 )
 
 
-@pytest.mark.xfail(reason=_REVERT_NAME_BUG, strict=True)
 def test_indexed_bytes_attribute_is_rejected_cleanly(mock_arkiv: MockArkiv) -> None:
     status, body = mock_arkiv.ctl_status(
         "POST", "/entities", {"min_lifetime": 5, "attributes": [attr("blob", "bytes", "0x00", indexed=True)]}
@@ -860,7 +859,6 @@ def test_indexed_bytes_attribute_is_rejected_cleanly(mock_arkiv: MockArkiv) -> N
     assert status in (400, 409), (status, body)
 
 
-@pytest.mark.xfail(reason=_REVERT_NAME_BUG, strict=True)
 def test_tombstone_in_create_is_rejected_cleanly(mock_arkiv: MockArkiv) -> None:
     status, body = mock_arkiv.ctl_status(
         "POST", "/entities", {"min_lifetime": 5, "attributes": [{"name": "x", "type": "tombstone"}]}

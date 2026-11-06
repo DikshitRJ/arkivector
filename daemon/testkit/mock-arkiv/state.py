@@ -82,9 +82,9 @@ class ControlError(Exception):
 class Revert(Exception):
     """EVM custom-error style revert of a whole tx (HTTP 409 from the control API)."""
 
-    def __init__(self, name: str, **args: Any) -> None:
-        super().__init__(name)
-        self.name = name
+    def __init__(self, error_name: str, /, **args: Any) -> None:
+        super().__init__(error_name)
+        self.name = error_name
         self.args_ = args
 
     def to_obj(self) -> dict[str, Any]:
