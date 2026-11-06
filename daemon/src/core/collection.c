@@ -771,6 +771,8 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
     const char *reason = NULL;
     void *pg = NULL;
     bool same_vec = false;
+    av_err ve; /* function scope: reason may point into ve.vb_error */
+    av_err_clear(&ve);
     if (vec == NULL || vec->type != AV_AT_BYTES) {
         reason = "VEC_MISSING";
     } else {
@@ -779,8 +781,6 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
                    roaring_bitmap_contains(av_live_working(c->live), old.docid);
         if (!same_vec) {
             av_vb_info info;
-            av_err ve;
-            av_err_clear(&ve);
             if (av_vb_decode(vec->val, vec->len, c->scratch, &pg, &info, &ve) != AV_OK)
                 reason = ve.vb_error[0] != '\0' ? ve.vb_error : "VEC_INVALID";
             else if (info.type != c->def.vtype)

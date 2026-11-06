@@ -59,8 +59,8 @@ jobs:
       - name: Build
         working-directory: daemon
         run: cmake --build --preset dev
-      - name: Install pinned clang-format
-        run: pip install "clang-format==$CLANG_FORMAT_VERSION"
+      - name: Install pinned clang-format and clang-tidy
+        run: pip install "clang-format==$CLANG_FORMAT_VERSION" "clang-tidy==$CLANG_FORMAT_VERSION"
       - name: clang-format check
         working-directory: daemon
         run: tools/format-files.sh | xargs clang-format --dry-run --Werror

@@ -81,7 +81,7 @@ static void set_state(av_sync *s, coll_state *cs, av_sync_state st, const char *
         av_collection_set_bootstrapping(cs->c, (st == AV_SYNC_BOOTSTRAP));
     }
     if (err != NULL) {
-        snprintf(cs->last_error, sizeof(cs->last_error), "%s", err);
+        snprintf(cs->last_error, sizeof(cs->last_error), "%.*s", (int) sizeof(cs->last_error) - 1, err);
     } else if (st == AV_SYNC_LIVE || st == AV_SYNC_CATCH_UP) {
         cs->last_error[0] = '\0';
     }
