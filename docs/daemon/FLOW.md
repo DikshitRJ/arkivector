@@ -1,4 +1,4 @@
-# Daemon flows (generated scenarios, D0 to D3)
+# Daemon flows (generated scenarios, D0 to D5)
 
 Each scenario gives the call path. The diagrams follow the source. The HNSW scenario follows the spike notes in `src/pgvector/PROVENANCE.md`, because the spike code is not yet part of the daemon path.
 
@@ -273,3 +273,245 @@ sequenceDiagram
 Notes:
 - The manifest entity contains the collection's authoritative configuration (vector column, metric, opclass, index hyperparameters, and membership rules).
 - Following immediately triggers background bootstrap and sync catch-up routines.
+
+## managed upsert
+
+Status: D5. Executed for `POST /v1/collections/{name}/entities`.
+
+Coordinates write idempotency, upsert-by-id differential analysis, operation batching, nonce allocation, EIP-1559 signing, mempool broadcast, receipt tracking, and write-through index commits.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant HTTP as HTTP Server (http.c)
+    participant Idem as Idempotency (idempotency.c)
+    participant W as Writer (write/writer.c)
+    participant LMDB as LMDB Store (lmdb_store.c)
+    participant B as Batcher (write/batcher.c)
+    participant N as Nonce Tracker (write/nonce.c)
+    participant T as Tx Builder (arkiv/tx.c)
+    participant S as Signer (arkiv/signer.c)
+    participant RPC as Arkiv RPC (arkiv/rpc.c)
+    participant C as Collection (core/collection.c)
+
+    Client->>HTTP: POST /v1/collections/{name}/entities (entities, wait, timeout_ms)
+    HTTP->>Idem: av_idempotency_check(key, hash)
+    alt Cached response exists
+        Idem-->>HTTP: return cached response
+        HTTP-->>Client: 200 OK / 202 Accepted
+    else In flight
+        Idem->>Idem: wait on condition variable
+    else New request
+        Idem->>Idem: register in-flight
+        HTTP->>W: av_writer_upsert(coll, store, signer, entities, wait)
+        loop For each entity
+            W->>LMDB: check av.id -> key and fetch existing row
+            alt Entity exists
+                alt Signer is owner
+                    W->>W: diff attributes -> create PATCH op (or NOOP)
+                    opt TTL supplied
+                        W->>W: add EXTEND_EXPIRY op
+                    end
+                else Signer not owner
+                    W-->>HTTP: 409 not_owner error
+                end
+            else Entity does not exist
+                W->>W: CSPRNG salt -> predict key -> create CREATE op
+            end
+        end
+        W->>B: av_batcher_plan(ops, max_tx_bytes, max_ops_per_tx)
+        B-->>W: transaction batches
+        loop For each batch
+            W->>N: av_nonce_acquire()
+            N-->>W: nonce
+            W->>B: av_batcher_estimate_gas()
+            W->>T: av_tx_sighash(tx)
+            W->>S: av_signer_sign(sighash)
+            S-->>W: (r, s, y_parity)
+            W->>T: av_tx_encode_signed(tx, sig)
+            W->>RPC: eth_sendRawTransaction(raw_tx)
+            RPC-->>W: tx_hash
+        end
+        alt wait == none
+            W-->>HTTP: 202 Accepted (predicted keys, tx_hashes)
+        else wait == receipt or indexed
+            W->>RPC: poll eth_getTransactionReceipt
+            RPC-->>W: receipts (block_number, logs, status)
+            opt Reverted transaction
+                W->>RPC: eth_call simulate revert
+                W-->>HTTP: tx_reverted error with catalogue error name
+            end
+            W->>W: map EntityCreated logs to ops by logIndex
+            W->>LMDB: write-through commit at receipt block
+            opt wait == indexed
+                W->>C: av_collection_wait_block(receipt_block)
+            end
+            W-->>HTTP: 200 OK (results, tx_hashes, block_number)
+        end
+        HTTP->>Idem: av_idempotency_complete(status, response)
+        HTTP-->>Client: HTTP response
+    end
+```
+
+Notes:
+- `wait=none` immediately returns 202 with deterministic predicted keys derived via `keccak256(chainId || arkiv || owner || nonce || salt)`.
+- If an entity exists with identical attributes and vector, `op: "noop"` is assigned and zero gas is consumed.
+- Write-through updates guarantee read-your-writes consistency immediately upon receipt confirmation without waiting for downstream sync polling.
+
+## prepare
+
+Status: D5. Executed for `POST /v1/collections/{name}/entities:prepare`.
+
+Prepares unsigned EIP-1559 transactions and pre-calculates deterministic entity keys for client-side signing (browser wallets, KMS) without requiring daemon-hosted signers.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant HTTP as HTTP Server (http.c)
+    participant W as Writer (write/writer.c)
+    participant LMDB as LMDB Store (lmdb_store.c)
+    participant RPC as Arkiv RPC (arkiv/rpc.c)
+    participant ABI as ABI Encoder (arkiv/abi.c)
+    participant B as Batcher (write/batcher.c)
+
+    Client->>HTTP: POST /v1/collections/{name}/entities:prepare (entities, from)
+    HTTP->>W: av_writer_prepare(coll, store, from, rpc, entities)
+    W->>RPC: eth_call entityNonce(from) (0x36917bfd)
+    RPC-->>W: current entityNonce
+    W->>RPC: eth_getTransactionCount(from, "pending")
+    RPC-->>W: current tx nonce
+    loop For each entity
+        W->>LMDB: check av.id -> key
+        alt Entity exists
+            alt from is owner
+                W->>W: diff attributes -> PATCH op
+            else from not owner
+                W-->>HTTP: 409 not_owner error
+            end
+        else Entity does not exist
+            W->>W: generate 128-bit CSPRNG salt
+            W->>ABI: av_abi_predict_key(chainId, arkiv, from, entityNonce++, salt)
+            ABI-->>W: predicted entityKey
+            W->>W: construct CREATE op
+        end
+    end
+    W->>B: av_batcher_plan(ops)
+    loop For each batch
+        W->>ABI: av_abi_encode_execute(batch_ops)
+        ABI-->>W: execute(ops) calldata
+        W->>B: av_batcher_estimate_gas(calldata, from)
+        B-->>W: gas_estimate
+        W->>W: assemble unsigned transaction {to, data, value: 0, nonce, gas_estimate}
+    end
+    W-->>HTTP: prepared batch {chain_id, transactions, results}
+    HTTP-->>Client: 200 OK (unsigned transactions & predicted keys)
+```
+
+Notes:
+- The daemon does not sign; client applications sign and broadcast using their own wallet or hardware security modules.
+- Predicted keys enable cross-entity relational referencing before transactions are included in blocks.
+
+## batch search
+
+Status: D4. Executed for `POST /v1/collections/{name}/search:batch`.
+
+Executes multiple vector similarity searches within a single snapshot under the collection's publish read lock, sharing index structures and performing parallel per-query execution.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant HTTP as HTTP Server (http.c)
+    participant H as h_batch_search (rest_search.c)
+    participant C as Collection (core/collection.c)
+    participant P as Query Planner (query/planner.c)
+    participant F as Filter Evaluator (filter/eval.c)
+    participant E as Query Executor (query/executor.c)
+    participant LMDB as LMDB Store (lmdb_store.c)
+
+    Client->>HTTP: POST /v1/collections/{name}/search:batch (searches[])
+    HTTP->>H: dispatch batch request
+    H->>C: acquire publish rwlock (shared / read lock)
+    loop For each search item
+        opt Filter present
+            H->>F: av_filter_eval(filter, attr_index, docmap, live, as_of)
+            F-->>H: candidate Roaring bitmap
+        end
+        H->>P: av_query_plan(segment, candidate_count, total_count, opclass, params)
+        P-->>H: query plan (AV_STRAT_EXACT_FLAT or AV_STRAT_HNSW_ITERATIVE)
+        H->>E: execute search against segments
+        alt Strategy S1: Flat scan
+            E->>E: av_flat_scan(candidates, opclass, offset, k)
+        else Strategy S2: HNSW iterative scan
+            E->>E: HnswSearchLayer / GetScanItems with live & candidate recheck
+            opt S2 yields < k
+                E->>E: S2 -> S1 fallback (exact flat scan)
+            end
+        end
+        E-->>H: top hit docids and distances
+        loop For each hit
+            E->>LMDB: av_store_get_entity (if projections requested)
+            E->>E: unpack attributes & derive scores
+        end
+        H->>H: record individual search result and plan
+    end
+    H->>C: release publish rwlock
+    H->>HTTP: serialize response { "results": [...] }
+    HTTP-->>Client: 200 OK (Arkivector-As-Of-Block, X-Request-Id)
+```
+
+Notes:
+- Holding the shared publish lock throughout the batch guarantees that all sub-queries execute against the exact same block snapshot.
+- Each individual search query independently benefits from crossover planning (choosing between flat sequential scan and HNSW iterative graph scan).
+
+## compaction
+
+Status: D4. Executed by background compactor thread (`index/compact.c`).
+
+Reclaims tombstoned vector memory, consolidates multi-segment fragments, partitions live entities into temporal expiry bands, and swaps rebuilt HNSW graphs with zero query downtime.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Compactor as Compactor Thread (index/compact.c)
+    participant C as Collection (core/collection.c)
+    participant Pool as Worker Threads (threadpool.c)
+    participant Arena as New Growing Arena (arena_file.c)
+    participant HNSW as HNSW Graph (pgvector/hnswbuild_mem.c)
+    participant LMDB as LMDB Store (store/lmdb_store.c)
+
+    loop Periodic Check (every 60s or block tick)
+        Compactor->>Compactor: av_compact_check_needed(collection, config)
+        alt Dead ratio > 30% OR segments > max_segments OR arena seal needed
+            Compactor->>C: read active live bitmap and segment counts
+            Compactor->>Compactor: gather live unexpired vectors
+            Compactor->>Compactor: partition vectors into expiry bands (width 302,400 blocks)
+            loop For each band / target segment
+                Compactor->>Arena: reserve virtual memory file arena
+                Compactor->>Pool: enqueue parallel insert jobs
+                par Worker Threads
+                    Pool->>HNSW: InsertTupleInMemory (using pgvector LWLocks)
+                end
+                Compactor->>Arena: seal rebuilt segment (write "AVSEG1" footer, msync, PROT_READ)
+            end
+            Compactor->>C: acquire publish rwlock (EXCLUSIVE)
+            Compactor->>C: swap segment array & live docmaps
+            Compactor->>C: release publish rwlock (microsecond duration)
+            Compactor->>Compactor: retire old segments (decrement refcount)
+            opt Reader refcount == 0
+                Compactor->>Compactor: unlink old arena files from disk
+            end
+        end
+        opt Expired band check
+            Compactor->>Compactor: av_compact_drop_expired_bands(as_of_block)
+            Compactor->>Compactor: unlink sealed segments where band_end <= as_of_block
+        end
+    end
+```
+
+Notes:
+- Compaction runs entirely out-of-band and never blocks active search queries.
+- Expiry bands group vectors by lifetime expiration, permitting entire expired segment files to be unlinked directly from disk without vector-by-vector deletion passes.
+

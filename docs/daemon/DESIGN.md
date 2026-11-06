@@ -1,6 +1,6 @@
-# Daemon design (generated sections, D0 to D3)
+# Daemon design (generated sections, D0 to D5)
 
-This file covers the daemon modules that exist after phases D0, D1, D2, and D3. It is generated from the source. Per-file details are in the mirror files under `docs/daemon/`.
+This file covers the daemon modules that exist after phases D0, D1, D2, D3, D4, and D5. It is generated from the source. Per-file details are in the mirror files under `docs/daemon/`.
 
 ## Build
 
@@ -78,11 +78,51 @@ All codec functions are reentrant. Output is arena memory. The caller owns the a
 
 `daemon/src/query/` coordinates query planning, flat vector scanning, storage retrieval, and result formatting.
 
-- `query/planner.c` determines the search strategy. In Phase D3, it always selects `AV_STRAT_EXACT_FLAT` with `exact = true`, calculates filter selectivity (`candidates / live_total`), and captures the active kernel tier name.
+- `query/planner.c` determines the search strategy. In Phase D3, it selects `AV_STRAT_EXACT_FLAT` with `exact = true`, calculates filter selectivity (`candidates / live_total`), and captures the active kernel tier name. In Phase D4, it implements the crossover heuristic $T = \gamma\sqrt{m \cdot ef \cdot N}$ to select between exact flat scan and HNSW iterative scan.
 - `query/executor.c` executes the full search pipeline:
-  - Invokes `av_flat_scan` to find top candidates.
+  - Invokes `av_flat_scan` or HNSW segment scans to find top candidates.
   - Derives similarity scores: `score = 1.0 - distance` for cosine distance; `score = -distance` for L2 and inner product metrics.
   - Applies optional `max_distance` and `min_score` cutoff thresholds.
   - Reads entity rows from LMDB (`av_store_get_entity`) and unpackages attribute binary blobs (`av_attrs_unpack`) using an ephemeral row arena.
   - Applies projection bitflags (`AV_INCLUDE_ATTRIBUTES`, `AV_INCLUDE_DOCUMENT`, `AV_INCLUDE_VECTOR`): extracts string ID (`av.id`), document text (`av.doc`), base64 VectorBytes (`av.vec`), and builds typed attribute JSON values.
   - Measures total monotonic elapsed execution time and attaches the query plan.
+
+## Index Compaction
+
+`daemon/src/index/compact.c` maintains steady-state memory sizing, query latency, and graph recall for pgvector HNSW segments in Phase D4.
+
+- **Triggers**: Compaction runs asynchronously in a background compactor worker thread when:
+  - Dead vector ratio exceeds 30% (`tombstones / total_vectors > 0.30`) due to deletes or vector updates.
+  - The number of sealed segment files exceeds `max_segments` (default 16), triggering small-segment merges.
+  - Growing arenas reach the sealing vector cap (`seal_max_vectors`, e.g. 64k).
+- **Expiry Bands**: Live vectors are partitioned by `expiresAt` into absolute block bands (default width 302,400 blocks $\approx$ 7 days, up to 27 bands across `MAX_LIFETIME`). This enables whole-segment unlinking when a band ends (`band_end <= as_of_block`), avoiding item-by-item vacuum overhead.
+- **Parallel Rebuild**: New growing arenas are populated concurrently by worker threads using pgvector's fine-grained element LWLocks and `InsertTupleInMemory`.
+- **Atomic Publish**: Newly sealed segments and docmaps are swapped into the collection instance under the collection's `publish` read-write lock (`pthread_rwlock_t`), which is held exclusively for mere microseconds.
+- **Reader Draining**: Retired segment files are unlinked from the filesystem only after active search query readers complete, managed via atomic reference counts on each segment handle.
+
+## Write Path
+
+`daemon/src/arkiv/` and `daemon/src/write/` implement the on-chain write rail for Phase D5. When a signer is configured, the daemon provides managed upsert-by-id, batching, signing, mempool broadcast, receipt tracking, and write-through indexing.
+
+- **EVM Contract Interface (`arkiv/abi.c`)**: Encodes calls to the Arkiv precompile `0x4400000000000000000000000000000000000044` via `execute((uint8,bytes)[])` (selector `0x49650044`). Encodes operations `CREATE` (1), `PATCH` (2), `EXTEND_EXPIRY` (3), `TRANSFER_OWNERSHIP` (4), and `DELETE` (5). Attributes are left-aligned in 32-byte words, sorted in strictly ascending ASCII order, and validated for uniqueness.
+- **Deterministic Key Prediction**: Pre-computes entity keys offline via Keccak-256 over tightly packed 96-byte buffers: $\text{keccak256}(\text{chainId}_{256} \mathbin{\Vert} \text{arkiv}_{160} \mathbin{\Vert} \text{owner}_{160} \mathbin{\Vert} \text{nonce}_{64} \mathbin{\Vert} \text{salt}_{128})$.
+- **Transactions & RLP (`arkiv/tx.c`, `arkiv/rlp.c`)**: Constructs Type-2 EIP-1559 envelopes with 0 native value, empty access lists, dynamic gas fees derived from `eth_feeHistory`, and EIP-2718 `0x02` envelopes.
+- **Signer Abstraction (`arkiv/signer.c`)**: Provides a pluggable SECP256k1 signing boundary. Supports Web3 Secret Storage v3 JSON files (using OpenSSL EVP for PBKDF2/scrypt, AES-128-CTR, and Keccak-256 MAC verification), environment-variable keys for development, and remote HTTP JSON-RPC signers (Web3Signer). Wipes private keys via `explicit_bzero`.
+- **Managed Upsert-by-ID (`write/writer.c`)**:
+  - Point lookups check `av.id -> key` in local storage.
+  - If entity exists and owner matches signer: computes differential attribute mutations for `PATCH`, omits unchanged data (`noop`), and handles TTL updates via `EXTEND_EXPIRY`.
+  - If entity does not exist: generates 128-bit CSPRNG salt, derives predicted key, and emits `CREATE`.
+  - If entity exists but owner differs: halts and returns `409 not_owner`.
+- **Batching & Sizing (`write/batcher.c`)**: Accumulates operations into transactions bounded by `max_tx_bytes` (128 KiB) and `max_ops_per_tx` (50 ops), estimates gas with `eth_estimateGas`, and applies a 20% safety margin.
+- **Nonce Pipelining (`write/nonce.c`)**: Atomically issues sequential nonces from an in-memory tracker, allowing concurrent transactions in flight. Resynchronizes with `eth_getTransactionCount(addr, "pending")` upon network stalls or `nonce_too_low` errors.
+- **Consistency & Revert Handling**: Supports `wait=none` (immediate 202 with predicted keys), `wait=receipt` (200 with mined block and logs), and `wait=indexed` (waits for daemon's local index to publish the receipt block). Simulates reverted transactions via `eth_call` to decode the contract's revert error from the 22-error catalogue. Performs write-through index commits at receipt block height.
+
+## Idempotency
+
+`daemon/src/server/idempotency.c` enforces exactly-once processing for write requests (`POST /v1/collections/{name}/entities`, `:delete`, `:extend`) carrying an `Idempotency-Key` header.
+
+- **Storage**: Backed by the dedicated LMDB database `idem` in `store/lmdb_store.c`.
+- **Payload Hash Binding**: Binds the idempotency key to the request signature: $\text{SHA-256}(\text{method} \mathbin{\Vert} \text{":"} \mathbin{\Vert} \text{path} \mathbin{\Vert} \text{":"} \mathbin{\Vert} \text{body})$.
+- **In-Flight Deduplication**: When an initial request is processing, it registers an in-flight entry with a condition variable. Concurrent requests with the same key and payload block on `pthread_cond_wait()` instead of initiating duplicate on-chain transactions, returning the identical response once the leader completes.
+- **Conflict Detection**: Presenting an active key with a differing method, path, or payload immediately returns `409 idempotency_conflict`.
+- **Retention**: Cached responses expire after 24 hours (86,400 seconds) and are purged periodically.
