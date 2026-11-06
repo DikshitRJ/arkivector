@@ -1,9 +1,0 @@
-# Licence Decision Pending
-
-As recorded in `AGENTS.md` and `PLAN_DAEMON.md` (Decision Q8), the project licence is deferred
-by the owner (@DikshitRJ).
-
-Upstream licences and notices for third-party and copied code are preserved in:
-- `daemon/src/pgvector/LICENSE.pgvector` (pgvector v0.8.7, PostgreSQL License)
-- `daemon/src/pgcompat/LICENSE.postgresql` (PostgreSQL REL_17_11, PostgreSQL License)
-- `daemon/third_party/VENDORED.lock` and respective directories under `daemon/third_party/`.
