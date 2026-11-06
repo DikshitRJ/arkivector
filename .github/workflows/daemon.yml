@@ -7,6 +7,8 @@ on:
   pull_request:
     branches: ['**']
     paths: ['daemon/**', 'spec/**', '.github/workflows/daemon.yml']
+  schedule:
+    - cron: '17 3 * * *' # nightly: fuzzers run 10 minutes each
 
 permissions:
   contents: read
@@ -74,21 +76,25 @@ jobs:
             --error-exitcode=1 --inline-suppr --suppress=missingIncludeSystem --quiet \
             -Isrc -Isrc/pgcompat/include -Isrc/pgvector -Ibuild/dev/generated
 
-  verbatim:
-    name: Verbatim pgvector files are byte-identical
+  provenance:
+    name: Copied pgvector/PostgreSQL code unmodified (V/F/S provenance)
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          for f in halfutils.c halfutils.h bitutils.c bitutils.h halfvec.h vector.h bitvec.h sparsevec.h; do
-            cmp "pgvector/src/$f" "daemon/src/pgvector/$f"
-          done
+      - name: Sparse checkout of PostgreSQL REL_17_11
+        run: |
+          git clone --depth 1 --branch REL_17_11 --filter=blob:none --sparse \
+            https://github.com/postgres/postgres "$RUNNER_TEMP/pg"
+          git -C "$RUNNER_TEMP/pg" sparse-checkout set src/include src/backend/lib src/backend/nodes \
+            src/backend/utils/adt src/common src/port
+      - name: check_provenance.py
+        run: python3 -I daemon/tools/check_provenance.py --postgres "$RUNNER_TEMP/pg"
 
   # Phase 2: integration tests. Skipped (and so not green) if Phase 1 fails.
   integration:
     name: "Phase 2: integration tests"
-    needs: [quality, verbatim]
+    needs: [quality, provenance]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -130,3 +136,49 @@ jobs:
         run: python daemon/testkit/mock-arkiv/selftest.py
       - name: Integration tests
         run: pytest -q daemon/test/integration
+      - name: Dev build (parity CLI)
+        working-directory: daemon
+        run: cmake --preset dev && cmake --build --preset dev
+      - name: pgvector parity suite (real pgvector 0.8.7)
+        run: |
+          pip install -r daemon/test/parity/requirements.txt
+          docker compose -f daemon/test/parity/docker-compose.yml up -d --wait
+          PARITY_N=2000 pytest -q daemon/test/parity
+          docker compose -f daemon/test/parity/docker-compose.yml down -v
+
+  fuzz:
+    name: "Phase 2: fuzz smoke (libFuzzer, 60 s per target)"
+    needs: [quality, provenance]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '600' || '60' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libuv1-dev libssl-dev \
+            clang pkg-config xz-utils
+      - name: Cache curl
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CURL_PREFIX }}
+          key: curl-${{ env.CURL_VERSION }}-ubuntu-24.04-openssl
+      - name: Build curl from source
+        run: daemon/tools/ci-install-curl.sh
+      - name: Point build at the new curl
+        run: |
+          echo "PKG_CONFIG_PATH=$CURL_PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$CURL_PREFIX/lib" >> "$GITHUB_ENV"
+      - name: Build fuzzers
+        working-directory: daemon
+        run: cmake --preset fuzz && cmake --build --preset fuzz
+      - name: Run fuzzers
+        working-directory: daemon
+        run: |
+          for t in build/fuzz/test/fuzz_*; do
+            name=$(basename "$t"); corpus="test/fuzz/corpus/${name#fuzz_}"
+            mkdir -p "$corpus"
+            "$t" -max_total_time=${FUZZ_SECONDS:-60} -max_len=200000 "$corpus"
+          done
