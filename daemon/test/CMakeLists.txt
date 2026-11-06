@@ -6,14 +6,16 @@ set(AV_UNIT_SOURCES
     unit/test_vectorbytes.c
     unit/test_text_io.c
     unit/test_ttl.c
-    unit/test_ttl.c
     unit/test_rlp.c
     unit/test_keccak.c
     unit/test_rpc_parse.c
     unit/test_rpc_mock.c
     unit/test_value.c
-    unit/test_filter_parser.c)
-set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp keccak arkiv_parse arkiv_rpc value filter_parser)
+    unit/test_filter_parser.c
+    unit/test_filter_eval.c
+    unit/test_planner.c
+    unit/test_rest.c)
+set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp keccak arkiv_parse arkiv_rpc value filter_parser filter_eval planner rest)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)

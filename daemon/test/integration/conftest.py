@@ -163,16 +163,132 @@ def mock_arkiv(mock_arkiv_factory: Callable[..., MockArkiv]) -> MockArkiv:
     return mock_arkiv_factory()
 
 
-# ---------------------------------------------------------------------------
-# PLACEHOLDER: `daemon` fixture (phase D2+). NOT IMPLEMENTED YET.
-#
-# Intended shape: start daemon/build/dev/arkivectord with a temp data dir pointed at `mock_arkiv`
-# (RPC url = mock_arkiv.url), wait until it listens, yield an object with `.url` and `.get/.post`
-# helpers, terminate at teardown. Until the binary exists every test using it is skipped.
-# ---------------------------------------------------------------------------
+import shutil
+import socket
+import tempfile
+import time
+
+
+class DaemonClient:
+    """Wrapper around a running arkivectord instance."""
+
+    def __init__(self, proc: subprocess.Popen[str], port: int, data_dir: Path) -> None:
+        self.proc = proc
+        self.port = port
+        self.url = f"http://127.0.0.1:{port}"
+        self.data_dir = data_dir
+
+    def http(
+        self, method: str, path: str, body: Any = None, headers: dict[str, str] | None = None
+    ) -> tuple[int, Any, Any]:
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        req_headers = {"Content-Type": "application/json"}
+        if headers:
+            req_headers.update(headers)
+        req = urllib.request.Request(self.url + path, data=data, method=method, headers=req_headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                raw = r.read()
+                return r.status, (json.loads(raw) if raw else None), r.headers
+        except urllib.error.HTTPError as e:
+            raw = e.read()
+            try:
+                parsed = json.loads(raw) if raw else None
+            except ValueError:
+                parsed = raw.decode(errors="replace")
+            return e.code, parsed, e.headers
+
+    def get(self, path: str, headers: dict[str, str] | None = None) -> tuple[int, Any]:
+        status, body, _ = self.http("GET", path, headers=headers)
+        return status, body
+
+    def post(self, path: str, body: Any = None, headers: dict[str, str] | None = None) -> tuple[int, Any]:
+        status, body, _ = self.http("POST", path, body, headers=headers)
+        return status, body
+
+    def stop(self) -> None:
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.proc.wait(timeout=5)
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return int(s.getsockname()[1])
+
+
 @pytest.fixture
-def daemon(mock_arkiv: MockArkiv) -> Iterator[Any]:
+def daemon(mock_arkiv: MockArkiv) -> Iterator[DaemonClient]:
     if not DAEMON_BIN.exists():
         pytest.skip(f"daemon binary missing: {DAEMON_BIN}")
-    pytest.skip("daemon fixture not implemented yet (placeholder for phase D2)")
-    yield None  # pragma: no cover
+
+    port = _free_port()
+    temp_dir = Path(tempfile.mkdtemp(prefix="arkivectord-test-"))
+    data_dir = temp_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    config_path = temp_dir / "config.toml"
+
+    config_content = f"""
+[server]
+listen = "127.0.0.1:{port}"
+
+[arkiv]
+rpc_urls = ["{mock_arkiv.url}"]
+ws_url = "{mock_arkiv.ws_url}"
+chain_id = 7794095
+confirmations = 0
+
+[storage]
+data_dir = "{data_dir}"
+map_size = 104857600
+
+[sync]
+poll_interval_ms = 50
+
+[log]
+level = "debug"
+format = "text"
+"""
+    config_path.write_text(config_content)
+
+    proc = subprocess.Popen(
+        [str(DAEMON_BIN), "--config", str(config_path), "--debug-routes"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    client = DaemonClient(proc, port, data_dir)
+
+    # Poll /readyz until ready or timeout
+    deadline = time.time() + 10.0
+    ready = False
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            stdout, stderr = proc.communicate()
+            raise RuntimeError(
+                f"arkivectord exited unexpectedly with code {proc.returncode}:\nstdout: {stdout}\nstderr: {stderr}"
+            )
+        try:
+            status, body = client.get("/readyz")
+            if status == 200:
+                ready = True
+                break
+        except Exception:
+            pass
+        time.sleep(0.05)
+
+    if not ready:
+        client.stop()
+        raise RuntimeError("Timed out waiting for arkivectord /readyz")
+
+    try:
+        yield client
+    finally:
+        client.stop()
+        shutil.rmtree(temp_dir, ignore_errors=True)
