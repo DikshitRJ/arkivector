@@ -470,7 +470,9 @@ class Client:
             self.check_capability("consistency.min_block")
 
         encoded_name = urllib.parse.quote(collection, safe="")
-        resp = self._http.request("POST", f"/v1/collections/{encoded_name}/search", body=body)
+        resp = self._http.request(
+            "POST", f"/v1/collections/{encoded_name}/search", body=body, is_idempotent=True
+        )
         data = resp.json() or {}
         return SearchResult.from_json(data)
 
@@ -530,7 +532,10 @@ class Client:
 
         encoded_name = urllib.parse.quote(collection, safe="")
         resp = self._http.request(
-            "POST", f"/v1/collections/{encoded_name}/search:batch", body=payload
+            "POST",
+            f"/v1/collections/{encoded_name}/search:batch",
+            body=payload,
+            is_idempotent=True,
         )
         data = resp.json() or {}
         return BatchResult.from_json(data)
@@ -581,7 +586,9 @@ class Client:
             self.check_capability("consistency.min_block")
 
         encoded_name = urllib.parse.quote(collection, safe="")
-        resp = self._http.request("POST", f"/v1/collections/{encoded_name}/scroll", body=body)
+        resp = self._http.request(
+            "POST", f"/v1/collections/{encoded_name}/scroll", body=body, is_idempotent=True
+        )
         data = resp.json() or {}
         return ScrollPage.from_json(data)
 
@@ -653,7 +660,9 @@ class Client:
             self.check_capability("consistency.min_block")
 
         encoded_name = urllib.parse.quote(collection, safe="")
-        resp = self._http.request("POST", f"/v1/collections/{encoded_name}/count", body=body)
+        resp = self._http.request(
+            "POST", f"/v1/collections/{encoded_name}/count", body=body, is_idempotent=True
+        )
         data = resp.json() or {}
         return CountResult.from_json(data)
 
@@ -1117,6 +1126,8 @@ def build_entity_attributes(
         res.append(DirectAttribute("av.doc", 0x07, str(e_doc).encode("utf-8")))
 
     for attr_name in sorted(e_attrs.keys()):
+        if attr_name == "arkiv.schema" or attr_name.startswith("av."):
+            continue
         declared = col_attrs.get(attr_name)
         type_id, val_bytes = _serialize_attribute_value(e_attrs[attr_name], declared)
         res.append(DirectAttribute(attr_name, type_id, val_bytes))

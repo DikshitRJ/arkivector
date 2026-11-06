@@ -216,6 +216,31 @@ class HttpTransport:
                 pass
             raise
 
+    def can_retry(
+        self,
+        method: str,
+        path: str,
+        is_idempotent: bool = False,
+        idempotency_key: Optional[str] = None,
+    ) -> bool:
+        """Determine if a request is eligible for automated retries per conventions.md §8."""
+        is_idempotent_path = any(
+            path.endswith(p) or f"{p}?" in path
+            for p in (
+                "/search",
+                "/search:batch",
+                "/scroll",
+                "/count",
+                "/entities:prepare",
+            )
+        )
+        return bool(
+            is_idempotent
+            or is_idempotent_path
+            or (method.upper() == "GET")
+            or (idempotency_key is not None)
+        )
+
     def request(
         self,
         method: str,
@@ -268,7 +293,22 @@ class HttpTransport:
         if headers:
             req_headers.update(headers)
 
-        can_retry = is_idempotent or (method.upper() == "GET") or (idempotency_key is not None)
+        is_idempotent_path = any(
+            path.endswith(p) or f"{p}?" in path
+            for p in (
+                "/search",
+                "/search:batch",
+                "/scroll",
+                "/count",
+                "/entities:prepare",
+            )
+        )
+        can_retry = (
+            is_idempotent
+            or is_idempotent_path
+            or (method.upper() == "GET")
+            or (idempotency_key is not None)
+        )
         effective_timeout = timeout if timeout is not None else self.timeout
         attempts_limit = self.max_retries if can_retry else 0
 
