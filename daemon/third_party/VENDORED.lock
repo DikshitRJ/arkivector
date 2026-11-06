@@ -73,3 +73,16 @@ url = "https://github.com/mjosaarinen/tiny_sha3/archive/dcbb3192047c2a721f5f851d
 artifact = "tarball at commit (sha3.c, sha3.h, LICENSE), unmodified"
 sha256 = "b09787cd69c9f2c8ae5be5187cbf432ccfef243c86e00b0932bfa641959837d3"
 license = "MIT"
+
+# System dependencies (found with pkg-config; minimums enforced in cmake/Vendored.cmake).
+# Audit 2026-11-06: no known critical/high advisories for the vendored pins above.
+[[system]]
+name = "libuv"
+min = "1.48.0"
+advisories = "GHSA-f74f-cvh7-c6q6 fixed in 1.48.0"
+
+[[system]]
+name = "libcurl"
+min = "8.11"
+recommended = "8.23.0"
+advisories = "CURL-CVE-2026-92392 (High) affects 8.12-8.22 except 8.14.3/8.16.2/8.20.2; CI and release builds use 8.23.0"

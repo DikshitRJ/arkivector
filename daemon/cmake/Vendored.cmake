@@ -71,6 +71,10 @@ pkg_check_modules(AV_LIBUV QUIET IMPORTED_TARGET libuv)
 if(NOT AV_LIBUV_FOUND)
   message(FATAL_ERROR "arkivectord needs the libuv development package, but pkg-config could not find 'libuv'. Install it (Debian/Ubuntu: libuv1-dev, Fedora/openSUSE: libuv-devel, macOS: brew install libuv) and re-run cmake.")
 endif()
+# Security floor (dependency audit 2026-11-06): GHSA-f74f-cvh7-c6q6 fixed in 1.48.0.
+if(AV_LIBUV_VERSION VERSION_LESS "1.48.0")
+  message(FATAL_ERROR "arkivectord needs libuv >= 1.48.0 (GHSA-f74f-cvh7-c6q6), found ${AV_LIBUV_VERSION}.")
+endif()
 add_library(av3p_uv INTERFACE)
 target_link_libraries(av3p_uv INTERFACE PkgConfig::AV_LIBUV)
 
@@ -80,6 +84,13 @@ if(NOT AV_LIBCURL_FOUND)
 endif()
 if(AV_LIBCURL_VERSION VERSION_LESS "8.11")
   message(FATAL_ERROR "arkivectord needs libcurl >= 8.11 for WebSocket support, but found ${AV_LIBCURL_VERSION}. Install a newer libcurl and re-run cmake.")
+endif()
+# Security floor (dependency audit 2026-11-06): CURL-CVE-2026-92392 (High) affects
+# 8.12..8.22 except the patched 8.14.3, 8.16.2 and 8.20.2 releases. Distro builds may
+# carry backports, so this is a warning; release builds pin 8.23.0 (D6).
+if(AV_LIBCURL_VERSION VERSION_LESS "8.23.0" AND NOT AV_LIBCURL_VERSION VERSION_EQUAL "8.14.3"
+   AND NOT AV_LIBCURL_VERSION VERSION_EQUAL "8.16.2" AND NOT AV_LIBCURL_VERSION VERSION_EQUAL "8.20.2")
+  message(WARNING "libcurl ${AV_LIBCURL_VERSION} may be affected by CURL-CVE-2026-92392; use >= 8.23.0 unless your distribution backported the fix.")
 endif()
 add_library(av3p_curl INTERFACE)
 target_link_libraries(av3p_curl INTERFACE PkgConfig::AV_LIBCURL)
