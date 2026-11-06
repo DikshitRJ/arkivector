@@ -8,6 +8,8 @@ extern SUITE(kernels);
 extern SUITE(vectorbytes);
 extern SUITE(text_io);
 extern SUITE(ttl);
+extern SUITE(value);
+extern SUITE(filter_parser);
 #ifdef AV_HAVE_HNSW_TEST
 extern SUITE(hnsw);
 #endif
@@ -22,6 +24,8 @@ int main(int argc, char **argv)
     RUN_SUITE(vectorbytes);
     RUN_SUITE(text_io);
     RUN_SUITE(ttl);
+    RUN_SUITE(value);
+    RUN_SUITE(filter_parser);
 #ifdef AV_HAVE_HNSW_TEST
     RUN_SUITE(hnsw);
 #endif

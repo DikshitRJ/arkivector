@@ -5,8 +5,10 @@ set(AV_UNIT_SOURCES
     unit/test_kernels.c
     unit/test_vectorbytes.c
     unit/test_text_io.c
-    unit/test_ttl.c)
-set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl)
+    unit/test_ttl.c
+    unit/test_value.c
+    unit/test_filter_parser.c)
+set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl value filter_parser)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)
@@ -39,6 +41,12 @@ if(AV_FUZZ)
   target_link_libraries(fuzz_vector_in PRIVATE av_core)
   target_compile_options(fuzz_vector_in PRIVATE -fsanitize=fuzzer-no-link)
   target_link_options(fuzz_vector_in PRIVATE -fsanitize=fuzzer)
+  foreach(_fz fuzz_filter_parser fuzz_json_filter)
+    add_executable(${_fz} fuzz/${_fz}.c)
+    target_link_libraries(${_fz} PRIVATE av_core av3p_yyjson)
+    target_compile_options(${_fz} PRIVATE -fsanitize=fuzzer-no-link)
+    target_link_options(${_fz} PRIVATE -fsanitize=fuzzer)
+  endforeach()
 endif()
 
 # pgvector parity helper (used by test/parity/*.py; see test/parity/README.md)
