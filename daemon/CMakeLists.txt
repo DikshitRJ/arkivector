@@ -176,6 +176,11 @@ set(AV_CORE_SOURCES
     src/core/coldef.c
     src/core/collection.c
     src/core/registry.c
+    src/filter/value.c
+    src/filter/ast.c
+    src/filter/lexer.c
+    src/filter/parser.c
+    src/filter/json_filter.c
     # D2 Lane A: runtime and HTTP server
     src/config.c
     src/core/threadpool.c
