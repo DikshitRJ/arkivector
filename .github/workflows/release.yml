@@ -1,0 +1,73 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'daemon-v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-binaries:
+    name: Build static binary (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            os: ubuntu-24.04
+          - target: darwin-arm64
+            os: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libuv1-dev libssl-dev pkg-config
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja libuv openssl pkg-config
+      - name: Configure and build
+        working-directory: daemon
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DAV_BUILD_TESTS=OFF -DAV_BUILD_BENCH=OFF
+          cmake --build build --target arkivectord
+          mkdir -p ../dist
+          cp build/arkivectord ../dist/arkivectord-${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/arkivectord-${{ matrix.target }}
+
+  release:
+    name: Create GitHub Release & SBOM
+    needs: [build-binaries]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum * > SHA256SUMS
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          path: dist
+          format: spdx-json
+          output-file: dist/sbom.spdx.json
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+          generate_release_notes: true
