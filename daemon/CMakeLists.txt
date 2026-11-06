@@ -1,0 +1,158 @@
+cmake_minimum_required(VERSION 3.20)
+project(arkivector VERSION 0.1.0 LANGUAGES C)
+
+# ---------------------------------------------------------------------------
+# Arkivector daemon (arkivectord). See PLAN_DAEMON.md and ARCHITECTURE.md §16.
+# Targets:
+#   av_pgcompat  PostgreSQL API shims + verbatim PostgreSQL helper files (static)
+#   av_pgvector  code copied from pgvector v0.8.7, upstream flags (static)
+#   av_core      Arkivector code, strict warnings (static)
+#   arkivectord  the daemon executable
+#   av_unit      unit tests (test/CMakeLists.txt)
+# ---------------------------------------------------------------------------
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON) # gnu11: pgvector uses GNU attributes/intrinsics
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+option(AV_NATIVE "Compile kernels once with -march=native (pgvector default)" OFF)
+option(AV_BUILD_TESTS "Build unit tests" ON)
+
+include(Warnings)
+include(Sanitizers)
+include(CheckIncludeFile)
+include(CheckCSourceCompiles)
+
+find_package(Threads REQUIRED)
+
+set(AV_THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+include(Vendored)
+
+set(AV_REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
+get_filename_component(AV_REPO_ROOT ${AV_REPO_ROOT} ABSOLUTE)
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+
+# ---------------------------------------------------------------------------
+# pg_config.h (generated): the configure-time facts copied code checks for.
+# ---------------------------------------------------------------------------
+check_include_file(cpuid.h HAVE__GET_CPUID_H)
+check_c_source_compiles("
+#include <cpuid.h>
+int main(void) { unsigned int a, b, c, d; __get_cpuid(1, &a, &b, &c, &d); return 0; }"
+  HAVE__GET_CPUID)
+check_c_source_compiles("
+#include <cpuid.h>
+int main(void) { unsigned int a, b, c, d; __get_cpuid_count(7, 0, &a, &b, &c, &d); return 0; }"
+  HAVE__GET_CPUID_COUNT)
+check_c_source_compiles("
+#include <immintrin.h>
+__attribute__((target(\"xsave\"))) int f(void) { return (int) _xgetbv(0); }
+int main(void) { return f(); }"
+  HAVE_XSAVE_INTRINSICS)
+check_c_source_compiles("
+int main(void) { return __builtin_popcount(3u) + __builtin_ctz(2u) + __builtin_clz(2u); }"
+  HAVE__BUILTIN_POPCOUNT)
+set(HAVE__BUILTIN_CTZ ${HAVE__BUILTIN_POPCOUNT})
+set(HAVE__BUILTIN_CLZ ${HAVE__BUILTIN_POPCOUNT})
+configure_file(src/pgcompat/include/pg_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/pg_config.h)
+
+# ---------------------------------------------------------------------------
+# av_base: allocator shared by pgcompat (palloc) and our code (strict)
+# ---------------------------------------------------------------------------
+add_library(av_base STATIC src/core/arena.c)
+target_include_directories(av_base PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+av_strict(av_base)
+
+# ---------------------------------------------------------------------------
+# av_pgcompat
+# ---------------------------------------------------------------------------
+set(AV_PGCOMPAT_OURS
+    src/pgcompat/src/palloc.c
+    src/pgcompat/src/elog.c
+    src/pgcompat/src/fmgr.c
+    src/pgcompat/src/lwlock.c
+    src/pgcompat/src/misc.c)
+set(AV_PGCOMPAT_VERBATIM
+    src/pgcompat/src/list.c
+    src/pgcompat/src/pairingheap.c
+    src/pgcompat/src/pg_prng.c
+    src/pgcompat/src/pg_bitutils.c)
+foreach(f ${AV_PGCOMPAT_VERBATIM})
+  if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${f})
+    list(REMOVE_ITEM AV_PGCOMPAT_VERBATIM ${f})
+  endif()
+endforeach()
+foreach(f ${AV_PGCOMPAT_OURS})
+  if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${f})
+    list(REMOVE_ITEM AV_PGCOMPAT_OURS ${f})
+  endif()
+endforeach()
+
+add_library(av_pgcompat STATIC ${AV_PGCOMPAT_OURS} ${AV_PGCOMPAT_VERBATIM})
+target_include_directories(av_pgcompat PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pgcompat/include
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/pgvector
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(av_pgcompat PUBLIC ARKIVECTOR=1)
+target_link_libraries(av_pgcompat PUBLIC av_base Threads::Threads m)
+target_compile_options(av_pgcompat PRIVATE -Wall -Wextra -Wno-unused-parameter)
+av_upstream_sources(${AV_PGCOMPAT_VERBATIM})
+
+# ---------------------------------------------------------------------------
+# av_pgvector: copied pgvector v0.8.7 code (see src/pgvector/PROVENANCE.md)
+# ---------------------------------------------------------------------------
+set(AV_PGVECTOR_SOURCES
+    src/pgvector/halfutils.c
+    src/pgvector/bitutils.c)
+set(AV_PGVECTOR_OPTIONAL
+    src/pgvector/vector_kernels.c
+    src/pgvector/hnswutils.c
+    src/pgvector/hnswbuild_mem.c)
+foreach(f ${AV_PGVECTOR_OPTIONAL})
+  file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/${f} _sz)
+  if(_sz GREATER 0)
+    list(APPEND AV_PGVECTOR_SOURCES ${f})
+  endif()
+endforeach()
+
+add_library(av_pgvector STATIC ${AV_PGVECTOR_SOURCES})
+target_link_libraries(av_pgvector PUBLIC av_pgcompat)
+av_upstream(av_pgvector)
+if(AV_NATIVE)
+  target_compile_options(av_pgvector PRIVATE -march=native)
+endif()
+
+# ---------------------------------------------------------------------------
+# av_core: Arkivector code (strict warnings)
+# ---------------------------------------------------------------------------
+set(AV_CORE_SOURCES
+    src/version.c)
+
+add_library(av_core STATIC ${AV_CORE_SOURCES})
+target_include_directories(av_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(av_core PUBLIC av_pgvector av_pgcompat Threads::Threads m)
+target_compile_definitions(av_core PUBLIC AV_REPO_ROOT="${AV_REPO_ROOT}")
+av_strict(av_core)
+
+# ---------------------------------------------------------------------------
+# arkivectord
+# ---------------------------------------------------------------------------
+add_executable(arkivectord src/main.c)
+target_link_libraries(arkivectord PRIVATE av_core)
+av_strict(arkivectord)
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+if(AV_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(test)
+endif()
