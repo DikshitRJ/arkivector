@@ -56,9 +56,8 @@ up() {
     echo "$DATA_DIR" > "$PID_DIR/data_dir"
 
     # 1. Start mock-arkiv on port 8545
-    nohup "$PYTHON" "$REPO_ROOT/daemon/testkit/mock-arkiv/server.py" --port 8545 > "$PID_DIR/mock.log" 2>&1 &
+    setsid "$PYTHON" "$REPO_ROOT/daemon/testkit/mock-arkiv/server.py" --port 8545 </dev/null > "$PID_DIR/mock.log" 2>&1 &
     MOCK_PID=$!
-    disown "$MOCK_PID" 2>/dev/null || true
     echo "$MOCK_PID" > "$PID_DIR/mock.pid"
 
     # Wait for mock-arkiv ready
@@ -103,9 +102,8 @@ EOF
         exit 1
     fi
 
-    nohup "$DAEMON_BIN" --config "$CONFIG_FILE" --debug-routes > "$PID_DIR/daemon.log" 2>&1 &
+    setsid "$DAEMON_BIN" --config "$CONFIG_FILE" --debug-routes </dev/null > "$PID_DIR/daemon.log" 2>&1 &
     DAEMON_PID=$!
-    disown "$DAEMON_PID" 2>/dev/null || true
     echo "$DAEMON_PID" > "$PID_DIR/daemon.pid"
 
     # Wait for HTTP server to respond

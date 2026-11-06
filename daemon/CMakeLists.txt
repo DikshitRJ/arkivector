@@ -210,6 +210,8 @@ set(AV_CORE_SOURCES
     src/server/idempotency.c
     src/server/auth.c
     src/server/ratelimit.c
+    src/server/qdrant.c
+    src/server/mcp.c
     src/sync/discovery.c)
 
 # Build-time generated headers (no runtime JSON reading, no runtime licence file lookup).

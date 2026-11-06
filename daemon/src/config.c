@@ -40,6 +40,8 @@ static const field k_fields[] = {
     F("server", "request_timeout_ms", K_INT, server.request_timeout_ms, 100, 600000),
     F("server", "idle_timeout_ms", K_INT, server.idle_timeout_ms, 100, 3600000),
     F("server", "api_keys_file", K_STR, server.api_keys_file, 0, 0),
+    F("server", "ratelimit_rps", K_DBL, server.ratelimit_rps, 0, 100000),
+    F("server", "ratelimit_burst", K_DBL, server.ratelimit_burst, 0, 100000),
 
     F("arkiv", "rpc_urls", K_LIST, arkiv.rpc_urls, 0, 0),
     F("arkiv", "ws_url", K_STR, arkiv.ws_url, 0, 0),

@@ -394,6 +394,9 @@ int main(int argc, char **argv)
     hc.max_connections = (size_t) cfg.server.max_connections;
     hc.request_timeout_ms = (int) cfg.server.request_timeout_ms;
     hc.idle_timeout_ms = (int) cfg.server.idle_timeout_ms;
+    hc.api_keys_file = cfg.server.api_keys_file;
+    hc.ratelimit_rps = cfg.server.ratelimit_rps;
+    hc.ratelimit_burst = cfg.server.ratelimit_burst;
     hc.router = router;
     app.http = av_http_create(loop, &hc, &e);
     if (app.http == NULL) {

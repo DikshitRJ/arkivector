@@ -32,6 +32,8 @@ typedef struct av_config {
         int64_t request_timeout_ms; /* slow-loris limit for receiving one request */
         int64_t idle_timeout_ms;    /* keep-alive idle limit */
         char *api_keys_file;        /* "" = auth off */
+        double ratelimit_rps;       /* 0 = disabled */
+        double ratelimit_burst;
     } server;
     struct {
         char **rpc_urls;

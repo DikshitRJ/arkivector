@@ -8,8 +8,10 @@
 
 #include "kernels/dispatch.h"
 #include "server/json_io.h"
+#include "server/mcp.h"
 #include "server/metrics.h"
 #include "server/problem.h"
+#include "server/qdrant.h"
 #include "server/rest.h"
 #include "version.h"
 #include "yyjson.h"
@@ -407,6 +409,8 @@ av_status av_rest_register_all(av_router *r, bool debug_routes, av_err *e)
     av_rest_register_collections(r, debug_routes, NULL);
     av_rest_register_entities(r, debug_routes, NULL);
     av_rest_register_search(r, debug_routes, NULL);
+    av_rest_register_qdrant(r, debug_routes, NULL);
+    av_rest_register_mcp(r, debug_routes, NULL);
 
     pthread_mutex_lock(&g_mu);
     size_t n = g_n_registrars;
