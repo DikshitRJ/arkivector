@@ -178,7 +178,7 @@ export class HttpTransport {
     this.timeoutMs = options.timeoutMs ?? 10000;
     this.maxRetries = options.maxRetries ?? 3;
     this.fetchFn = options.fetchFn ?? globalThis.fetch;
-    this.userAgent = options.userAgent ?? "@arkivector/client/0.1.0";
+    this.userAgent = options.userAgent ?? "arkivector-node/1.0";
   }
 
   /**

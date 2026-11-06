@@ -89,6 +89,7 @@ jobs:
         working-directory: sdk/python
         run: |
           sed -i "s/^version = .*/version = \"${{ needs.version.outputs.v }}\"/" pyproject.toml
+          sed -i "s/^__version__ = .*/__version__ = \"${{ needs.version.outputs.v }}\"/" src/arkivector/__init__.py
           pip install build twine
           python -m build
           twine check dist/*
@@ -133,12 +134,13 @@ jobs:
       - name: Build and pack
         working-directory: sdk/node
         run: |
+          v=${{ needs.version.outputs.v }}
+          sed -i "s/^export const VERSION = .*/export const VERSION = \"$v\";/" src/index.ts
+          npm pkg set version="$v"
           npm ci
           npm run build
-          npm pkg set name="@dikshitrj/arkivector-client" version="${{ needs.version.outputs.v }}" \
-            publishConfig.registry="https://npm.pkg.github.com" \
-            repository.type=git repository.url="git+https://github.com/${{ github.repository }}.git"
           mkdir -p ../../dist && npm pack --pack-destination ../../dist
+          mv ../../dist/*.tgz ../../dist/arkivector-node-$v.tgz
       - name: Publish to GitHub Packages
         working-directory: sdk/node
         env:
@@ -175,6 +177,8 @@ jobs:
           labels: |
             org.opencontainers.image.title=arkivectord
             org.opencontainers.image.description=pgvector for Arkiv: off-chain vector co-processor daemon
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
       - uses: docker/build-push-action@v6
         env:
           DOCKER_BUILD_RECORD_UPLOAD: 'false'
@@ -201,6 +205,9 @@ jobs:
     needs: [daemon, docker, sdk-python, sdk-node]
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
       # Only our artifacts: docker/build-push-action also uploads a *.dockerbuild record that
       # download-artifact cannot extract.
       - uses: actions/download-artifact@v4
@@ -218,28 +225,23 @@ jobs:
       - name: SHA256SUMS
         working-directory: dist
         run: sha256sum * > SHA256SUMS
-      - name: Install notes
+      - name: Render release notes
         run: |
-          v="${GITHUB_REF_NAME#daemon-}"; v="${v#v}"; owner="${GITHUB_REPOSITORY_OWNER,,}"
-          cat > notes.md <<EOF
-          ## Install
-
-          **Daemon (binary, Linux x86_64; needs libuv and OpenSSL 3)**
-          \`\`\`
-          curl -LO https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/arkivectord-${v}-linux-x86_64.tar.gz
-          tar xzf arkivectord-${v}-linux-x86_64.tar.gz && ./arkivectord-${v}-linux-x86_64/bin/arkivectord --help
-          \`\`\`
-          **Daemon (container)**
-          \`\`\`
-          docker run -p 8080:8080 -v arkivector-data:/data -e ARKIVECTOR_ARKIV_ACCESS_KEY=... ghcr.io/${owner}/arkivectord:${v}
-          \`\`\`
-          Writes need a funded wallet key in \`ARKIV_PRIVATE_KEY\`. Configuration: \`arkivector.example.toml\`.
-
-          **Python SDK**: \`pip install arkivector==${v}\` (or the wheel attached below)
-          **Node SDK**: \`npm install @${owner}/arkivector-client@${v} --registry=https://npm.pkg.github.com\`
-          EOF
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          body_path: notes.md
-          generate_release_notes: true
+          export TAG="$GITHUB_REF_NAME" REPO="$GITHUB_REPOSITORY" OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          export VERSION="${TAG#daemon-}"; VERSION="${VERSION#v}"; export MAJOR="${VERSION%%.*}"
+          envsubst '${TAG} ${REPO} ${OWNER} ${VERSION} ${MAJOR}' < .github/release-notes.md > notes.md
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          args=()
+          for f in *; do
+            case "$f" in
+              *.whl) args+=("$f#${f/arkivector-/arkivector-python-} (Python wheel)") ;;
+              arkivector-[0-9]*.tar.gz) args+=("$f#${f/arkivector-/arkivector-python-} (Python sdist)") ;;
+              *) args+=("$f") ;;
+            esac
+          done
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "Arkivector $GITHUB_REF_NAME" \
+            --notes-file ../notes.md --verify-tag "${args[@]}"

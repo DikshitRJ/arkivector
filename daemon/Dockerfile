@@ -21,6 +21,10 @@ RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DAV_BUILD_TESTS=OFF -DAV
     && build/arkivectord --version
 
 FROM alpine:3.22
+LABEL org.opencontainers.image.title="arkivectord" \
+      org.opencontainers.image.description="pgvector for Arkiv: off-chain vector co-processor daemon" \
+      org.opencontainers.image.source="https://github.com/DikshitRJ/arkivector" \
+      org.opencontainers.image.licenses="MIT"
 RUN apk add --no-cache libuv libcurl openssl ca-certificates \
     && adduser -D -H -u 10001 arkivector \
     && mkdir -p /data /etc/arkivector && chown arkivector /data

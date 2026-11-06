@@ -1,5 +1,5 @@
 /**
- * Quickstart example for @arkivector/client
+ * Quickstart example for @dikshitrj/arkivector
  * Demonstrates client connection, version/capabilities, ops, collections,
  * error handling, and the retry engine.
  */
@@ -246,9 +246,13 @@ async function main(): Promise<void> {
     );
 
     console.log("Demonstrating prepare for client-side signing...");
-    const prepRes = await writeClient.prepare("demo.docs", [{ ...writeEntities[0], id: "quickstart-prepare-1" }], {
-      from: "0x1111111111111111111111111111111111111111",
-    });
+    const prepRes = await writeClient.prepare(
+      "demo.docs",
+      [{ ...writeEntities[0], id: "quickstart-prepare-1" }],
+      {
+        from: "0x1111111111111111111111111111111111111111",
+      },
+    );
     console.log(
       `Prepare succeeded: chainId=${prepRes.chainId}, ${prepRes.transactions.length} tx(s), ${prepRes.results.length} predicted key(s)`,
     );

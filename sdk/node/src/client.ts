@@ -108,7 +108,7 @@ export class Arkivector {
       timeoutMs: this.timeoutMs,
       maxRetries: this.maxRetries,
       fetchFn: options?.fetch,
-      userAgent: options?.userAgent ?? "@arkivector/client/0.1.0",
+      userAgent: options?.userAgent ?? "arkivector-node/1.0",
     });
   }
 

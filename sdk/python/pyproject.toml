@@ -7,6 +7,9 @@ name = "arkivector"
 version = "0.1.0"
 description = "Arkivector Python SDK: Vector co-processor client for Arkiv"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Dikshit Rishi Jain" }]
 requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -17,15 +20,16 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
     "Topic :: Database",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/arkivector/arkivector"
-Documentation = "https://github.com/arkivector/arkivector/tree/main/docs/api"
-Repository = "https://github.com/arkivector/arkivector"
+Homepage = "https://github.com/DikshitRJ/arkivector"
+Documentation = "https://github.com/DikshitRJ/arkivector/tree/main/docs/api"
+Repository = "https://github.com/DikshitRJ/arkivector"
 
 [project.optional-dependencies]
 numpy = ["numpy"]

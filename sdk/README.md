@@ -7,7 +7,7 @@ Client libraries for [Arkivector](https://github.com/arkivector/arkivector) — 
 | Language | Package | Status | Documentation |
 | :--- | :--- | :---: | :--- |
 | **Python** | `arkivector` | Active (v0.1.0) | [`docs/api/sdk-guidelines.md#python`](../docs/api/sdk-guidelines.md#python-sdkpython-package-arkivector-python--39-stdlib-only) |
-| **Node.js** | `@arkivector/client` | Active (v0.1.0) | [`docs/api/sdk-guidelines.md#node`](../docs/api/sdk-guidelines.md#nodejs--typescript-sdknode-package-arkivectorclient-node--18-zero-runtime-deps-esm) |
+| **Node.js** | `@dikshitrj/arkivector` | Active (v0.1.0) | [`docs/api/sdk-guidelines.md#node`](../docs/api/sdk-guidelines.md#nodejs--typescript-sdknode-package-arkivectorclient-node--18-zero-runtime-deps-esm) |
 | **C** | `libarkivector` | *(Deferred)* | [`docs/api/sdk-guidelines.md#c`](../docs/api/sdk-guidelines.md#c-sdkc-library-libarkivector-c11-deps-libcurl--vendored-yyjson) |
 | **C++** | `arkivector-cpp` | *(Deferred)* | [`docs/api/sdk-guidelines.md#cpp`](../docs/api/sdk-guidelines.md#c-sdkcpp-c17-wraps-the-c-sdk) |
 | **Rust** | `arkivector` | *(Deferred)* | [`docs/api/sdk-guidelines.md#rust`](../docs/api/sdk-guidelines.md#rust-sdkrust-crate-arkivector-msrv-175) |
@@ -29,7 +29,7 @@ pip install arkivector[llama-index]
 
 ### Node.js (Node ≥ 18)
 ```bash
-npm install @arkivector/client
+npm install @dikshitrj/arkivector
 ```
 Optional peer dependency for LangChain.js:
 ```bash

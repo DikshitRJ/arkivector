@@ -1,8 +1,8 @@
 {
-  "name": "@arkivector/client",
+  "name": "@dikshitrj/arkivector",
   "version": "0.1.0",
   "description": "Arkivector Node.js and TypeScript client library",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -18,16 +18,17 @@
   },
   "files": [
     "dist/src",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/arkivector/arkivector.git",
+    "url": "git+https://github.com/DikshitRJ/arkivector.git",
     "directory": "sdk/node"
   },
-  "homepage": "https://github.com/arkivector/arkivector#readme",
+  "homepage": "https://github.com/DikshitRJ/arkivector#readme",
   "bugs": {
-    "url": "https://github.com/arkivector/arkivector/issues"
+    "url": "https://github.com/DikshitRJ/arkivector/issues"
   },
   "keywords": [
     "arkivector",
@@ -60,5 +61,9 @@
     "prettier": "^3.3.3",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.12.2"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   }
 }
