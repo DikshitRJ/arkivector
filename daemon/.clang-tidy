@@ -9,6 +9,10 @@
 #  - branch-clone: upstream itemptr.h, intentionally repeated branches.
 #  - narrowing-conversions, implicit-widening-of-multiplication-result, misplaced-widening-cast:
 #    duplicates of -Wconversion (which is -Werror in our build) and noisy on int-typed PostgreSQL APIs.
+#  - clang-analyzer-valist.Uninitialized: false positive (clang 18) for a va_list started with va_start
+#    and passed to vsnprintf in a helper.
+#  - clang-analyzer-optin.core.EnumCastOutOfRange: tests deliberately pass invalid enum values.
+#  - clang-analyzer-optin.performance.Padding: layout follows the documented field order (small structs).
 Checks: >-
   -*,
   bugprone-*,
@@ -23,5 +27,8 @@ Checks: >-
   cert-err34-c,
   clang-analyzer-*,
   -clang-analyzer-security.insecureAPI.*,
+  -clang-analyzer-valist.Uninitialized,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  -clang-analyzer-optin.performance.Padding,
   misc-redundant-expression
 WarningsAsErrors: '*'

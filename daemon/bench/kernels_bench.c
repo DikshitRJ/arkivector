@@ -143,7 +143,7 @@ static double bench_raw_half(void **objs, size_t n, int dim, int use_proto)
 
 static void **make_pool(av_vtype t, int dim, size_t n)
 {
-    void **p = palloc(sizeof(void *) * n);
+    void **p = (void **) palloc(sizeof(void *) * n);
     for (size_t k = 0; k < n; k++) {
         if (t == AV_VT_VECTOR) {
             Vector *v = InitVector(dim);
@@ -165,13 +165,13 @@ int main(int argc, char **argv)
     size_t npairs = 8192;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--pairs") && i + 1 < argc)
-            npairs = (size_t) atol(argv[++i]);
+            npairs = (size_t) strtol(argv[++i], NULL, 10);
         else if (!strcmp(argv[i], "--repeats") && i + 1 < argc) {
-            g_repeats = atoi(argv[++i]);
+            g_repeats = (int) strtol(argv[++i], NULL, 10);
             if (g_repeats > 31)
                 g_repeats = 31;
         } else if (!strcmp(argv[i], "--iters") && i + 1 < argc)
-            g_iters = atol(argv[++i]);
+            g_iters = strtol(argv[++i], NULL, 10);
     }
     av_kernels_init();
     MemoryContext ctx = AllocSetContextCreate(NULL, "bench", ALLOCSET_DEFAULT_SIZES);
