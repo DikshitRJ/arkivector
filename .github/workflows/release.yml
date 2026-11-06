@@ -176,6 +176,8 @@ jobs:
             org.opencontainers.image.title=arkivectord
             org.opencontainers.image.description=pgvector for Arkiv: off-chain vector co-processor daemon
       - uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: 'false'
         with:
           context: .
           file: daemon/Dockerfile
@@ -199,10 +201,20 @@ jobs:
     needs: [daemon, docker, sdk-python, sdk-node]
     runs-on: ubuntu-24.04
     steps:
+      # Only our artifacts: docker/build-push-action also uploads a *.dockerbuild record that
+      # download-artifact cannot extract.
       - uses: actions/download-artifact@v4
         with:
+          name: daemon
           path: dist
-          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-python
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-node
+          path: dist
       - name: SHA256SUMS
         working-directory: dist
         run: sha256sum * > SHA256SUMS
