@@ -1,0 +1,9 @@
+# Path ownership (mirrors AGENTS.md §2). Owner: @DikshitRJ
+*                               @DikshitRJ
+/daemon/                        @DikshitRJ
+/docs/daemon/                   @DikshitRJ
+/sdk/                           @DikshitRJ
+# Frozen contract: changes only via CCR (spec/changes/README.md)
+/spec/                          @DikshitRJ
+/docs/api/                      @DikshitRJ
+/.github/                       @DikshitRJ

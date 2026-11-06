@@ -3,6 +3,8 @@
 > **Who executes this:** the *SDK lead* agent, orchestrating one implementation subagent per language.
 > **Read first:** [`AGENTS.md`](AGENTS.md), then the whole contract: [`docs/api/`](docs/api/README.md) (especially [`sdk-guidelines.md`](docs/api/sdk-guidelines.md), [`vectors.md`](docs/api/vectors.md), [`errors.md`](docs/api/errors.md), [`conventions.md`](docs/api/conventions.md)) and [`spec/`](spec/).
 > **Parallel track:** the daemon ([`PLAN_DAEMON.md`](PLAN_DAEMON.md)) is built at the same time. You never read or import daemon code. You integrate **only** through the contract, the Prism mock, and the milestones M1–M4.
+> **Current scope (owner decision 2026-11-06): Python and Node.js only.** The C, C++ and Rust sections below are kept for later and marked **(deferred)**. Do not start them, do not add them to CI, and do not spawn agents for them until the owner re-enables them. Their placeholder files under `sdk/{c,cpp,rust}/` stay empty.
+> **Open-question decisions** (frozen contract, licence deferred, etc.) are listed in [`PLAN_DAEMON.md`](PLAN_DAEMON.md#decisions-on-open-questions-2026-11-06-owner-approved-take-the-best-most-optimistic-path). For SDKs this means: the contract in `spec/` is final for v1; package licence fields stay unset until the owner chooses (Q8).
 > **Project decision:** the SDK track has **no documentation, test, or review subagents**. Quality comes from strict linting, type checks, the shared golden files, and the `golden_check` example run in CI.
 
 ---
@@ -14,15 +16,15 @@
 ```mermaid
 flowchart TB
   Lead["SDK lead (orchestrator)"]
-  Lead --> C["C agent<br/>sdk/c"]
-  Lead --> CPP["C++ agent<br/>sdk/cpp"]
-  Lead --> RS["Rust agent<br/>sdk/rust"]
   Lead --> PY["Python agent<br/>sdk/python"]
   Lead --> JS["Node agent<br/>sdk/node"]
-  C -- "S2: public C headers frozen" --> CPP
+  Lead -. "deferred" .-> C["C agent<br/>sdk/c"]
+  Lead -. "deferred" .-> CPP["C++ agent<br/>sdk/cpp"]
+  Lead -. "deferred" .-> RS["Rust agent<br/>sdk/rust"]
 ```
 
-- The lead runs **S0** itself (scaffolding for all five languages + `sdk.yml` CI + `sdk/README.md`). Then for each phase S1…S6 it spawns **five `backend-implementer` subagents in parallel**, each with `isolation: "worktree"` and `run_in_background: true`, one per language. The C++ agent starts each phase only after the C agent of that phase has merged (C++ wraps C). Until then it may prepare the header-only parts.
+- The lead runs **S0** itself (scaffolding for **Python and Node** + `sdk.yml` CI + `sdk/README.md`). Then for each phase S1…S6 it spawns **two `backend-implementer` subagents in parallel** (Python, Node), each with `isolation: "worktree"` and `run_in_background: true`.
+- *(Deferred, for when C/C++/Rust are re-enabled: one more agent per language. The C++ agent starts each phase only after the C agent of that phase has merged, because C++ wraps C.)*
 - Each language agent works on branch `sdk/<lang>-s<n>-<topic>`, commits per the phase table, opens a PR, and makes `sdk.yml` green. The lead merges the PRs, resolves cross-language inconsistencies, and starts the next phase.
 - Optional: `api-integration-specialist` for the framework adapters in S5 (LangChain / LlamaIndex / LangChain.js), and `explorer` to summarise long docs.
 
@@ -79,6 +81,8 @@ Contract ambiguity → do NOT guess silently: implement the most literal reading
 | **S5** | Framework adapters (Python LangChain + LlamaIndex, Node LangChain.js) + ergonomics (Rust/C/C++ iterators, examples) | daemon M2 (M3 for add_texts) | RAG quickstart runs |
 | **S6** | Release readiness: package metadata, publish dry-runs, version pins | daemon M4 | **M4**: packages build and install cleanly |
 
+Active languages for every phase: **Python, Node**. Rows and subsections labelled *(deferred)* are skipped.
+
 If the daemon milestone a phase needs for its *online* check isn't tagged yet, finish the phase against Prism, mark the online check "pending M<n>", and re-run it when `milestone/M<n>-daemon` appears. **Never block on the daemon.**
 
 ---
@@ -93,25 +97,25 @@ If the daemon milestone a phase needs for its *online* check isn't tagged yet, f
 
 | Lang | Files to fill in S0 |
 | :--- | :--- |
-| C | `sdk/c/CMakeLists.txt` (lib `arkivector` static+shared, examples, install, `arkivector.pc`), `arkivector.pc.in`, `third_party/README.md` + vendored `yyjson.c/.h` (pin + sha256), empty-but-compiling `src/*.c` and headers with include guards |
-| C++ | `sdk/cpp/CMakeLists.txt` (`add_subdirectory(../c)` or `find_package(arkivector)`, target `arkivector::cpp`, C++17), headers with namespace skeletons |
-| Rust | `sdk/rust/Cargo.toml` (name `arkivector`, edition 2021, rust-version 1.75, deps per sdk-guidelines §3, features `blocking`, `native-tls`, default `rustls`), `src/lib.rs` module tree, examples registered |
+| C *(deferred)* | `sdk/c/CMakeLists.txt` (lib `arkivector` static+shared, examples, install, `arkivector.pc`), `arkivector.pc.in`, `third_party/README.md` + vendored `yyjson.c/.h` (pin + sha256), empty-but-compiling `src/*.c` and headers with include guards |
+| C++ *(deferred)* | `sdk/cpp/CMakeLists.txt` (`add_subdirectory(../c)` or `find_package(arkivector)`, target `arkivector::cpp`, C++17), headers with namespace skeletons |
+| Rust *(deferred)* | `sdk/rust/Cargo.toml` (name `arkivector`, edition 2021, rust-version 1.75, deps per sdk-guidelines §3, features `blocking`, `native-tls`, default `rustls`), `src/lib.rs` module tree, examples registered |
 | Python | `sdk/python/pyproject.toml` (hatchling, name `arkivector`, requires-python ≥ 3.9, no deps, extras `numpy`, `langchain = ["langchain-core>=0.3"]`, `llama-index = ["llama-index-core>=0.11"]`, ruff + mypy config), `src/arkivector/__init__.py` exporting the planned names, `py.typed` |
 | Node | `sdk/node/package.json` (name `@arkivector/client`, type module, exports `.` and `./langchain`, engines node ≥ 18, scripts build/lint/typecheck/format, devDeps typescript 5.6, eslint 9 + typescript-eslint, prettier, `@types/node`), `tsconfig.json` (strict, NodeNext, outDir dist, includes examples), `eslint.config.js` |
 
 ### CI `.github/workflows/sdk.yml`
-Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `spec/**`. Matrix job per language. **Phase 1** = build + lint/typecheck. **Phase 2** = `golden_check` offline (contract check). Both are required for the green tick. Example steps:
-- C: `cmake -S sdk/c -B b -DCMAKE_C_FLAGS="-Wall -Wextra -Werror" && cmake --build b && b/golden_check`
-- C++: same for `sdk/cpp`
-- Rust: `cargo fmt --check && cargo clippy --all-features -- -D warnings && cargo run --example golden_check`
+Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `spec/**`. Matrix job per **active** language (`python`, `node`; add `c`, `cpp`, `rust` only when re-enabled). **Phase 1** = build + lint/typecheck. **Phase 2** = `golden_check` offline (contract check). Both are required for the green tick. Example steps:
+- *(deferred)* C: `cmake -S sdk/c -B b -DCMAKE_C_FLAGS="-Wall -Wextra -Werror" && cmake --build b && b/golden_check`
+- *(deferred)* C++: same for `sdk/cpp`
+- *(deferred)* Rust: `cargo fmt --check && cargo clippy --all-features -- -D warnings && cargo run --example golden_check`
 - Python: `pip install ruff mypy && ruff check && ruff format --check && mypy --strict src && python examples/golden_check.py`
 - Node: `npm ci && npm run lint && npm run typecheck && npm run build && node dist/examples/golden_check.js`
 
 ### Commits
-`build(sdk): scaffolding for c, cpp, rust, python, node packages` · `ci: sdk build, lint and golden-check workflow` · `docs(sdk): sdk README`
+`build(sdk): scaffolding for python and node packages` · `ci: sdk build, lint and golden-check workflow` · `docs(sdk): sdk README`
 
 ### Exit
-- [ ] All 5 packages build/lint clean (empty implementations). CI green. Prism mock instructions verified locally.
+- [ ] Python and Node packages build/lint clean (empty implementations). CI green. Prism mock instructions verified locally.
 
 ---
 
@@ -161,19 +165,19 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
   Validate it against every `halfvec_*` golden case (including `input_values` rounding).
 - Commits: `feat(sdk-node): pgvector value types and VectorBytes codec` · `feat(sdk-node): typed values, ttl and error base` · `feat(sdk-node): golden_check offline`
 
-**Rust** (`types.rs`, `vectorbytes.rs`, `models.rs`, `error.rs`)
+**Rust** *(deferred)* (`types.rs`, `vectorbytes.rs`, `models.rs`, `error.rs`)
 - `half::f16::from_f32` (round-to-nearest-even). Reject `is_infinite()` results from finite input. `serde` for TypedValue (`#[serde(tag="type", content="value")]` won't fit since value types vary, so implement a custom `Serialize`/`Deserialize`).
 - `thiserror` error enum with `ErrorKind` per errors.md §3, plus `VectorBytes(VbCode)`.
 - Commits: `feat(sdk-rust): pgvector value types and VectorBytes codec` · `feat(sdk-rust): typed values, ttl and error types` · `feat(sdk-rust): golden_check example`
 
-**C** (`include/arkivector/{types.h,vectorbytes.h}`, `src/vectorbytes.c`, `src/errors.c`)
+**C** *(deferred)* (`include/arkivector/{types.h,vectorbytes.h}`, `src/vectorbytes.c`, `src/errors.c`)
 - `av_vector_t` = tagged struct `{av_vtype type; int32_t dim; int32_t nnz; float *f32; uint16_t *f16; uint8_t *bits; int32_t *indices; float *values;}`, constructors `av_vector_from_f32`, `av_halfvec_from_f32`, `av_bit_from_string`, `av_sparsevec_new`, `av_vector_free`, `av_vb_encode(const av_vector_t*, bool normalized, uint8_t **out, size_t *len, av_error_t*)`, `av_vb_decode(const uint8_t*, size_t, av_vector_t **out, av_error_t*)`.
 - **Copy the binary16 software conversion from pgvector** (`pgvector/src/halfutils.h:62–243`, `HalfToFloat4` and `Float4ToHalfUnchecked`, software branches only) into `src/vectorbytes.c` with the PostgreSQL License notice and a provenance comment. Wrap it with an overflow check (`VB_NON_FINITE`).
 - `av_value_t` TypedValue (`av_v_bool/i32/u64/u256/dec/str/addr/key/bytes`), `av_ttl_t`.
 - `examples/golden_check.c` reads JSON with the vendored yyjson.
 - Commits: `feat(sdk-c): vector types and VectorBytes codec (half conversion copied from pgvector)` · `feat(sdk-c): typed values, ttl, error struct` · `feat(sdk-c): golden_check example`
 
-**C++** (`types.hpp`, `error.hpp`, `src/types.cpp`)
+**C++** *(deferred)* (`types.hpp`, `error.hpp`, `src/types.cpp`)
 - `arkivector::Vector/HalfVector/SparseVector/Bit` as value classes owning `std::vector`. `to_vectorbytes()`/`from_vectorbytes()` delegate to the C SDK codec (RAII on `av_vector_t`). `VectorBytesError` derives from `arkivector::Error`.
 - Commits: `feat(sdk-cpp): value types over the c codec` · `feat(sdk-cpp): golden_check example`
 
@@ -200,9 +204,9 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 ### Per language
 - **Python** (`_http.py` on `urllib.request` with a keep-alive `http.client.HTTPConnection` pool keyed by host, thread-safe via a lock-protected pool; `client.py`; `models.py` dataclasses with `from_json`): commits `feat(sdk-python): http transport, retries and problem errors` · `feat(sdk-python): version, capabilities, ops and collections api`.
 - **Node** (`http.ts` on global `fetch` with `AbortController` timeouts, injectable `fetch`; `client.ts`; `models.ts` interfaces + parse functions; camelCase ↔ snake_case mappers): commits `feat(sdk-node): fetch transport, retries and problem errors` · `feat(sdk-node): version, capabilities, ops and collections api`.
-- **Rust** (`client.rs` async on `reqwest::Client` with `ClientBuilder` (timeout, gzip, user agent), `blocking.rs` behind feature `blocking` wrapping `reqwest::blocking`, sharing request/response models from `models.rs` with serde): commits `feat(sdk-rust): async/blocking transport, retries, errors` · `feat(sdk-rust): version, capabilities, ops and collections api`.
-- **C** (`http.c` on libcurl easy handles (one per call from a mutex-protected pool), `json.c` yyjson helpers, `client.c`; `arkivector.h` declares `av_config_t` + `AV_CONFIG_INIT`, `av_client_new/free`, `av_global_init/cleanup`, `av_version`, `av_has_capability`, `av_health`, `av_ready`, `av_sync_status`, `av_list_collections`, `av_get_collection`, `av_create_collection`, `av_follow_collection`, `av_delete_collection`, result structs + `*_free`; `av_error_t {char code[40]; int status; bool retryable; char request_id[72]; char *title; char *detail; char *problem_json; av_status_t category;}` + `av_error_clear`). **Freeze the public C headers at the end of S2** (append-only afterwards), because the C++ agent builds on them. Commits: `feat(sdk-c): libcurl transport, retries, problem errors` · `feat(sdk-c): version, capabilities, ops and collections api` · `feat(sdk-c): freeze public headers v0.1`.
-- **C++** (after the C S2 merge: `arkivector.hpp` `Client` with `Config` struct (designated-initialiser friendly), RAII handle, exceptions per error category, `Collection` etc. as C++ structs converted from C results): commits `feat(sdk-cpp): client, config and exceptions over the c sdk` · `feat(sdk-cpp): version, ops and collections api`.
+- **Rust** *(deferred)* (`client.rs` async on `reqwest::Client` with `ClientBuilder` (timeout, gzip, user agent), `blocking.rs` behind feature `blocking` wrapping `reqwest::blocking`, sharing request/response models from `models.rs` with serde): commits `feat(sdk-rust): async/blocking transport, retries, errors` · `feat(sdk-rust): version, capabilities, ops and collections api`.
+- **C** *(deferred)* (`http.c` on libcurl easy handles (one per call from a mutex-protected pool), `json.c` yyjson helpers, `client.c`; `arkivector.h` declares `av_config_t` + `AV_CONFIG_INIT`, `av_client_new/free`, `av_global_init/cleanup`, `av_version`, `av_has_capability`, `av_health`, `av_ready`, `av_sync_status`, `av_list_collections`, `av_get_collection`, `av_create_collection`, `av_follow_collection`, `av_delete_collection`, result structs + `*_free`; `av_error_t {char code[40]; int status; bool retryable; char request_id[72]; char *title; char *detail; char *problem_json; av_status_t category;}` + `av_error_clear`). **Freeze the public C headers at the end of S2** (append-only afterwards), because the C++ agent builds on them. Commits: `feat(sdk-c): libcurl transport, retries, problem errors` · `feat(sdk-c): version, capabilities, ops and collections api` · `feat(sdk-c): freeze public headers v0.1`.
+- **C++** *(deferred)* (after the C S2 merge: `arkivector.hpp` `Client` with `Config` struct (designated-initialiser friendly), RAII handle, exceptions per error category, `Collection` etc. as C++ structs converted from C results): commits `feat(sdk-cpp): client, config and exceptions over the c sdk` · `feat(sdk-cpp): version, ops and collections api`.
 
 ### Exit
 - [ ] Against Prism: every collections/ops call parses the example response. An invalid request (e.g. bad collection name) surfaces Prism's 422 as `ValidationError`. A retry test with a fake 503 server (inline in the example or a 20-line local server) shows backoff (manual check, logged in the PR).
@@ -225,9 +229,9 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 ### Per language
 - **Python**: `filter.py` (`F.eq(...)`, `F.and_(…)`, `F.or_(…)`, `F.not_(…)`, `F.between(field, lo, hi)`, `F.startswith`, `F.exists`, `F.typeof`), `client.py` read ops, generator-based `scroll`. Commits: `feat(sdk-python): filter builder` · `feat(sdk-python): get, search, batch, scroll, count with consistency` · `feat(sdk-python): golden_check online and quickstart`.
 - **Node**: `filter.ts`, read ops, `scroll` as `AsyncIterable<Entity>`. Commits: `feat(sdk-node): filter builder` · `feat(sdk-node): read ops with async-iterable scroll` · `feat(sdk-node): golden_check online and quickstart`.
-- **Rust**: `filter.rs` (`F::eq`, `F::all([...])`/`F::and_`, …, implementing `Serialize`), request builders `SearchRequest::new(v).k(5).filter(f).include([Include::Attributes])`, `scroll` returning `impl Stream<Item = Result<Entity>>` (async) and `impl Iterator` (blocking). Commits: `feat(sdk-rust): filter builder and request builders` · `feat(sdk-rust): read ops with scroll streams` · `feat(sdk-rust): golden_check online and quickstart`.
-- **C**: `filter.h/.c` (`av_filter_t` tree, `av_f_eq(field, av_value_t)`, `av_f_and(size_t n, av_filter_t **children)`, …, `av_filter_free`, `av_filter_to_json`), `av_search_params_t` + `AV_SEARCH_PARAMS_INIT`, `av_search`, `av_search_batch`, `av_scroll_page` + an `av_scroll_iter_t` (`av_scroll_next`), `av_count`, `av_get`. Result structs own their memory, released with the matching `*_free`. Commits: `feat(sdk-c): filter builder` · `feat(sdk-c): read ops and scroll iterator` · `feat(sdk-c): golden_check online and quickstart`.
-- **C++** (after C S3): `filter.hpp` (`F::eq`, …, value semantics), `SearchRequest` fluent builder, `search`, `search_batch`, `scroll` returning an input range (`begin()/end()` with lazy paging), `count`, `get`. Commits: `feat(sdk-cpp): filter builder and request builders` · `feat(sdk-cpp): read ops and scroll range` · `feat(sdk-cpp): golden_check online and quickstart`.
+- **Rust** *(deferred)*: `filter.rs` (`F::eq`, `F::all([...])`/`F::and_`, …, implementing `Serialize`), request builders `SearchRequest::new(v).k(5).filter(f).include([Include::Attributes])`, `scroll` returning `impl Stream<Item = Result<Entity>>` (async) and `impl Iterator` (blocking). Commits: `feat(sdk-rust): filter builder and request builders` · `feat(sdk-rust): read ops with scroll streams` · `feat(sdk-rust): golden_check online and quickstart`.
+- **C** *(deferred)*: `filter.h/.c` (`av_filter_t` tree, `av_f_eq(field, av_value_t)`, `av_f_and(size_t n, av_filter_t **children)`, …, `av_filter_free`, `av_filter_to_json`), `av_search_params_t` + `AV_SEARCH_PARAMS_INIT`, `av_search`, `av_search_batch`, `av_scroll_page` + an `av_scroll_iter_t` (`av_scroll_next`), `av_count`, `av_get`. Result structs own their memory, released with the matching `*_free`. Commits: `feat(sdk-c): filter builder` · `feat(sdk-c): read ops and scroll iterator` · `feat(sdk-c): golden_check online and quickstart`.
+- **C++** *(deferred)* (after C S3): `filter.hpp` (`F::eq`, …, value semantics), `SearchRequest` fluent builder, `search`, `search_batch`, `scroll` returning an input range (`begin()/end()` with lazy paging), `count`, `get`. Commits: `feat(sdk-cpp): filter builder and request builders` · `feat(sdk-cpp): read ops and scroll range` · `feat(sdk-cpp): golden_check online and quickstart`.
 
 ### Exit → M2 (each language)
 - [ ] Against Prism: all read ops parse the examples.
@@ -261,9 +265,9 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 | :--- | :--- | :--- | :--- |
 | Python | `ArkivectorVectorStore` for LangChain (metadata ↔ attributes via `plain_attributes()`, `filter` param accepts dict-of-equals → `F.and_(F.eq…)` or an `F` node, scores = `distance`), and for LlamaIndex (MetadataFilters `EQ, NE, GT, GTE, LT, LTE, IN, NIN` → F; node text in `document`; node id in `id`). Lazy imports, `ImportError` with an install hint | `langchain.py`, `llama_index.py`, `examples/rag_langchain.py` (add file) | `feat(sdk-python): langchain vector store` · `feat(sdk-python): llama-index vector store` |
 | Node | `ArkivectorVectorStore` for LangChain.js at subpath `./langchain` (peer dep `@langchain/core`) | `src/langchain.ts`, `examples/rag_langchain.ts` (add file) | `feat(sdk-node): langchain.js vector store` |
-| Rust | `scroll_all` convenience, `Client::from_env()`, docs examples in README (no framework) | `client.rs`, `README.md` (add) | `feat(sdk-rust): ergonomics and examples` |
-| C | `av_client_from_env`, `av_search_simple(client, coll, const float*, dim, k, ...)` | `client.c` | `feat(sdk-c): convenience api` |
-| C++ | `Client::from_env()`, range-for over search hits, `std::span` overloads when C++20 is available | `client.cpp` | `feat(sdk-cpp): convenience api` |
+| Rust *(deferred)* | `scroll_all` convenience, `Client::from_env()`, docs examples in README (no framework) | `client.rs`, `README.md` (add) | `feat(sdk-rust): ergonomics and examples` |
+| C *(deferred)* | `av_client_from_env`, `av_search_simple(client, coll, const float*, dim, k, ...)` | `client.c` | `feat(sdk-c): convenience api` |
+| C++ *(deferred)* | `Client::from_env()`, range-for over search hits, `std::span` overloads when C++20 is available | `client.cpp` | `feat(sdk-cpp): convenience api` |
 
 **Exit:** the Python and Node RAG examples run against `dev-up.sh` (with a fake deterministic embedder in the example, so no API key is needed).
 
@@ -271,11 +275,11 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | Tasks | Commit |
 | :--- | :--- | :--- |
-| Python | Complete `pyproject.toml` metadata (classifiers, urls, licence), `python -m build`, `twine check`, test install in a fresh venv, version `0.1.0` | `build(sdk-python): release metadata and build check` |
-| Node | `package.json` metadata, `files`, `exports` with types, `npm pack --dry-run`, test install in a temp project, ESM import works | `build(sdk-node): release metadata and pack check` |
-| Rust | Crate metadata (description, licence, repository, readme, keywords), `cargo package --list`, `cargo publish --dry-run` | `build(sdk-rust): release metadata and package check` |
-| C | `install` targets, `arkivector.pc`, CMake package config (`arkivectorConfig.cmake`), a static+shared build check, `find_package(arkivector)` from a sample project | `build(sdk-c): install, pkg-config and cmake package` |
-| C++ | CMake package `arkivector-cpp`, `find_package` sample project | `build(sdk-cpp): install and cmake package` |
+| Python | Complete `pyproject.toml` metadata (classifiers, urls; **licence field left unset** until the owner decides, Q8), `python -m build`, `twine check`, test install in a fresh venv, version `0.1.0` | `build(sdk-python): release metadata and build check` |
+| Node | `package.json` metadata (**`license` field left unset / `UNLICENSED` placeholder** until the owner decides, Q8), `files`, `exports` with types, `npm pack --dry-run`, test install in a temp project, ESM import works | `build(sdk-node): release metadata and pack check` |
+| Rust *(deferred)* | Crate metadata (description, licence, repository, readme, keywords), `cargo package --list`, `cargo publish --dry-run` | `build(sdk-rust): release metadata and package check` |
+| C *(deferred)* | `install` targets, `arkivector.pc`, CMake package config (`arkivectorConfig.cmake`), a static+shared build check, `find_package(arkivector)` from a sample project | `build(sdk-c): install, pkg-config and cmake package` |
+| C++ *(deferred)* | CMake package `arkivector-cpp`, `find_package` sample project | `build(sdk-cpp): install and cmake package` |
 
 **Exit → M4:** with the daemon at M4, all packages install from local artifacts and pass `golden_check` (offline + online) against a release daemon binary. Tag `sdk-v0.1.0` and `milestone/M4-sdk-<lang>`.
 
@@ -319,8 +323,8 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | S0 | S1 (M1) | S2 | S3 (M2) | S4 (M3) | S5 | S6 (M4) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| C | | | | | | | |
-| C++ | | | | | | | |
-| Rust | | | | | | | |
 | Python | | | | | | | |
 | Node | | | | | | | |
+| C | deferred | | | | | | |
+| C++ | deferred | | | | | | |
+| Rust | deferred | | | | | | |

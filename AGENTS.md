@@ -13,7 +13,10 @@
 | Product | Path | Language | What it is |
 | :--- | :--- | :--- | :--- |
 | **Daemon** `arkivectord` | `daemon/` | C11 | Off-chain vector co-processor. Syncs entities from the Arkiv chain, indexes vectors with pgvector's own code (copied from `pgvector/`), and serves REST. |
-| **SDKs** | `sdk/{c,cpp,rust,python,node}` | C, C++17, Rust, Python, TypeScript | Thin HTTP clients of the daemon, plus the VectorBytes codec and the pgvector value types. |
+| **SDKs** | `sdk/{python,node}` (active) · `sdk/{c,cpp,rust}` (**deferred**) | Python, TypeScript (later: C, C++17, Rust) | Thin HTTP clients of the daemon, plus the VectorBytes codec and the pgvector value types. |
+
+**Current scope:** daemon + the Python and Node SDKs. `sdk/c`, `sdk/cpp` and `sdk/rust` are deferred placeholders. Do not work on them until the owner re-enables them.
+**Owner decisions on open questions** (frozen on-chain format and API, HNSW spike in D0, Rabdi work at the end, licence deferred, owner `@DikshitRJ`) are in [`PLAN_DAEMON.md` → Decisions](PLAN_DAEMON.md#decisions-on-open-questions-2026-11-06-owner-approved-take-the-best-most-optimistic-path).
 
 The two tracks are built **in parallel by independent agents**. They integrate **only** through the frozen contract in `spec/` and `docs/api/`.
 
@@ -26,13 +29,15 @@ The two tracks are built **in parallel by independent agents**. They integrate *
 | `daemon/**` | Daemon track | Daemon lead + daemon subagents |
 | `docs/daemon/**` | Daemon track | **Only** the `opencode-docs` subagent (generated docs) |
 | `.github/workflows/daemon.yml` | Daemon track | Daemon lead / `ci-cd-engineer` |
-| `sdk/**` | SDK track | SDK lead + per-language SDK subagents (each only in its own `sdk/<lang>/`) |
+| `sdk/python/**`, `sdk/node/**`, `sdk/README.md` | SDK track | SDK lead + per-language SDK subagents (each only in its own `sdk/<lang>/`) |
+| `sdk/{c,cpp,rust}/**` | SDK track (**deferred**) | Nobody, until the owner re-enables them |
 | `.github/workflows/sdk.yml` | SDK track | SDK lead |
 | `spec/**`, `docs/api/**` | **Contract (shared, frozen)** | Nobody directly. Changes only via a CCR PR approved by the human owner ([`spec/changes/README.md`](spec/changes/README.md)) |
 | `.github/workflows/contract.yml`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/CODEOWNERS`, `.editorconfig`, `.clang-format` | Shared infra | Daemon lead in phase D0 creates them. Later changes need a note in both tracks' PRs |
 | `AGENTS.md`, `CODEBASE.md`, `ARCHITECTURE.md`, `PLAN_*.md` | Orchestrator (human) | Agents propose edits in PR descriptions. A track lead may update **its own** plan's status checkboxes only |
 | `pgvector/` | **Read-only reference** (pgvector v0.8.7 upstream) | Nobody. Copy *from* it, never edit it |
 | `RESEARCH/`, `QUESTION.md` | Read-only reference | Nobody |
+| Root `LICENSE` | Owner | **Deferred.** Do not add a licence or SPDX headers until the owner decides. Upstream notices (`LICENSE.pgvector`, `LICENSE.postgresql`) are still required next to copied code |
 | `openspec/` | Both (after `openspec init` in D0) | Each track adds change proposals under `openspec/changes/<track>-<id>/` |
 
 **Hard rule:** never edit files outside your track's paths. If you need something from the other track, write a CCR (contract) or open an issue titled `[daemon→sdk]` / `[sdk→daemon]`.
@@ -81,6 +86,8 @@ The track lead (the agent executing a plan) is the **orchestrator** of its track
 | `performance-profiler` | Claude | Kernel and search benchmarks, regressions (D1, D4) | Daemon |
 | `backend-implementer` | Claude | Bounded, parallelisable implementation lanes (with `isolation: "worktree"`) | Both |
 | `explorer` | Claude | Read-only reconnaissance of `pgvector/` or `RESEARCH/` when a plan step says "read" and the lead wants a summary | Both |
+
+**Fallback when a backend is unavailable:** if `agy` rejects the configured Gemini model, run `agy models` and use the closest Gemini flash/pro model. If `agy` itself is unavailable, use `test-writer` instead of `gemini-integration-tester` and `code-reviewer` instead of `gemini-reviewer`. If Ollama or OpenCode is down, `opencode-docs` uses its hosted-model fallback (see its definition). Record any fallback in the PR.
 
 **SDK track rule:** the SDK track has **no documentation, test or review subagents** (explicit project decision). SDK agents verify themselves with `examples/golden_check.*` and the Prism mock.
 
@@ -149,9 +156,9 @@ Report file:line, severity, failure scenario. Do not edit files.
 
 | Lang | Style / lint | Build | Notes |
 | :--- | :--- | :--- | :--- |
-| C | `.clang-format`, `-Wall -Wextra -Werror` | CMake ≥ 3.20 | C11, libcurl, vendored yyjson. `av_` prefix shared with the daemon is fine because they are separate binaries, but the SDK must not include daemon headers |
-| C++ | `.clang-format`, `-Wall -Wextra -Werror` | CMake | C++17, wraps the C SDK |
-| Rust | `cargo fmt`, `cargo clippy -- -D warnings` | Cargo | MSRV 1.75 |
+| C *(deferred)* | `.clang-format`, `-Wall -Wextra -Werror` | CMake ≥ 3.20 | C11, libcurl, vendored yyjson. `av_` prefix shared with the daemon is fine because they are separate binaries, but the SDK must not include daemon headers |
+| C++ *(deferred)* | `.clang-format`, `-Wall -Wextra -Werror` | CMake | C++17, wraps the C SDK |
+| Rust *(deferred)* | `cargo fmt`, `cargo clippy -- -D warnings` | Cargo | MSRV 1.75 |
 | Python | `ruff check`, `ruff format`, `mypy --strict` | `pyproject.toml` (hatchling) | ≥ 3.9, stdlib-only core |
 | Node | `eslint`, `tsc --noEmit`, `prettier --check` | `tsc` → `dist/` | ESM, Node ≥ 18, zero runtime deps |
 
@@ -165,7 +172,7 @@ SDKs **must not** import or copy daemon code. They may copy **pgvector** code wh
   - **Phase 1** (code quality & compilation): configure + build (gcc, clang), clang-format check, clang-tidy, cppcheck.
   - **Phase 2** (integration tests): unit tests (ASan + UBSan), integration tests vs mock-arkiv, contract tests (schemathesis), pgvector parity tests.
   - The green tick requires both phases.
-- `.github/workflows/sdk.yml` (all branches): per-language build + lint + `golden_check` offline. No test suites.
+- `.github/workflows/sdk.yml` (all branches): build + lint + `golden_check` offline for **Python and Node** (other languages are added when re-enabled). No test suites.
 - `.github/workflows/contract.yml` (all branches): `spec/tools/validate.sh`.
 
 ---
@@ -188,9 +195,6 @@ docker compose -f test/parity/docker-compose.yml up -d && pytest -q test/parity
 tools/dev-up.sh                                      # mock-arkiv + daemon + demo.docs on :8080
 
 # SDKs
-(cd sdk/c && cmake -B build && cmake --build build && ./build/golden_check)
-(cd sdk/cpp && cmake -B build && cmake --build build && ./build/golden_check)
-(cd sdk/rust && cargo clippy -- -D warnings && cargo run --example golden_check)
 (cd sdk/python && ruff check . && mypy --strict src && python -m examples.golden_check)
 (cd sdk/node && npm ci && npm run lint && npm run build && node dist/examples/golden_check.js)
 ```

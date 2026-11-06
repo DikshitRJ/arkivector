@@ -1,6 +1,6 @@
 # CODEBASE.md: Repository Map
 
-> One line per folder and file. **Status legend:** ✅ written · ⬜ empty placeholder (to be implemented in the phase shown) · 🔒 read-only reference · ⚙️ generated.
+> One line per folder and file. **Status legend:** ✅ written · ⬜ empty placeholder (to be implemented in the phase shown) · ⏸ deferred (do not start) · 🔒 read-only reference · ⚙️ generated.
 > Phases: `D0`–`D7` = [`PLAN_DAEMON.md`](PLAN_DAEMON.md), `S0`–`S6` = [`PLAN_SDK.md`](PLAN_SDK.md).
 > Generated per-file daemon docs live in `docs/daemon/<same path>.md`.
 
@@ -40,7 +40,7 @@ arkivector/
 │   ├── workflows/sdk.yml          ⬜ S0 Per-language build + lint + golden_check offline (matrix)
 │   ├── workflows/contract.yml     ⬜ D0 Runs spec/tools/validate.sh
 │   ├── PULL_REQUEST_TEMPLATE.md   ⬜ D0 Checklist: phase, plan steps, CI, subagent reports, contract impact
-│   └── CODEOWNERS                 ⬜ D0 Path ownership mirroring AGENTS.md §2
+│   └── CODEOWNERS                 ✅ Path ownership mirroring AGENTS.md §2 (@DikshitRJ)
 │
 ├── spec/                          ── FROZEN CONTRACT (change via CCR only)
 │   ├── VERSION                    ✅ Contract semver (1.0.0)
@@ -81,7 +81,7 @@ arkivector/
 │   ├── CMakePresets.json          ⬜ D0 Presets: dev, asan, ubsan, tsan, fuzz, release-static
 │   ├── Dockerfile                 ⬜ D6 Multi-stage Alpine static build → scratch image
 │   ├── arkivector.example.toml    ⬜ D2 Documented example config (ARCHITECTURE §16.3)
-│   ├── RABDI_FACTS.md             ⬜ D0 Measured answers to ARCHITECTURE §19 open questions
+│   ├── RABDI_FACTS.md             ⬜ D6 Measured answers to ARCHITECTURE §19 (defaults used until then)
 │   ├── cmake/Warnings.cmake       ⬜ D0 Strict warnings for our code, upstream flags for vendored code
 │   ├── cmake/Sanitizers.cmake     ⬜ D0 ASan/UBSan/TSan/libFuzzer options
 │   ├── cmake/KernelTiers.cmake    ⬜ D1 Compile kernel TUs per x86 tier (baseline/v3/v4) with symbol suffixes
@@ -101,7 +101,7 @@ arkivector/
 │   │   │   ├── LICENSE.pgvector   ⬜ D0 Upstream licence text
 │   │   │   ├── PROVENANCE.md      ⬜ D0 Per-file upstream path, commit, mode V/F/S/P, ARKIVECTOR deltas
 │   │   │   ├── vector.h halfvec.h sparsevec.h bitvec.h   ⬜ D1 (V) type structs, limits, dispatch macros
-│   │   │   ├── hnsw.h             ⬜ D4 (S) HNSW structs/macros; HNSW_MAX_DIM lifted
+│   │   │   ├── hnsw.h             ⬜ D0 spike → D4 (S) HNSW structs/macros; HNSW_MAX_DIM lifted
 │   │   │   ├── halfutils.c/.h     ⬜ D0 (V) FP16 conversion + F16C kernels + CPUID dispatch
 │   │   │   ├── bitutils.c/.h      ⬜ D0 (V) Hamming/Jaccard + AVX-512 popcount dispatch
 │   │   │   ├── vector_kernels.c   ⬜ D1 (F) VectorL2SquaredDistance/InnerProduct/CosineSimilarity/L1Distance
@@ -112,8 +112,8 @@ arkivector/
 │   │   │   ├── halfvec_io.c       ⬜ D1 (F) halfvec_in/halfvec_out
 │   │   │   ├── sparsevec_io.c     ⬜ D1 (F) sparsevec_in/sparsevec_out
 │   │   │   ├── vector_funcs.c     ⬜ D1 (F) l2_normalize, binary_quantize, subvector, casts
-│   │   │   ├── hnswutils.c        ⬜ D4 (S) HnswSearchLayer, SelectNeighbors, FindElementNeighbors (in-memory paths)
-│   │   │   ├── hnswbuild_mem.c    ⬜ D4 (S) InsertTupleInMemory & co. from hnswbuild.c
+│   │   │   ├── hnswutils.c        ⬜ D0 spike → D4 (S) HnswSearchLayer, SelectNeighbors, FindElementNeighbors (in-memory paths)
+│   │   │   ├── hnswbuild_mem.c    ⬜ D0 spike → D4 (S) InsertTupleInMemory & co. from hnswbuild.c
 │   │   │   └── hnswscan_mem.c     ⬜ D4 (P) GetScanItems/ResumeScanItems on arena graphs
 │   │   ├── pgcompat/              ── PostgreSQL API surface for copied code
 │   │   │   ├── LICENSE.postgresql ⬜ D0 PostgreSQL licence text
@@ -121,8 +121,8 @@ arkivector/
 │   │   │   ├── include/…          ⬜ D0–D4 postgres.h, c.h, fmgr.h, varatt.h, miscadmin.h, port.h, lib/*, nodes/pg_list.h,
 │   │   │   │                          utils/{relptr,memutils,varbit,float,elog}.h, port/{pg_bitutils,atomics}.h,
 │   │   │   │                          storage/{lwlock,spin,itemptr}.h, common/{hashfn,shortest_dec}.h
-│   │   │   └── src/               ⬜ palloc.c (D0) elog.c (D0) lwlock.c (D4) fmgr.c (D1) list.c (D4, verbatim PG)
-│   │   │                              pairingheap.c (D4, verbatim PG) stringinfo.c (D1) f2s.c (D1, verbatim PG)
+│   │   │   └── src/               ⬜ palloc.c elog.c lwlock.c list.c pairingheap.c pg_prng.c (D0; list/pairingheap/pg_prng verbatim PG)
+│   │   │                              fmgr.c (D0 minimal, D1 full) · stringinfo.c f2s.c (D1; f2s verbatim PG)
 │   │   ├── kernels/dispatch.c/.h  ⬜ D1 Tier detection (pgvector CPUID/xgetbv code) → function table
 │   │   ├── kernels/opclass.c/.h   ⬜ D1 Opclass registry: name → type, distance fn, norm fn, operator
 │   │   ├── codec/vectorbytes.c/.h ⬜ D1 VectorBytes v1 encode/decode/validate → pgvector structs (M1)
@@ -196,7 +196,7 @@ arkivector/
 │   ├── third_party/README.md      ⬜ D0 What is vendored, why, how to update
 │   ├── third_party/VENDORED.lock  ⬜ D0 name, version, source URL, sha256, licence per vendored lib
 │   ├── tools/pgvector-sync.sh     ⬜ D1 3-way merge helper for new pgvector tags
-│   ├── tools/rabdi-probe.py       ⬜ D0 Scripted Rabdi measurements → RABDI_FACTS.md
+│   ├── tools/rabdi-probe.py       ⬜ D6 Scripted Rabdi measurements → RABDI_FACTS.md
 │   ├── tools/dev-up.sh            ⬜ D3 Start mock-arkiv + daemon + seed demo.docs (M2)
 │   ├── tools/seed-demo.py         ⬜ D3 Load spec/fixtures/demo-dataset.json into mock-arkiv
 │   ├── test/CMakeLists.txt        ⬜ D0 Unit test + fuzz targets
@@ -217,8 +217,8 @@ arkivector/
 │   │   └── requirements.txt       ⬜ aiohttp pin
 │   └── bench/                     ⬜ D4 datasets.py, run_recall.py, report.py
 │
-└── sdk/                           ── SDKs (SDK track). README.md ⬜ S0 overview + install per language
-    ├── c/                         ⬜ S0–S6 libarkivector (C11)
+└── sdk/                           ── SDKs (SDK track). ACTIVE: python, node. DEFERRED: c, cpp, rust. README.md ⬜ S0
+    ├── c/                         ⏸ DEFERRED libarkivector (C11)
     │   ├── CMakeLists.txt         ⬜ S0 Library + examples, install, pkg-config
     │   ├── arkivector.pc.in       ⬜ S0 pkg-config template
     │   ├── include/arkivector/arkivector.h   ⬜ S2 Client, config, ops, results
@@ -228,8 +228,8 @@ arkivector/
     │   ├── src/{internal.h,client.c,http.c,json.c,vectorbytes.c,filter.c,errors.c}  ⬜ S1–S4
     │   ├── third_party/README.md  ⬜ S0 Vendored yyjson
     │   └── examples/{quickstart.c,golden_check.c}  ⬜ S1/S3
-    ├── cpp/                       ⬜ C++17 wrapper: include/arkivector/{arkivector,types,filter,error}.hpp, src/, examples/
-    ├── rust/                      ⬜ Crate arkivector: src/{lib,client,blocking,models,types,vectorbytes,filter,error}.rs, examples/
+    ├── cpp/                       ⏸ DEFERRED C++17 wrapper: include/arkivector/{arkivector,types,filter,error}.hpp, src/, examples/
+    ├── rust/                      ⏸ DEFERRED Crate arkivector: src/{lib,client,blocking,models,types,vectorbytes,filter,error}.rs, examples/
     ├── python/                    ⬜ Package arkivector: src/arkivector/{__init__,_http,client,models,types,vectorbytes,
     │                                  filter,errors,langchain,llama_index}.py, py.typed, examples/
     └── node/                      ⬜ @arkivector/client: src/{index,http,client,models,types,vectorbytes,filter,errors,

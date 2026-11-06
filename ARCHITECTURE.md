@@ -1210,7 +1210,9 @@ flowchart LR
 
 ## 19. Open Questions & Risks
 
-### To measure on Rabdi (Phase 0)
+> **Resolved 2026-11-06:** the owner chose the optimistic path. Development uses the defaults below against `mock-arkiv`, and Rabdi measurements move to the end (daemon phase D6). The HNSW in-memory risk is tested by a spike in D0. See [`PLAN_DAEMON.md` → Decisions](PLAN_DAEMON.md#decisions-on-open-questions-2026-11-06-owner-approved-take-the-best-most-optimistic-path).
+
+### To measure on Rabdi (daemon phase D6; defaults used until then)
 
 | # | Question | Affects | Default assumption |
 | :---: | :--- | :--- | :--- |

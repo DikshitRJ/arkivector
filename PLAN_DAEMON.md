@@ -6,6 +6,23 @@
 
 ---
 
+## Decisions on open questions (2026-11-06, owner-approved: "take the best, most optimistic path")
+
+| # | Question | Decision | Consequence for this plan |
+| :---: | :--- | :--- | :--- |
+| Q1 | On-chain format (VectorBytes v1 header, LE, pgvector layout) and attribute names `av.vec`/`av.id`/`av.doc` | **Frozen as specified** in `docs/api/vectors.md` and `collections.md §4` | No changes. Treat them as irreversible once data exists on Rabdi |
+| Q2 | API response shapes (TypedValue attributes, error codes) | **Frozen as specified** in `spec/` | No changes |
+| Q3 | Is pgvector's in-memory HNSW usable as a long-lived, concurrently searched, mmapped index? | **Assume yes, but prove it on day one.** The HNSW in-memory spike moves into **D0** (§4.4 step 7) | D0 copies the HNSW files early. D4 builds on the spike instead of starting cold. Fallback only if the spike fails: port the same algorithms (mode P) into our own structs, with the same API (`av_segment_search_hnsw`) |
+| Q4 | HNSW above 2,000 dims | **Lift to 16,000** (`VECTOR_MAX_DIM`). Benchmark 3072-d in D4 | No changes (D4 already includes it) |
+| Q5 | Unmeasured Arkiv facts (reorg depth, getLogs range, query length, WS, gas/byte) | **Use the documented defaults** (ARCHITECTURE §19 table) and develop entirely against `mock-arkiv` configured with those defaults. **Rabdi probes and the Rabdi soak run at the end (D6)** | D0 has no Rabdi work. `RABDI_FACTS.md` is filled in D6, and config defaults are adjusted then |
+| Q6 | `halfvec` default vs gas cost | **Keep `halfvec`** as the default | No changes |
+| Q7 | Open-collection discovery cost | **Keep curated (writer-scoped) collections as the default**. Discovery B/C stays in D5 | No changes |
+| Q8 | Project licence | **Deferred** by the owner. Upstream notices (`LICENSE.pgvector`, `LICENSE.postgresql`) are still copied in D0 because they are required. No root `LICENSE` and no licence fields in package metadata until the owner decides | D6 release builds leave the licence placeholder |
+| Q9 | Subagent backend model ids may not resolve | **Assume they work.** If `agy` rejects the model, run `agy models` and pick the closest Gemini flash/pro model. If `agy` is unavailable, fall back to `test-writer` (tests) / `code-reviewer` (review) | See AGENTS.md §5 fallback note |
+| Q10 | GitHub owner handle | `@DikshitRJ` | Used in `.github/CODEOWNERS` (already written) |
+
+---
+
 ## 0. How to execute a phase (the loop)
 
 For **every** phase Dn:
@@ -52,13 +69,13 @@ The prompt templates are in AGENTS.md §5.2. Each phase below lists the **phase-
 
 | Phase | Title | Depends on | Milestone | Capabilities added | Arch. ref |
 | :---: | :--- | :--- | :---: | :--- | :--- |
-| **D0** | Foundations: build, CI, pgcompat skeleton, mock-arkiv, Rabdi probes | — | — | — | §16, §17 P0 |
+| **D0** | Foundations: build, CI, pgcompat skeleton, **HNSW in-memory spike**, mock-arkiv | — | — | — | §16, §17 P0 |
 | **D1** | pgvector types, kernels, dispatch, VectorBytes, text I/O | D0 | **M1** | — | §5, §7, §11.3 |
 | **D2** | Core runtime, Arkiv client, storage, sync, TTL, HTTP skeleton | D1 | — | (ops endpoints implemented) | §8, §9, §10 |
 | **D3** | Filter engine, exact executor, REST read API, dev-up | D2 | **M2** | ops.*, collections.read/write/follow, entities.read, search.exact, search.filter.json/where, search.explain, scroll, count, consistency.min_block | §11, §13 |
 | **D4** | pgvector HNSW arenas, segments, compaction, planner, iterative scan | D3 | — | search.hnsw, search.batch | §5.3, §8.2, §11.4–5 |
 | **D5** | Write path: ABI/RLP/tx/signer, managed upsert, prepare, idempotency, discovery B/C | D3 (D4 optional) | **M3** | entities.write, entities.prepare, idempotency, collections.manifest | §12 |
-| **D6** | Hardening & surface: auth, rate limit, Qdrant, MCP, verify, release builds, soak | D4, D5 | **M4** | auth.api_keys, qdrant, mcp, entities.verify | §15, §16 |
+| **D6** | Hardening & surface: auth, rate limit, Qdrant, MCP, verify, release builds, **Rabdi probes + soak** | D4, D5 | **M4** | auth.api_keys, qdrant, mcp, entities.verify | §15, §16, §19 |
 | **D7** | Post-v1: BQ+rerank, vacuum repair, IVFFlat, lite mode, keep-alive, snapshots | D6 | — | (new capabilities via CCR) | §11.7, §17 P5 |
 
 > Re-sequencing note vs ARCHITECTURE §17: the HTTP read API moves **before** HNSW (D3 before D4), so the SDK track can integrate against a real daemon early (M2). The search API is unchanged when HNSW lands. Only `plan.strategy` changes.
@@ -163,11 +180,12 @@ av_status av_collection_wait_block(av_collection *c, uint64_t min_block, int tim
 
 ## 4. Phase D0: Foundations
 
-**Goal:** a building, CI-gated skeleton where verbatim pgvector files compile against `pgcompat`, plus the mock Arkiv node that all later tests use.
-**Branches:** `daemon/d0-build`, then `daemon/d0-mock-arkiv` (can be one branch).
+**Goal:** a building, CI-gated skeleton where verbatim pgvector files compile against `pgcompat`. A **spike** proves that pgvector's in-memory HNSW graph works as a long-lived, mmapped, concurrently searched index (decision Q3). Plus the mock Arkiv node that all later tests use. **No Rabdi access is needed in D0** (decision Q5).
+**Branches:** `daemon/d0-build`, `daemon/d0-hnsw-spike`, `daemon/d0-mock-arkiv` (merge in this order, or use one branch).
 
 ### 4.1 Read first
-- `ARCHITECTURE.md` §4 (stack), §5 (reuse strategy), §16 (build/hardening), §19 (open questions)
+- `ARCHITECTURE.md` §4 (stack), §5 (reuse strategy), §8.2 (arenas), §16 (build/hardening), §19 (open questions; use its default column)
+- For the spike: `RESEARCH/pgvector/indexes/hnsw_build.md` (relptr, in-memory phase), `hnsw_insert.md`; `pgvector/src/hnsw.h`, `hnswutils.c:217–1600`, `hnswbuild.c:315–640`
 - `RESEARCH/pgvector/architecture/build_system.md` (pgvector compiler flags, `-march=native`, CI matrix)
 - `pgvector/Makefile` lines 14–40 (`OPTFLAGS`, `PG_CFLAGS += -ftree-vectorize -fassociative-math -fno-signed-zeros -fno-trapping-math -ffp-contract=fast`)
 - `pgvector/src/halfvec.h` lines 17–60 (dispatch macros `USE_DISPATCH`, `USE_TARGET_CLONES`, `F16C_SUPPORT`)
@@ -183,12 +201,14 @@ av_status av_collection_wait_block(av_collection *c, uint64_t min_block, int tim
 | `pgvector/src/halfvec.h`, `vector.h`, `bitvec.h`, `sparsevec.h` | `daemon/src/pgvector/` | **V** (needed by halfutils/bitutils includes) |
 | PostgreSQL `COPYRIGHT` (pick the latest `REL_17_*` tag, record the tag + commit in PROVENANCE.md) | `daemon/src/pgcompat/LICENSE.postgresql` | V |
 | PostgreSQL `src/include/port/pg_bitutils.h` (only the popcount/`pg_nextpower2_*` parts actually referenced) | `daemon/src/pgcompat/include/port/pg_bitutils.h` | S |
+| **Spike:** every row of the D4 copy table (§8.2) **except** `hnswscan_mem.c`: `hnsw.h`, `hnswutils.c` (in-memory functions), `hnswbuild_mem.c` (in-memory insert functions), PostgreSQL `pg_list.h`/`list.c`, `pairingheap.{c,h}`, `simplehash.h`, `relptr.h`, `hashfn.h` subset, `pg_prng.{c,h}` | Final locations listed in §8.2 | S / V |
+| **Spike:** `VectorL2SquaredDistance` + `vector_l2_squared_distance` (`src/vector.c:548–595`) | `src/pgvector/vector_kernels.c` (early part of the D1 copy) | F |
 
 Fetch PostgreSQL files with a sparse checkout into the scratchpad (never into the repo):
 `git clone --depth 1 --branch REL_17_<x> --filter=blob:none --sparse https://github.com/postgres/postgres <scratch>/pg && git -C <scratch>/pg sparse-checkout set src/include src/backend/lib src/backend/nodes src/common`
 
 ### 4.3 Files
-`daemon/CMakeLists.txt`, `CMakePresets.json`, `cmake/{Warnings,Sanitizers,Vendored}.cmake`, `src/version.h`, `src/core/arena.{c,h}`, `src/pgcompat/include/{postgres.h,c.h,port.h,utils/elog.h,utils/memutils.h,port/pg_bitutils.h}`, `src/pgcompat/src/{palloc.c,elog.c}`, `src/pgcompat/STUBS.md`, `src/pgvector/PROVENANCE.md`, `third_party/{README.md,VENDORED.lock}`, `test/CMakeLists.txt`, `test/unit/{test_main.c,test_pgcompat.c,test_kernels.c}` (kernel part: halfutils/bitutils only), `testkit/mock-arkiv/*`, `tools/rabdi-probe.py`, `RABDI_FACTS.md`, root `.editorconfig`, `.clang-format`, `.gitignore` additions, `.github/workflows/{daemon.yml,contract.yml}`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/CODEOWNERS`.
+`daemon/CMakeLists.txt`, `CMakePresets.json`, `cmake/{Warnings,Sanitizers,Vendored}.cmake`, `src/version.h`, `src/core/arena.{c,h}`, `src/pgcompat/include/{postgres.h,c.h,port.h,utils/elog.h,utils/memutils.h,port/pg_bitutils.h}`, `src/pgcompat/src/{palloc.c,elog.c}`, `src/pgcompat/STUBS.md`, `src/pgvector/PROVENANCE.md`, `third_party/{README.md,VENDORED.lock}`, `test/CMakeLists.txt`, `test/unit/{test_main.c,test_pgcompat.c,test_kernels.c}` (kernel part: halfutils/bitutils only), **spike:** `src/pgvector/{hnsw.h,hnswutils.c,hnswbuild_mem.c,vector_kernels.c}` (partial), `src/pgcompat/include/{fmgr.h,varatt.h,nodes/pg_list.h,lib/pairingheap.h,lib/simplehash.h,utils/relptr.h,storage/{lwlock,spin,itemptr}.h,port/atomics.h,common/{hashfn,pg_prng}.h,miscadmin.h}`, `src/pgcompat/src/{fmgr.c,lwlock.c,list.c,pairingheap.c,pg_prng.c}`, `test/unit/test_hnsw.c` (spike part), `testkit/mock-arkiv/*`, root `.editorconfig`, `.clang-format`, `.gitignore` additions, `.github/workflows/{daemon.yml,contract.yml}`, `.github/PULL_REQUEST_TEMPLATE.md`. (`.github/CODEOWNERS` is already written. `tools/rabdi-probe.py` and `RABDI_FACTS.md` move to D6.)
 
 ### 4.4 Steps
 
@@ -217,13 +237,24 @@ Fetch PostgreSQL files with a sparse checkout into the scratchpad (never into th
    - Control API `/_mock/*` (JSON): `POST entities` (create with optional preset key/owner/creator/expires, attributes typed), `PATCH entities/{key}`, `DELETE entities/{key}`, `POST entities/{key}/extend`, `POST entities/{key}/transfer`, `POST mine {n}` (advance n blocks), `POST auto_mine {interval_ms}`, `POST reorg {depth, replacement_ops}`, `POST faults {drop_ws_ratio, http_429_ratio, latency_ms, fail_methods}`, `GET state`, `POST reset`.
    - It must be deterministic given `--seed`.
    - `README.md` documents the control API. `requirements.txt` pins `aiohttp==3.10.10`.
-7. **Rabdi probes** (`tools/rabdi-probe.py`, stdlib + `websockets` optional). Measure §19 questions 1–4, 6–10 of ARCHITECTURE.md (5 only if `ARKIV_PRIVATE_KEY` + faucet funds are available). Write the results into `RABDI_FACTS.md` (table: question | measured value | date | method). Any unmeasured item keeps the documented default.
+7. **HNSW in-memory spike** (decision Q3; branch `daemon/d0-hnsw-spike`). Goal: prove, before D1–D3 build on the design, that pgvector's in-memory graph code works unchanged as our index.
+   1. Copy the spike rows of §4.2 (the same files and deltas that D4 §8.2 specifies, so nothing is thrown away later). Mark every delta `/* ARKIVECTOR: … */` and list it in `PROVENANCE.md`.
+   2. Write the shims the spike needs, in their final form: `lwlock.c` (4-byte atomic RW lock, per-thread held-lock stack, thread-local read-only flag that turns acquire/release into no-ops), `spin.h` (`atomic_flag`), `itemptr.h` (`ItemPointerData` ↔ `uint32` docid), `fmgr.h/.c` (minimal: `FmgrInfo`, `FunctionCall2Coll`, `PG_FUNCTION_ARGS`, `PG_GETARG_POINTER`, `PG_RETURN_FLOAT8`; D1 completes it), `varatt.h`, `miscadmin.h` (`CHECK_FOR_INTERRUPTS` no-op for now), and the verbatim PostgreSQL `list.c`, `pairingheap.c`, `simplehash.h`, `relptr.h`, `pg_prng.c`.
+   3. Spike harness in `test/unit/test_hnsw.c` (spike part), using `vector` type + `vector_l2_ops` only:
+      - allocate a 256 MiB arena with `mmap(MAP_ANONYMOUS)`, set it as `base`, `InitGraph`/`InitAllocator` on it;
+      - insert 10,000 random 128-d vectors through an `av_hnsw_insert` prototype (the `InsertTuple` steps of §8.2, returning "seal needed" at the memory limit);
+      - search 200 random queries with `HnswSearchLayer` (index = NULL): **recall@10 ≥ 0.95** vs brute force;
+      - `memcpy` the arena into a file, `mmap(PROT_READ)` the file at a **different address**, set the read-only lock flag, and repeat the searches: **identical results** (proves relptr position independence and read-only safety);
+      - 4 inserter threads + 4 searcher threads on a fresh arena for 10 s: no crash, recall still ≥ 0.95, and **TSan clean** (`tsan` preset);
+      - force the memory limit: insert returns "seal needed" at pgvector's `memoryUsed >= memoryTotal` point.
+   4. Record the results (recall, insert/search ns, element size in bytes, TSan result) in the PR description and in `PROVENANCE.md` under "Spike results".
+   5. **If any check fails and can't be fixed with shim changes alone:** stop and report to the owner with a proposal for the fallback (port the algorithms into our own structs, mode P, same `av_segment_*` API). Do not silently patch pgvector logic.
 8. **CI + repo hygiene** (`ci-cd-engineer`): `.github/workflows/daemon.yml` on `push: branches: ['**']` and `pull_request: branches: ['**']`, `paths: daemon/**, spec/**, .github/workflows/daemon.yml`.
    - job `quality` (Phase 1): apt install libuv1-dev libcurl4-openssl-dev clang clang-tidy cppcheck; cmake dev with gcc and clang; build; clang-format `--dry-run --Werror` on our files (exclude `src/pgvector`, the verbatim `src/pgcompat` files, `third_party`); clang-tidy (our files); cppcheck.
    - job `integration` (Phase 2, `needs: quality`): asan preset build + ctest. pytest `daemon/test/integration` (skips cleanly while empty). Later phases add the contract and parity steps.
    - `.github/workflows/contract.yml`: `spec/tools/validate.sh` on every push/PR.
    - `.github/PULL_REQUEST_TEMPLATE.md`: phase, checklist (plan steps, CI, reviewer report, docs generated, integration tests, contract impact / CCR id).
-   - `.github/CODEOWNERS`: paths per AGENTS.md §2 (owner = repository owner account).
+   - `.github/CODEOWNERS`: already written (owner `@DikshitRJ`). Only extend it if new top-level paths appear.
    - `.editorconfig`, `.clang-format` (based on LLVM, 4-space indent, 110 columns), `.gitignore` (+ `daemon/build/`, `sdk/*/build/`, `sdk/rust/target/`, `node_modules/`, `dist/`, `.venv/`, `__pycache__/`).
 9. **OpenSpec**: `openspec init` (non-interactive flags if available), then add `openspec/changes/daemon-d0-foundations/` (proposal.md, tasks.md) describing D0.
 
@@ -231,7 +262,8 @@ Fetch PostgreSQL files with a sparse checkout into the scratchpad (never into th
 - [VERIFY after step 6] `gemini-integration-tester`, background. *Scenarios:* mock-arkiv conformance to the research docs: limit > 100 → `-32602`, key-cursor pagination returns all entities exactly once, `$expiresAt` liveness hides expired entities at the right block, `ORDER BY` missing-attribute placement, log topics for each of the 5 ops, reorg replaces blocks and changes hashes, faults inject 429s. Location: `daemon/test/integration/test_mock_arkiv.py` (add the file).
 - After step 2: `dependency-auditor` checks licences (no GPL/LGPL) and known CVEs for the vendored versions.
 - Step 8: `ci-cd-engineer` writes the workflows.
-- Phase end: `gemini-reviewer` (focus: build flags isolation between our code and upstream code; pgcompat correctness of palloc/PG_TRY semantics; mock-arkiv fidelity to the Arkiv docs). `opencode-docs` covers the CMake files, pgcompat files, core/arena, mock-arkiv, tools.
+- After step 7: `gemini-reviewer` on the spike diff (focus: copied HNSW code unchanged except marked deltas; lwlock semantics vs PostgreSQL LWLock; read-only flag never lets a sealed map be written; relptr base handling; TSan report). If the spike needs a fallback decision, the lead asks the owner before continuing.
+- Phase end: `gemini-reviewer` (focus: build flags isolation between our code and upstream code; pgcompat correctness of palloc/PG_TRY semantics; mock-arkiv fidelity to the Arkiv docs). `opencode-docs` covers the CMake files, pgcompat files, core/arena, copied HNSW files (short docs), mock-arkiv, tools.
 
 ### 4.6 Commits
 | # | Message |
@@ -243,7 +275,9 @@ Fetch PostgreSQL files with a sparse checkout into the scratchpad (never into th
 | 5 | `feat(pgvector): vendor halfutils, bitutils and type headers from pgvector v0.8.7 (verbatim)` |
 | 6 | `test(daemon): unit harness, pgcompat and half/bit kernel tests` |
 | 7 | `feat(testkit): mock-arkiv v0 with full query language, logs, ws, control api` |
-| 8 | `docs(daemon): rabdi probe script and measured facts` |
+| 8a | `feat(pgcompat): lwlock, spinlock, itemptr, minimal fmgr shims and PostgreSQL list, pairingheap, simplehash, relptr, pg_prng (verbatim)` |
+| 8b | `feat(pgvector): copy hnsw.h, in-memory hnswutils and hnswbuild insertion from pgvector v0.8.7 (copy+shim)` |
+| 8c | `test(daemon): hnsw in-memory spike: recall, mmap relocation, concurrency, seal point` |
 | 9 | `ci: daemon two-phase workflow, contract validation, PR template, codeowners` |
 | 10 | `chore: openspec init and d0 change proposal` |
 | — | `test(daemon): mock-arkiv conformance tests` (gemini) · `docs(daemon): generated docs for D0` (opencode) |
@@ -252,7 +286,7 @@ Fetch PostgreSQL files with a sparse checkout into the scratchpad (never into th
 - [ ] `cmake --preset dev && cmake --build --preset dev && ctest --preset dev` green with gcc and clang. ASan preset green.
 - [ ] `halfutils.c`, `bitutils.c` and the 4 type headers are byte-identical to `pgvector/src/` (CI check: `cmp`).
 - [ ] mock-arkiv passes its conformance tests. CI `daemon.yml` and `contract.yml` green on the PR.
-- [ ] `RABDI_FACTS.md` filled (measured or explicitly defaulted).
+- [ ] HNSW spike: recall@10 ≥ 0.95, identical results after mmap relocation, TSan clean with concurrent insert + search, seal point detected. Or the owner approved the fallback.
 
 ---
 
@@ -293,7 +327,7 @@ Fetch PostgreSQL files with a sparse checkout into the scratchpad (never into th
 `src/pgvector/{vector_kernels,halfvec_kernels,sparsevec_kernels,bitvec_kernels,vector_io,halfvec_io,sparsevec_io,vector_funcs}.c`, `src/pgcompat/include/{fmgr.h,varatt.h,utils/varbit.h,utils/float.h,common/shortest_dec.h,lib/stringinfo.h}`, `src/pgcompat/src/{fmgr.c,stringinfo.c,f2s.c}`, `src/kernels/{dispatch,opclass}.{c,h}`, `src/codec/{vectorbytes,hex,base64}.{c,h}`, `cmake/KernelTiers.cmake`, `tools/pgvector-sync.sh`, `test/unit/{test_kernels,test_vectorbytes,test_text_io}.c`, `test/fuzz/{fuzz_vectorbytes,fuzz_vector_in}.c`, `test/parity/*`, `src/pgvector/PROVENANCE.md` (update).
 
 ### 5.4 Steps
-1. **fmgr shim** (`fmgr.h/.c`): `PG_FUNCTION_ARGS` = `FunctionCallInfo fcinfo`, a struct with `nargs` and `Datum args[4]`. Macros `PG_GETARG_POINTER(n)`, `PG_GETARG_DATUM`, `PG_GETARG_INT32`, `PG_GETARG_VECTOR_P` (from vector.h), `PG_RETURN_FLOAT8/POINTER/DATUM`, `DirectFunctionCall1/2/3`, `FunctionCall2Coll(FmgrInfo*, Oid, Datum, Datum)`, `FmgrInfo { PGFunction fn_addr; }`, `PG_FUNCTION_INFO_V1(name)` → nothing, `Float8GetDatum/DatumGetFloat8` via a union (64-bit by-value). `varatt.h`: `VARSIZE`, `SET_VARSIZE`, `VARSIZE_ANY`, `VARHDRSZ` (4), `PG_DETOAST_DATUM` → identity.
+1. **fmgr shim** (`fmgr.h/.c`; D0's spike created a minimal version, so complete it here): `PG_FUNCTION_ARGS` = `FunctionCallInfo fcinfo`, a struct with `nargs` and `Datum args[4]`. Macros `PG_GETARG_POINTER(n)`, `PG_GETARG_DATUM`, `PG_GETARG_INT32`, `PG_GETARG_VECTOR_P` (from vector.h), `PG_RETURN_FLOAT8/POINTER/DATUM`, `DirectFunctionCall1/2/3`, `FunctionCall2Coll(FmgrInfo*, Oid, Datum, Datum)`, `FmgrInfo { PGFunction fn_addr; }`, `PG_FUNCTION_INFO_V1(name)` → nothing, `Float8GetDatum/DatumGetFloat8` via a union (64-bit by-value). `varatt.h`: `VARSIZE`, `SET_VARSIZE`, `VARSIZE_ANY`, `VARHDRSZ` (4), `PG_DETOAST_DATUM` → identity.
 2. **Function-level copies** per §5.2, **unmodified function bodies**. Keep upstream comments. Head each new file with a provenance comment block: `/* Copied from pgvector v0.8.7 src/vector.c (functions: …). Mode F. Do not edit; see PROVENANCE.md. */`.
 3. **Kernel tiers** (`cmake/KernelTiers.cmake`): on x86-64, compile `vector_kernels.c`, `halfvec_kernels.c`, `sparsevec_kernels.c` three times with `-march=x86-64`, `-march=x86-64-v3`, `-march=x86-64-v4` and `-DAV_TIER_SUFFIX=_t0|_t3|_t4`. Use a small header `src/pgvector/av_tier.h` (ARKIVECTOR-owned) that renames exported symbols with `AV_TIER_SUFFIX`, so the copied files stay unmodified (the include goes through the compile command line `-include av_tier.h`). `halfutils.c`/`bitutils.c` compile once (they dispatch internally). On aarch64, compile once. With `-DAV_NATIVE=ON`, compile once with `-march=native` (pgvector default).
 4. **Dispatch** (`kernels/dispatch.c`): at startup, detect the tier by **reusing pgvector's detection code**. Copy `SupportsCpuFeature`-style code from `halfutils.c:250–290` and `bitutils.c:170–200` (the CPUID leaf 1/7 + `_xgetbv(0) & 6`/`0xe6` checks) into `dispatch.c`. Comment the provenance. Fill a function table `av_kernels` (`l2sq`, `ip`, `cos`, `l1` per type). `av_kernel_tier()` returns the name.
@@ -348,7 +382,7 @@ Fetch PostgreSQL files with a sparse checkout into the scratchpad (never into th
 ### 6.1 Read first
 - `ARCHITECTURE.md` §2 insights 3–5, §3 threading model, §8 (storage), §9 (sync, all subsections), §10 (TTL)
 - `RESEARCH/arkiv-docs/02-json-rpc-protocol/*` (all), `03-evm-mutations-and-contract-spec/events-and-logs.md`, `entity-key-derivation.md`, `04-query-engine-and-ast/pagination-and-cursors.md`, `schema-filtering-tag.md`, `01-architecture-and-fundamentals/lifecycle-and-expiration.md`, `06-reference-and-benchmarks/limits-and-quotas.md`
-- `daemon/RABDI_FACTS.md` (log range cap, reorg depth, WS availability)
+- ARCHITECTURE §19 "Default assumption" column (decision Q5). Configure mock-arkiv with these defaults (`--max-log-range 2000`, reorgs ≤ 10, WS enabled). Real Rabdi values arrive in D6
 - libuv docs (`uv_poll`, `uv_async`, `uv_timer`), libcurl "multi_socket" + `curl_ws_*` docs (use the context7 MCP for current API), LMDB docs (single writer, `MDB_NOTLS`)
 
 ### 6.2 Copy-paste
@@ -505,6 +539,8 @@ None from pgvector. The `where` grammar comes from research doc 04. Port the EBN
 
 ### 8.2 Copy-paste
 
+> Most rows were already copied by the **D0 HNSW spike** (decision Q3). In D4, re-diff them against `pgvector/src` (they must still match apart from the marked deltas) and complete what the spike left out: `hnswscan_mem.c`, all type infos (halfvec/bit/sparsevec), cosine normalisation, and the segment integration.
+
 | Upstream | Location | Destination | Mode | Deltas allowed |
 | :--- | :--- | :--- | :---: | :--- |
 | `hnsw.h` | whole | `src/pgvector/hnsw.h` | S | `HNSW_MAX_DIM` → `VECTOR_MAX_DIM` under `#ifdef ARKIVECTOR`. Add `HnswMemBuildState` (subset of `HnswBuildState`: graph, support, typeInfo, m, efConstruction, ml, maxLevel, dimensions, hnswarea, allocator) under `#ifdef ARKIVECTOR`. Page/WAL structs stay but are unused |
@@ -522,8 +558,8 @@ None from pgvector. The `where` grammar comes from research doc 04. Port the EBN
 `src/pgvector/{hnsw.h,hnswutils.c,hnswbuild_mem.c,hnswscan_mem.c}`, `src/pgcompat/include/{nodes/pg_list.h,lib/pairingheap.h,lib/simplehash.h,utils/relptr.h,storage/{lwlock,spin,itemptr}.h,port/atomics.h,common/{hashfn,pg_prng}.h,miscadmin.h}`, `src/pgcompat/src/{lwlock.c,list.c,pairingheap.c,pg_prng.c}`, `src/index/{segment,compact}.{c,h}` (HNSW kind), `src/sync/ttl.c` (segment drop), `src/query/{planner,executor,calibrate}.{c,h}`, `src/server/rest_search.c` (batch), `test/unit/{test_hnsw,test_segment,test_planner}.c`, `bench/{datasets,run_recall,report}.py`.
 
 ### 8.4 Steps
-1. **pgcompat for HNSW:** `lwlock.c` is a 4-byte atomic RW lock (`LWLockInitialize`, `LWLockAcquire(LW_SHARED|LW_EXCLUSIVE)`, `LWLockRelease`, `LWLockHeldByMe`), with a per-thread held-lock stack released on `PG_CATCH` unwind, and the **thread-local read-only flag** `av_lwlock_readonly_arena` that makes acquire/release no-ops. `spin.h` uses `atomic_flag`. `itemptr.h`: `ItemPointerData` with `av_docid_to_tid` / `av_tid_to_docid`. `CHECK_FOR_INTERRUPTS()` polls the request deadline. Copy list/pairingheap/simplehash/relptr/pg_prng verbatim.
-2. Copy `hnsw.h`, `hnswutils.c`, and the in-memory parts of `hnswbuild.c` per §8.2 and get them compiling. Every delta is marked and listed in PROVENANCE.md.
+1. **pgcompat for HNSW** (created by the D0 spike; here make `CHECK_FOR_INTERRUPTS()` poll the request deadline and wire lock release into `PG_CATCH`): `lwlock.c` is a 4-byte atomic RW lock (`LWLockInitialize`, `LWLockAcquire(LW_SHARED|LW_EXCLUSIVE)`, `LWLockRelease`, `LWLockHeldByMe`), with a per-thread held-lock stack released on `PG_CATCH` unwind, and the **thread-local read-only flag** `av_lwlock_readonly_arena` that makes acquire/release no-ops. `spin.h` uses `atomic_flag`. `itemptr.h`: `ItemPointerData` with `av_docid_to_tid` / `av_tid_to_docid`. `CHECK_FOR_INTERRUPTS()` polls the request deadline. Copy list/pairingheap/simplehash/relptr/pg_prng verbatim.
+2. Starting from the D0 spike copies of `hnsw.h`, `hnswutils.c`, and `hnswbuild_mem.c`: re-diff them against `pgvector/src`, add the halfvec/bit/sparsevec type infos and cosine normalisation (`HnswNormValue`), and keep every delta marked and listed in PROVENANCE.md.
 3. **HNSW segment** (`segment.c`, kind `AV_SEG_HNSW`): the arena_file reserves `seal_bytes` = estimate(seal_max_vectors, dims, m) × 1.2. `HnswAllocator` alloc fn = bump inside the arena (`memoryUsed/memoryTotal` mirror pgvector's). `av_hnsw_insert` per §8.2. Sealing writes the footer `{magic "AVSEG1", pgvector tag, opclass, m, ef_construction, dims, entryPoint relptr, count, docid range, prng seed}` and `msync`s. Loading a sealed segment = `mmap(PROT_READ)` + footer validation.
 4. **Search** (`hnswscan_mem.c` + `av_segment_search_hnsw`): run `GetScanItems`. Iterate candidates in order, recheck (live ∧ filter bitmap). With `iterative != off`, call `ResumeScanItems` until k matches, `max_scan_tuples`, or the memory cap. Relaxed mode does one extra batch after k, then sorts. Strict mode uses the `previousDistance` logic copied from `hnswgettuple`. The executor sets `av_lwlock_readonly_arena = seg->sealed` around the call. The per-query MemoryContext is reset after each segment.
 5. **Planner** (ARCHITECTURE §11.4): `T = γ·sqrt(m·ef·N)`, guards `k_floor = 2048`, `s_min = 0.005`, `exact`, operator ≠ opclass operator → exact. Initial `ef = min(1000, max(ef_search, ceil(1.5·k/s)))`. S2 → S1 fallback when < k. `calibrate.c`: at startup, time 10k distance calls per kernel and 200 HNSW searches on a synthetic arena to estimate `c_d` and ρ. Refine online with an EWMA per strategy (metrics exported).
@@ -542,9 +578,9 @@ None from pgvector. The `where` grammar comes from research doc 04. Port the EBN
 ### 8.6 Commits
 | # | Message |
 | :---: | :--- |
-| 1 | `feat(pgcompat): lwlock/spinlock/itemptr shims and PostgreSQL list, pairingheap, simplehash, relptr, pg_prng (verbatim)` |
-| 2 | `feat(pgvector): copy hnsw.h and in-memory hnswutils from pgvector v0.8.7 (copy+shim)` |
-| 3 | `feat(pgvector): copy in-memory graph insertion from hnswbuild.c (copy+shim)` |
+| 1 | `feat(pgcompat): deadline-aware CHECK_FOR_INTERRUPTS and lock release on error unwind` |
+| 2 | `feat(pgvector): hnsw type infos for halfvec, bit and sparsevec plus cosine normalisation (copy+shim)` |
+| 3 | `chore(pgvector): re-diff spike copies against pgvector v0.8.7 and update provenance` |
 | 4 | `feat(pgvector): port hnsw iterative scan to arena graphs` |
 | 5 | `feat(index): hnsw arena segments with seal at pgvector's memory-full point` |
 | 6 | `feat(query): exact-selectivity planner, guards, calibration` |
@@ -637,8 +673,10 @@ None from pgvector. Ethereum test vectors (EIP-155/1559 signing, RLP) from the E
 6. Recall canary: sample 1% of approximate searches (configurable), re-run them exact on the query pool at low priority, export `arkivector_recall_at_k`.
 7. Release build (`ci-cd-engineer`): `CMakePresets release-static`. `Dockerfile` (Alpine: static libuv, libcurl+openssl, musl; kernel tiers; `strip`; final `scratch` image with CA certs). GitHub workflow `release` on tags `daemon-v*` builds linux-x86_64, linux-aarch64 (QEMU or ARM runner), darwin-arm64, plus SHA256SUMS + SBOM (syft) and a multi-arch image push.
 8. Lite mode (`mode: "lite"`, ARCHITECTURE §11.7): **deferred to D7** unless trivial. Keep `invalid_argument` for `mode=lite` until then.
-9. Rabdi soak: 24 h against Rabdi with a synthetic writer (needs `ARKIV_ACCESS_KEY`, a funded key). Reconciler divergence = 0. Memory stable.
-10. `dependency-auditor` pre-release audit. Update `VENDORED.lock`.
+9. **Rabdi probes** (moved here by decision Q5). Write `tools/rabdi-probe.py` (stdlib + optional `websockets`). It measures ARCHITECTURE §19 questions 1–4, 6–10, and question 5 only if `ARKIV_PRIVATE_KEY` + faucet funds are available. Write `RABDI_FACTS.md` (table: question | measured value | date | method). **Then adjust config defaults** (`max_log_range`, `confirmations`, ring size K, OR-chunk start size, `rpc_budget_per_sec`, CU weights) and the mock-arkiv defaults to the measured values, and re-run the full integration suite. Any value that contradicts an architecture assumption (e.g. no WS on Rabdi, deep reorgs) is reported to the owner before the soak.
+10. **Rabdi soak:** 24 h against Rabdi with a synthetic writer (needs `ARKIV_ACCESS_KEY`, a funded key). Reconciler divergence = 0. Memory stable.
+11. `dependency-auditor` pre-release audit. Update `VENDORED.lock`.
+12. **Licence (decision Q8):** if the owner has chosen a licence by now, add the root `LICENSE` and the SPDX headers. Otherwise release artifacts ship only the upstream notices plus a `LICENSE-PENDING` note.
 
 ### 10.3 Subagents
 - [VERIFY] `gemini-integration-tester`, background: `test_qdrant.py` (run the official `qdrant-client` Python flows: create collection, upsert, search with filter, scroll, count, delete; LangChain `QdrantVectorStore` similarity search against `/qdrant`), `test_mcp.py` (initialize, tools/list, tools/call search/get/count, error results), auth/scopes/rate-limit tests, verify flag tests.
@@ -647,7 +685,7 @@ None from pgvector. Ethereum test vectors (EIP-155/1559 signing, RLP) from the E
 - Phase end: `gemini-reviewer`, then `opencode-docs` (all D6 files; generate `docs/daemon/CONFIG.md` (every config key), `docs/daemon/TESTING.md` (all suites and how to run them), refresh DESIGN/FLOW).
 
 ### 10.4 Commits
-`feat(server): api keys and scopes` · `feat(server): rate limiting` · `feat(server): entity verify against arkiv_getEntity` · `feat(server): qdrant-compatible subset` · `feat(server): mcp streamable http endpoint` · `feat(query): recall canary` · `build(daemon): static release builds and docker image` · `ci: release workflow for daemon binaries and image` · `test(daemon): qdrant, mcp, auth suites` (gemini) · `docs(daemon): generated docs for D6`
+`docs(daemon): rabdi probe script, measured facts and tuned defaults` · `feat(server): api keys and scopes` · `feat(server): rate limiting` · `feat(server): entity verify against arkiv_getEntity` · `feat(server): qdrant-compatible subset` · `feat(server): mcp streamable http endpoint` · `feat(query): recall canary` · `build(daemon): static release builds and docker image` · `ci: release workflow for daemon binaries and image` · `test(daemon): qdrant, mcp, auth suites` (gemini) · `docs(daemon): generated docs for D6`
 
 ### 10.5 Exit criteria → **Milestone M4**
 - [ ] All suites + contract tests green. Rabdi 24 h soak passes.
