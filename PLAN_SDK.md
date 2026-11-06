@@ -182,7 +182,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 - Commits: `feat(sdk-cpp): value types over the c codec` · `feat(sdk-cpp): golden_check example`
 
 ### Exit → M1 (each language)
-- [ ] `golden_check` offline: 29/29 PASS. Tag `milestone/M1-sdk-<lang>`.
+- [x] `golden_check` offline: 29/29 PASS. Tag `milestone/M1-sdk-<lang>`.
 
 ---
 
@@ -323,8 +323,8 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | S0 | S1 (M1) | S2 | S3 (M2) | S4 (M3) | S5 | S6 (M4) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Python | done | | | | | | |
-| Node | done | | | | | | |
+| Python | done | done | | | | | |
+| Node | done | done | | | | | |
 | C | deferred | | | | | | |
 | C++ | deferred | | | | | | |
 | Rust | deferred | | | | | | |
