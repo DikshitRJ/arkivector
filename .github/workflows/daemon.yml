@@ -128,7 +128,10 @@ jobs:
         run: cmake --preset tsan && cmake --build --preset tsan
       - name: Unit tests (TSan)
         working-directory: daemon
-        run: ctest --preset tsan
+        # TSan cannot map its shadow memory with the runner's vm.mmap_rnd_bits=32
+        run: |
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          ctest --preset tsan
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
