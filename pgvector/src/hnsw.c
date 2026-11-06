@@ -1,0 +1,600 @@
+#include "postgres.h"
+
+#include <float.h>
+#include <limits.h>
+#include <math.h>
+
+#include "access/amapi.h"
+#include "access/amvalidate.h"
+#include "access/genam.h"
+#include "access/htup_details.h"
+#include "access/reloptions.h"
+#include "catalog/pg_amop.h"
+#include "catalog/pg_amproc.h"
+#include "catalog/pg_opclass.h"
+#include "commands/progress.h"
+#include "commands/vacuum.h"
+#include "fmgr.h"
+#include "hnsw.h"
+#include "miscadmin.h"
+#include "nodes/pg_list.h"
+#include "storage/lwlock.h"
+#include "utils/catcache.h"
+#include "utils/float.h"
+#include "utils/guc.h"
+#include "utils/lsyscache.h"
+#include "utils/regproc.h"
+#include "utils/relcache.h"
+#include "utils/selfuncs.h"
+#include "utils/spccache.h"
+#include "utils/syscache.h"
+#include "vector.h"
+
+#if PG_VERSION_NUM < 180000
+#include "catalog/pg_opfamily.h"
+#endif
+
+static const struct config_enum_entry hnsw_iterative_scan_options[] = {
+	{"off", HNSW_ITERATIVE_SCAN_OFF, false},
+	{"relaxed_order", HNSW_ITERATIVE_SCAN_RELAXED, false},
+	{"strict_order", HNSW_ITERATIVE_SCAN_STRICT, false},
+	{NULL, 0, false}
+};
+
+int			hnsw_ef_search;
+int			hnsw_iterative_scan;
+int			hnsw_max_scan_tuples;
+double		hnsw_scan_mem_multiplier;
+int			hnsw_lock_tranche_id;
+static relopt_kind hnsw_relopt_kind;
+
+/*
+ * Assign a tranche ID for our LWLocks. This only needs to be done by one
+ * backend, as the tranche ID is remembered in shared memory.
+ *
+ * This shared memory area is very small, so we just allocate it from the
+ * "slop" that PostgreSQL reserves for small allocations like this. If
+ * this grows bigger, we should use a shmem_request_hook and
+ * RequestAddinShmemSpace() to pre-reserve space for this.
+ */
+void
+HnswInitLockTranche(void)
+{
+	int		   *tranche_ids;
+	bool		found;
+
+	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
+	tranche_ids = ShmemInitStruct("hnsw LWLock ids",
+								  sizeof(int) * 1,
+								  &found);
+	if (!found)
+	{
+#if PG_VERSION_NUM >= 190000
+		tranche_ids[0] = LWLockNewTrancheId("HnswBuild");
+#else
+		tranche_ids[0] = LWLockNewTrancheId();
+#endif
+	}
+	hnsw_lock_tranche_id = tranche_ids[0];
+	LWLockRelease(AddinShmemInitLock);
+
+#if PG_VERSION_NUM < 190000
+	/* Per-backend registration of the tranche ID */
+	LWLockRegisterTranche(hnsw_lock_tranche_id, "HnswBuild");
+#endif
+}
+
+/*
+ * Initialize index options and variables
+ */
+void
+HnswInit(void)
+{
+	if (!process_shared_preload_libraries_in_progress)
+		HnswInitLockTranche();
+
+	hnsw_relopt_kind = add_reloption_kind();
+	add_int_reloption(hnsw_relopt_kind, "m", "Max number of connections",
+					  HNSW_DEFAULT_M, HNSW_MIN_M, HNSW_MAX_M, AccessExclusiveLock);
+	add_int_reloption(hnsw_relopt_kind, "ef_construction", "Size of the dynamic candidate list for construction",
+					  HNSW_DEFAULT_EF_CONSTRUCTION, HNSW_MIN_EF_CONSTRUCTION, HNSW_MAX_EF_CONSTRUCTION, AccessExclusiveLock);
+
+	DefineCustomIntVariable("hnsw.ef_search", "Sets the size of the dynamic candidate list for search",
+							"Valid range is 1..1000.", &hnsw_ef_search,
+							HNSW_DEFAULT_EF_SEARCH, HNSW_MIN_EF_SEARCH, HNSW_MAX_EF_SEARCH, PGC_USERSET, 0, NULL, NULL, NULL);
+
+	DefineCustomEnumVariable("hnsw.iterative_scan", "Sets the mode for iterative scans",
+							 NULL, &hnsw_iterative_scan,
+							 HNSW_ITERATIVE_SCAN_OFF, hnsw_iterative_scan_options, PGC_USERSET, 0, NULL, NULL, NULL);
+
+	/* This is approximate and does not affect the initial scan */
+	DefineCustomIntVariable("hnsw.max_scan_tuples", "Sets the max number of tuples to visit for iterative scans",
+							NULL, &hnsw_max_scan_tuples,
+							20000, 1, INT_MAX, PGC_USERSET, 0, NULL, NULL, NULL);
+
+	/* Same range as hash_mem_multiplier */
+	DefineCustomRealVariable("hnsw.scan_mem_multiplier", "Sets the multiple of work_mem to use for iterative scans",
+							 NULL, &hnsw_scan_mem_multiplier,
+							 1, 1, 1000, PGC_USERSET, 0, NULL, NULL, NULL);
+
+	MarkGUCPrefixReserved("hnsw");
+}
+
+/*
+ * Get the name of index build phase
+ */
+static char *
+hnswbuildphasename(int64 phasenum)
+{
+	switch (phasenum)
+	{
+		case PROGRESS_CREATEIDX_SUBPHASE_INITIALIZE:
+			return "initializing";
+		case PROGRESS_HNSW_PHASE_LOAD:
+			return "loading tuples";
+		default:
+			return NULL;
+	}
+}
+
+/*
+ * Estimate the cost of an index scan
+ */
+static void
+hnswcostestimate(PlannerInfo *root, IndexPath *path, double loop_count,
+				 Cost *indexStartupCost, Cost *indexTotalCost,
+				 Selectivity *indexSelectivity, double *indexCorrelation,
+				 double *indexPages)
+{
+	IndexOptInfo *indexInfo = path->indexinfo;
+	GenericCosts costs = {0};
+	int			m;
+	double		ratio;
+	double		tuples = indexInfo->tuples;
+	double		startupPages;
+	double		spc_seq_page_cost;
+
+	/* Never use index without order */
+	if (path->indexorderbys == NIL)
+	{
+		*indexStartupCost = get_float8_infinity();
+		*indexTotalCost = get_float8_infinity();
+		*indexSelectivity = 0;
+		*indexCorrelation = 0;
+		*indexPages = 0;
+#if PG_VERSION_NUM >= 180000
+		/* See "On disable_cost" thread on pgsql-hackers */
+		path->path.disabled_nodes = 2;
+#endif
+		return;
+	}
+
+	genericcostestimate(root, path, loop_count, &costs);
+
+	/* Get m */
+	if (!indexInfo->hypothetical)
+	{
+		Relation	index;
+
+		index = index_open(indexInfo->indexoid, NoLock);
+		HnswGetMetaPageInfo(index, &m, NULL, NULL);
+		index_close(index, NoLock);
+	}
+	else
+		m = HNSW_DEFAULT_M;
+
+	/*
+	 * HNSW cost estimation follows a formula that accounts for the total
+	 * number of tuples indexed combined with the parameters that most
+	 * influence the duration of the index scan, namely: m - the number of
+	 * tuples that are scanned in each step of the HNSW graph traversal
+	 * ef_search - which influences the total number of steps taken at layer 0
+	 *
+	 * The source of the vector data can impact how many steps it takes to
+	 * converge on the set of vectors to return to the executor. Currently, we
+	 * use a hardcoded scaling factor (HNSWScanScalingFactor) to help
+	 * influence that, but this could later become a configurable parameter
+	 * based on the cost estimations.
+	 *
+	 * The tuple estimator formula is below:
+	 *
+	 * numIndexTuples = entryLevel * m + layer0TuplesMax * layer0Selectivity
+	 *
+	 * "entryLevel * m" represents the floor of tuples we need to scan to get
+	 * to layer 0 (L0).
+	 *
+	 * "layer0TuplesMax" is the estimated total number of tuples we'd scan at
+	 * L0 if we weren't discarding already visited tuples as part of the scan.
+	 *
+	 * "layer0Selectivity" estimates the percentage of tuples that are scanned
+	 * at L0, accounting for previously visited tuples, multiplied by the
+	 * "scalingFactor" (currently hardcoded).
+	 */
+	if (tuples > 0)
+	{
+		double		scalingFactor = 0.55;
+		int			entryLevel = (int) (log(tuples) * HnswGetMl(m));
+		int			layer0TuplesMax = HnswGetLayerM(m, 0) * hnsw_ef_search;
+		double		layer0Selectivity = scalingFactor * log(tuples) / (log(m) * (1 + log(hnsw_ef_search)));
+
+		ratio = (entryLevel * m + layer0TuplesMax * layer0Selectivity) / tuples;
+
+		if (ratio > 1)
+			ratio = 1;
+	}
+	else
+		ratio = 1;
+
+	get_tablespace_page_costs(indexInfo->reltablespace, NULL, &spc_seq_page_cost);
+
+	/* Startup cost is cost before returning the first row */
+	costs.indexStartupCost = costs.indexTotalCost * ratio;
+
+	/* Adjust cost if needed since TOAST not included in seq scan cost */
+	startupPages = costs.numIndexPages * ratio;
+	if (startupPages > indexInfo->rel->pages && ratio < 0.5)
+	{
+		/* Change all page cost from random to sequential */
+		costs.indexStartupCost -= startupPages * (costs.spc_random_page_cost - spc_seq_page_cost);
+
+		/* Remove cost of extra pages */
+		costs.indexStartupCost -= (startupPages - indexInfo->rel->pages) * spc_seq_page_cost;
+	}
+
+	*indexStartupCost = costs.indexStartupCost;
+	*indexTotalCost = costs.indexTotalCost;
+	*indexSelectivity = costs.indexSelectivity;
+	*indexCorrelation = costs.indexCorrelation;
+	*indexPages = costs.numIndexPages;
+}
+
+/*
+ * Parse and validate the reloptions
+ */
+static bytea *
+hnswoptions(Datum reloptions, bool validate)
+{
+	static const relopt_parse_elt tab[] = {
+		{"m", RELOPT_TYPE_INT, offsetof(HnswOptions, m)},
+		{"ef_construction", RELOPT_TYPE_INT, offsetof(HnswOptions, efConstruction)},
+	};
+
+	return (bytea *) build_reloptions(reloptions, validate,
+									  hnsw_relopt_kind,
+									  sizeof(HnswOptions),
+									  tab, lengthof(tab));
+}
+
+/*
+ * Check whether access method, index, or column has property
+ */
+static bool
+hnswproperty(Oid index_oid, int attno, IndexAMProperty prop, const char *propname, bool *res, bool *isnull)
+{
+	if (attno == 0 || prop != AMPROP_DISTANCE_ORDERABLE)
+		return false;
+
+	*res = true;
+	*isnull = false;
+	return true;
+}
+
+/*
+ * Validate catalog entries for the specified operator class
+ */
+static bool
+hnswvalidate(Oid opclassoid)
+{
+	bool		result = true;
+	HeapTuple	classtup;
+	Form_pg_opclass classform;
+	Oid			opcintype;
+	char	   *opclassname;
+	Oid			opfamilyoid;
+#if PG_VERSION_NUM < 180000
+	HeapTuple	familytup;
+	Form_pg_opfamily familyform;
+#endif
+	char	   *opfamilyname;
+	CatCList   *proclist;
+	CatCList   *oprlist;
+	List	   *grouplist;
+	OpFamilyOpFuncGroup *opclassgroup;
+	ListCell   *lc;
+
+	/* Fetch opclass information */
+	classtup = SearchSysCache1(CLAOID, ObjectIdGetDatum(opclassoid));
+	if (!HeapTupleIsValid(classtup))
+		elog(ERROR, "cache lookup failed for operator class %u", opclassoid);
+	classform = (Form_pg_opclass) GETSTRUCT(classtup);
+	opcintype = classform->opcintype;
+	opclassname = NameStr(classform->opcname);
+
+	/* Fetch opfamily information */
+	opfamilyoid = classform->opcfamily;
+#if PG_VERSION_NUM >= 180000
+	opfamilyname = get_opfamily_name(opfamilyoid, false);
+#else
+	familytup = SearchSysCache1(OPFAMILYOID, ObjectIdGetDatum(opfamilyoid));
+	if (!HeapTupleIsValid(familytup))
+		elog(ERROR, "cache lookup failed for operator family %u", opfamilyoid);
+	familyform = (Form_pg_opfamily) GETSTRUCT(familytup);
+	opfamilyname = NameStr(familyform->opfname);
+#endif
+
+	/* Fetch all operators and support functions of the opfamily */
+	oprlist = SearchSysCacheList1(AMOPSTRATEGY, ObjectIdGetDatum(opfamilyoid));
+	proclist = SearchSysCacheList1(AMPROCNUM, ObjectIdGetDatum(opfamilyoid));
+
+	/* Check individual support functions */
+	for (int i = 0; i < proclist->n_members; i++)
+	{
+		HeapTuple	proctup = &proclist->members[i]->tuple;
+		Form_pg_amproc procform = (Form_pg_amproc) GETSTRUCT(proctup);
+		bool		ok;
+
+		/* Check matching left/right types */
+		if (procform->amproclefttype != procform->amprocrighttype)
+		{
+			ereport(INFO,
+					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("operator family \"%s\" of access method %s contains support function %s with different left and right input types",
+							opfamilyname, "hnsw",
+							format_procedure(procform->amproc))));
+			result = false;
+		}
+
+		if (procform->amproclefttype != opcintype)
+			continue;
+
+		/* Check procedure numbers and function signatures */
+		switch (procform->amprocnum)
+		{
+			case HNSW_DISTANCE_PROC:
+				ok = check_amproc_signature(procform->amproc, FLOAT8OID, true, 2, 2, opcintype, opcintype);
+				break;
+			case HNSW_NORM_PROC:
+				ok = check_amproc_signature(procform->amproc, FLOAT8OID, true, 1, 1, opcintype);
+				break;
+			case HNSW_TYPE_INFO_PROC:
+				ok = check_amproc_signature(procform->amproc, INTERNALOID, true, 1, 1, INTERNALOID);
+				break;
+			default:
+				ereport(INFO,
+						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+						 errmsg("operator family \"%s\" of access method %s contains function %s with invalid support number %d",
+								opfamilyname, "hnsw",
+								format_procedure(procform->amproc),
+								procform->amprocnum)));
+				result = false;
+				continue;
+		}
+
+		if (!ok)
+		{
+			ereport(INFO,
+					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("operator family \"%s\" of access method %s contains function %s with wrong signature for support number %d",
+							opfamilyname, "hnsw",
+							format_procedure(procform->amproc),
+							procform->amprocnum)));
+			result = false;
+		}
+	}
+
+	/* Check individual operators */
+	for (int i = 0; i < oprlist->n_members; i++)
+	{
+		HeapTuple	oprtup = &oprlist->members[i]->tuple;
+		Form_pg_amop oprform = (Form_pg_amop) GETSTRUCT(oprtup);
+
+		/* Check strategy number */
+		if (oprform->amopstrategy != 1)
+		{
+			ereport(INFO,
+					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("operator family \"%s\" of access method %s contains operator %s with invalid strategy number %d",
+							opfamilyname, "hnsw",
+							format_operator(oprform->amopopr),
+							oprform->amopstrategy)));
+			result = false;
+		}
+
+		/* Check sort family */
+		if (oprform->amoppurpose != AMOP_ORDER || !opfamily_can_sort_type(oprform->amopsortfamily, FLOAT8OID))
+		{
+			ereport(INFO,
+					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("operator family \"%s\" of access method %s contains invalid ORDER BY specification for operator %s",
+							opfamilyname, "hnsw",
+							format_operator(oprform->amopopr))));
+			result = false;
+		}
+
+		/* Check operator signature */
+		if (!check_amop_signature(oprform->amopopr, FLOAT8OID, opcintype, opcintype))
+		{
+			ereport(INFO,
+					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("operator family \"%s\" of access method %s contains operator %s with wrong signature",
+							opfamilyname, "hnsw",
+							format_operator(oprform->amopopr))));
+			result = false;
+		}
+	}
+
+	grouplist = identify_opfamily_groups(oprlist, proclist);
+	opclassgroup = NULL;
+	foreach(lc, grouplist)
+	{
+		OpFamilyOpFuncGroup *thisgroup = (OpFamilyOpFuncGroup *) lfirst(lc);
+
+		if (thisgroup->lefttype == opcintype &&
+			thisgroup->righttype == opcintype)
+			opclassgroup = thisgroup;
+	}
+
+	/* Check required support functions */
+	for (int i = 1; i <= HNSW_NPROCS; i++)
+	{
+		if (opclassgroup && (opclassgroup->functionset & (((int64) 1) << i)) != 0)
+			continue;
+		if (i == HNSW_NORM_PROC || i == HNSW_TYPE_INFO_PROC)
+			continue;
+		ereport(INFO,
+				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+				 errmsg("operator class \"%s\" of access method %s is missing support function %d",
+						opclassname, "hnsw", i)));
+		result = false;
+	}
+
+	ReleaseCatCacheList(proclist);
+	ReleaseCatCacheList(oprlist);
+#if PG_VERSION_NUM < 180000
+	ReleaseSysCache(familytup);
+#endif
+	ReleaseSysCache(classtup);
+
+	return result;
+}
+
+/*
+ * Define index handler
+ *
+ * See https://www.postgresql.org/docs/current/index-api.html
+ */
+FUNCTION_PREFIX PG_FUNCTION_INFO_V1(hnswhandler);
+Datum
+hnswhandler(PG_FUNCTION_ARGS)
+{
+#if PG_VERSION_NUM >= 190000
+	static const IndexAmRoutine amroutine = {
+		.type = T_IndexAmRoutine,
+		.amstrategies = 0,
+		.amsupport = HNSW_NPROCS,
+		.amoptsprocnum = 0,
+		.amcanorder = false,
+		.amcanorderbyop = true,
+		.amcanhash = false,
+		.amconsistentequality = false,
+		.amconsistentordering = false,
+		.amcanbackward = false,
+		.amcanunique = false,
+		.amcanmulticol = false,
+		.amoptionalkey = true,
+		.amsearcharray = false,
+		.amsearchnulls = false,
+		.amstorage = false,
+		.amclusterable = false,
+		.ampredlocks = false,
+		.amcanparallel = false,
+		.amcanbuildparallel = true,
+		.amcaninclude = false,
+		.amusemaintenanceworkmem = false,
+		.amsummarizing = false,
+		.amparallelvacuumoptions = VACUUM_OPTION_PARALLEL_BULKDEL,
+		.amkeytype = InvalidOid,
+
+		.ambuild = hnswbuild,
+		.ambuildempty = hnswbuildempty,
+		.aminsert = hnswinsert,
+		.aminsertcleanup = NULL,
+		.ambulkdelete = hnswbulkdelete,
+		.amvacuumcleanup = hnswvacuumcleanup,
+		.amcanreturn = NULL,
+		.amcostestimate = hnswcostestimate,
+		.amgettreeheight = NULL,
+		.amoptions = hnswoptions,
+		.amproperty = hnswproperty,
+		.ambuildphasename = hnswbuildphasename,
+		.amvalidate = hnswvalidate,
+		.amadjustmembers = NULL,
+		.ambeginscan = hnswbeginscan,
+		.amrescan = hnswrescan,
+		.amgettuple = hnswgettuple,
+		.amgetbitmap = NULL,
+		.amendscan = hnswendscan,
+		.ammarkpos = NULL,
+		.amrestrpos = NULL,
+		.amestimateparallelscan = NULL,
+		.aminitparallelscan = NULL,
+		.amparallelrescan = NULL,
+		.amtranslatestrategy = NULL,
+		.amtranslatecmptype = NULL,
+	};
+
+	PG_RETURN_POINTER(&amroutine);
+#else
+	IndexAmRoutine *amroutine = makeNode(IndexAmRoutine);
+
+	amroutine->amstrategies = 0;
+	amroutine->amsupport = HNSW_NPROCS;
+	amroutine->amoptsprocnum = 0;
+	amroutine->amcanorder = false;
+	amroutine->amcanorderbyop = true;
+#if PG_VERSION_NUM >= 180000
+	amroutine->amcanhash = false;
+	amroutine->amconsistentequality = false;
+	amroutine->amconsistentordering = false;
+#endif
+	amroutine->amcanbackward = false;	/* can change direction mid-scan */
+	amroutine->amcanunique = false;
+	amroutine->amcanmulticol = false;
+	amroutine->amoptionalkey = true;
+	amroutine->amsearcharray = false;
+	amroutine->amsearchnulls = false;
+	amroutine->amstorage = false;
+	amroutine->amclusterable = false;
+	amroutine->ampredlocks = false;
+	amroutine->amcanparallel = false;
+#if PG_VERSION_NUM >= 170000
+	amroutine->amcanbuildparallel = true;
+#endif
+	amroutine->amcaninclude = false;
+	amroutine->amusemaintenanceworkmem = false; /* not used during VACUUM */
+#if PG_VERSION_NUM >= 160000
+	amroutine->amsummarizing = false;
+#endif
+	amroutine->amparallelvacuumoptions = VACUUM_OPTION_PARALLEL_BULKDEL;
+	amroutine->amkeytype = InvalidOid;
+
+	/* Interface functions */
+	amroutine->ambuild = hnswbuild;
+	amroutine->ambuildempty = hnswbuildempty;
+	amroutine->aminsert = hnswinsert;
+#if PG_VERSION_NUM >= 170000
+	amroutine->aminsertcleanup = NULL;
+#endif
+	amroutine->ambulkdelete = hnswbulkdelete;
+	amroutine->amvacuumcleanup = hnswvacuumcleanup;
+	amroutine->amcanreturn = NULL;
+	amroutine->amcostestimate = hnswcostestimate;
+#if PG_VERSION_NUM >= 180000
+	amroutine->amgettreeheight = NULL;
+#endif
+	amroutine->amoptions = hnswoptions;
+	amroutine->amproperty = hnswproperty;
+	amroutine->ambuildphasename = hnswbuildphasename;
+	amroutine->amvalidate = hnswvalidate;
+	amroutine->amadjustmembers = NULL;
+	amroutine->ambeginscan = hnswbeginscan;
+	amroutine->amrescan = hnswrescan;
+	amroutine->amgettuple = hnswgettuple;
+	amroutine->amgetbitmap = NULL;
+	amroutine->amendscan = hnswendscan;
+	amroutine->ammarkpos = NULL;
+	amroutine->amrestrpos = NULL;
+
+	/* Interface functions to support parallel index scans */
+	amroutine->amestimateparallelscan = NULL;
+	amroutine->aminitparallelscan = NULL;
+	amroutine->amparallelrescan = NULL;
+
+#if PG_VERSION_NUM >= 180000
+	amroutine->amtranslatestrategy = NULL;
+	amroutine->amtranslatecmptype = NULL;
+#endif
+
+	PG_RETURN_POINTER(amroutine);
+#endif
+}
