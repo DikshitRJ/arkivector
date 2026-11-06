@@ -34,10 +34,10 @@
 PGDLLEXPORT Datum vector_l2_squared_distance(PG_FUNCTION_ARGS);
 PGDLLEXPORT Datum vector_dims(PG_FUNCTION_ARGS);
 
-#define DIM 128
-#define NVEC 10000
-#define NQUERY 200
-#define K 10
+#define DIM         128
+#define NVEC        10000
+#define NQUERY      200
+#define K           10
 #define ARENA_BYTES ((Size) 256 * 1024 * 1024)
 
 typedef enum { SPIKE_OK, SPIKE_SEAL_NEEDED } spike_result;
@@ -239,7 +239,7 @@ static int spike_search(char *base, HnswGraph *graph, HnswSupport *support, int 
 
     int total = list_length(w);
     hit *all = palloc(sizeof(hit) * (size_t) (total > 0 ? total : 1));
-    foreach(lc2, w) {
+    foreach (lc2, w) {
         HnswSearchCandidate *sc = lfirst(lc2);
         HnswElement e = HnswPtrAccess(base, sc->element);
         all[n].docid = av_tid_to_docid(&e->heaptids[0]);
@@ -353,20 +353,24 @@ TEST spike_recall(void)
 {
     build_main();
     double t0 = now_ns();
-    double r40 = recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 40, NVEC, NULL, NULL);
+    double r40 =
+        recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 40, NVEC, NULL, NULL);
     double search40 = (now_ns() - t0) / NQUERY;
-    double r100 = recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 100, NVEC, NULL, NULL);
+    double r100 =
+        recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 100, NVEC, NULL, NULL);
     t0 = now_ns();
-    double r200 = recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 200, NVEC, NULL, NULL);
+    double r200 =
+        recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 200, NVEC, NULL, NULL);
     double search200 = (now_ns() - t0) / NQUERY;
-    fprintf(stderr,
-            "\n[spike] %d x %d-d, m=%d ef_construction=%d: insert %.0f ns/op, arena %zu bytes (%.0f B/vector, "
-            "element struct %zu B)\n"
-            "[spike] recall@10 ef_search=40: %.4f  100: %.4f  200: %.4f  (search incl. brute force: %.0f / %.0f "
-            "ns/query)\n",
-            NVEC, DIM, main_ix.bs.m, main_ix.bs.efConstruction, insert_ns_per_op, main_ix.graph->memoryUsed,
-            (double) main_ix.graph->memoryUsed / NVEC, sizeof(HnswElementData), r40, r100, r200, search40,
-            search200);
+    fprintf(
+        stderr,
+        "\n[spike] %d x %d-d, m=%d ef_construction=%d: insert %.0f ns/op, arena %zu bytes (%.0f B/vector, "
+        "element struct %zu B)\n"
+        "[spike] recall@10 ef_search=40: %.4f  100: %.4f  200: %.4f  (search incl. brute force: %.0f / %.0f "
+        "ns/query)\n",
+        NVEC, DIM, main_ix.bs.m, main_ix.bs.efConstruction, insert_ns_per_op, main_ix.graph->memoryUsed,
+        (double) main_ix.graph->memoryUsed / NVEC, sizeof(HnswElementData), r40, r100, r200, search40,
+        search200);
     {
         MemoryContext ctx = AllocSetContextCreate(NULL, "lat", ALLOCSET_DEFAULT_SIZES);
         MemoryContext old = MemoryContextSwitchTo(ctx);
@@ -374,11 +378,12 @@ TEST spike_recall(void)
         for (int ef = 40; ef <= 200; ef *= 5) {
             double ts = now_ns();
             for (int qi = 0; qi < NQUERY; qi++) {
-                (void) spike_search(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, queries[qi], ef,
-                                    out, K);
+                (void) spike_search(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m,
+                                    queries[qi], ef, out, K);
                 MemoryContextReset(ctx);
             }
-            fprintf(stderr, "[spike] search only, ef_search=%d: %.0f ns/query\n", ef, (now_ns() - ts) / NQUERY);
+            fprintf(stderr, "[spike] search only, ef_search=%d: %.0f ns/query\n", ef,
+                    (now_ns() - ts) / NQUERY);
         }
         MemoryContextSwitchTo(old);
         MemoryContextDelete(ctx);
@@ -391,7 +396,8 @@ TEST spike_mmap_relocation(void)
 {
     build_main();
     static hit before[NQUERY][K], after[NQUERY][K];
-    (void) recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 100, NVEC, NULL, before);
+    (void) recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, 100, NVEC, NULL,
+                       before);
 
     char path[] = "/tmp/av_spike_arenaXXXXXX";
     int fd = mkstemp(path);
@@ -422,7 +428,8 @@ TEST spike_mmap_relocation(void)
             ASSERT_EQ(before[q][i].docid, after[q][i].docid);
             ASSERT_EQ(before[q][i].distance, after[q][i].distance);
         }
-    fprintf(stderr, "[spike] relocated read-only search at %p (built at %p): identical results for %d queries\n",
+    fprintf(stderr,
+            "[spike] relocated read-only search at %p (built at %p): identical results for %d queries\n",
             (void *) ro, (void *) main_ix.base, NQUERY);
     PASS();
 }
@@ -471,7 +478,8 @@ static void *searcher(void *p)
     while (!atomic_load(a->stop)) {
         hit out[K];
         int qi = (int) (rand_r(&seed) % NQUERY);
-        int n = spike_search(a->ix->base, a->ix->graph, &a->ix->bs.support, a->ix->bs.m, queries[qi], 40, out, K);
+        int n =
+            spike_search(a->ix->base, a->ix->graph, &a->ix->bs.support, a->ix->bs.m, queries[qi], 40, out, K);
         for (int i = 1; i < n; i++)
             if (out[i].distance < out[i - 1].distance)
                 abort();
@@ -498,8 +506,13 @@ TEST spike_concurrent_insert_search(void)
     pthread_t th[8];
     worker_arg args[8];
     for (int i = 0; i < 8; i++) {
-        args[i] = (worker_arg){.ix = &ix, .next = &next, .stop = &stop, .inserted = inserted, .limit = nvecs_total,
-                               .id = i, .ops = 0};
+        args[i] = (worker_arg){.ix = &ix,
+                               .next = &next,
+                               .stop = &stop,
+                               .inserted = inserted,
+                               .limit = nvecs_total,
+                               .id = i,
+                               .ops = 0};
         pthread_create(&th[i], NULL, i < 4 ? inserter : searcher, &args[i]);
     }
     struct timespec ts = {.tv_sec = seconds, .tv_nsec = 0};
@@ -523,7 +536,8 @@ TEST spike_concurrent_insert_search(void)
     if (nbase > nvecs_total)
         nbase = nvecs_total;
     double r = recall_at_k(ix.base, ix.graph, &ix.bs.support, ix.bs.m, 200, nbase, inserted, NULL);
-    fprintf(stderr, "[spike] concurrent %ds: %ld inserts, %ld searches; recall@10 (ef 200) over %ld vectors: %.4f\n",
+    fprintf(stderr,
+            "[spike] concurrent %ds: %ld inserts, %ld searches; recall@10 (ef 200) over %ld vectors: %.4f\n",
             seconds, ins, srch, ins, r);
     munmap(base, ARENA_BYTES);
     free(inserted);
@@ -575,7 +589,8 @@ TEST spike_uniform_info(void)
     main_built = false;
     build_main();
     for (int ef = 40; ef <= 800; ef *= 2) {
-        double r = recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, ef, NVEC, NULL, NULL);
+        double r =
+            recall_at_k(main_ix.base, main_ix.graph, &main_ix.bs.support, main_ix.bs.m, ef, NVEC, NULL, NULL);
         fprintf(stderr, "[spike] uniform 128-d recall@10 ef_search=%d: %.4f\n", ef, r);
     }
     PASS();

@@ -3,7 +3,7 @@
 #define BLOCK_H
 typedef uint32 BlockNumber;
 #define InvalidBlockNumber ((BlockNumber) 0xFFFFFFFF)
-#define MaxBlockNumber ((BlockNumber) 0xFFFFFFFE)
+#define MaxBlockNumber     ((BlockNumber) 0xFFFFFFFE)
 typedef struct BlockIdData {
     uint16 bi_hi;
     uint16 bi_lo;

@@ -34,8 +34,6 @@ typedef struct PlannerInfo PlannerInfo;
 typedef struct IndexPath IndexPath;
 typedef struct ExprContext ExprContext;
 
-
-
 typedef int Buffer;
 #define InvalidBuffer 0
 typedef enum ForkNumber {

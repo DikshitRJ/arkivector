@@ -11,10 +11,10 @@
 #include <string.h>
 
 /* PostgreSQL wraps these for portability; on POSIX the libc versions are fine. */
-#define pg_strcasecmp strcasecmp
+#define pg_strcasecmp  strcasecmp
 #define pg_strncasecmp strncasecmp
-#define pg_qsort qsort
-#define qsort_arg av_pg_qsort_arg
+#define pg_qsort       qsort
+#define qsort_arg      av_pg_qsort_arg
 
 typedef int (*qsort_arg_comparator)(const void *a, const void *b, void *arg);
 void av_pg_qsort_arg(void *base, size_t nel, size_t elsize, qsort_arg_comparator cmp, void *arg);
@@ -22,7 +22,7 @@ void av_pg_qsort_arg(void *base, size_t nel, size_t elsize, qsort_arg_comparator
 static inline unsigned char pg_tolower(unsigned char ch)
 {
     if (ch >= 'A' && ch <= 'Z') {
-        ch = (unsigned char)(ch + ('a' - 'A'));
+        ch = (unsigned char) (ch + ('a' - 'A'));
     }
     return ch;
 }
@@ -30,7 +30,7 @@ static inline unsigned char pg_tolower(unsigned char ch)
 static inline unsigned char pg_toupper(unsigned char ch)
 {
     if (ch >= 'a' && ch <= 'z') {
-        ch = (unsigned char)(ch - ('a' - 'A'));
+        ch = (unsigned char) (ch - ('a' - 'A'));
     }
     return ch;
 }

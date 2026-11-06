@@ -1,0 +1,21 @@
+# Arkivector code style (our C code only). Excluded: daemon/src/pgvector (pgindent
+# style, copied), verbatim PostgreSQL files in daemon/src/pgcompat, daemon/third_party.
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 110
+BreakBeforeBraces: Linux
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AlignConsecutiveMacros: Consecutive
+AlignEscapedNewlines: Left
+IndentCaseLabels: false
+PointerAlignment: Right
+SortIncludes: Never
+SpaceAfterCStyleCast: true
+ReflowComments: false
+MaxEmptyLinesToKeep: 1
+IncludeBlocks: Preserve

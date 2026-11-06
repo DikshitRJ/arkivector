@@ -14,21 +14,21 @@ typedef union {
     } va_4byte;
 } varattrib_4b;
 
-#define VARATT_IS_EXTENDED(PTR) false
+#define VARATT_IS_EXTENDED(PTR)   false
 #define VARATT_IS_COMPRESSED(PTR) false
-#define VARATT_IS_EXTERNAL(PTR) false
-#define VARATT_IS_SHORT(PTR) false
-#define VARATT_IS_4B_U(PTR) true
+#define VARATT_IS_EXTERNAL(PTR)   false
+#define VARATT_IS_SHORT(PTR)      false
+#define VARATT_IS_4B_U(PTR)       true
 
-#define VARSIZE_4B(PTR) ((((const varattrib_4b *) (PTR))->va_4byte.va_header >> 2) & 0x3FFFFFFF)
+#define VARSIZE_4B(PTR)          ((((const varattrib_4b *) (PTR))->va_4byte.va_header >> 2) & 0x3FFFFFFF)
 #define SET_VARSIZE_4B(PTR, len) (((varattrib_4b *) (PTR))->va_4byte.va_header = (((uint32) (len)) << 2))
 
-#define VARSIZE(PTR) VARSIZE_4B(PTR)
-#define SET_VARSIZE(PTR, len) SET_VARSIZE_4B(PTR, len)
-#define VARSIZE_ANY(PTR) VARSIZE_4B(PTR)
+#define VARSIZE(PTR)           VARSIZE_4B(PTR)
+#define SET_VARSIZE(PTR, len)  SET_VARSIZE_4B(PTR, len)
+#define VARSIZE_ANY(PTR)       VARSIZE_4B(PTR)
 #define VARSIZE_ANY_EXHDR(PTR) (VARSIZE_4B(PTR) - VARHDRSZ)
-#define VARSIZE_EXHDR VARSIZE_ANY_EXHDR
-#define VARDATA(PTR) (((varattrib_4b *) (PTR))->va_4byte.va_data)
-#define VARDATA_ANY(PTR) VARDATA(PTR)
+#define VARSIZE_EXHDR          VARSIZE_ANY_EXHDR
+#define VARDATA(PTR)           (((varattrib_4b *) (PTR))->va_4byte.va_data)
+#define VARDATA_ANY(PTR)       VARDATA(PTR)
 
 #endif /* VARATT_H */

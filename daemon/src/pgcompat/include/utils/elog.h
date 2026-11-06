@@ -17,29 +17,30 @@
 #include <setjmp.h>
 
 /* Error levels (PostgreSQL 17 values). */
-#define DEBUG5 10
-#define DEBUG4 11
-#define DEBUG3 12
-#define DEBUG2 13
-#define DEBUG1 14
-#define LOG 15
-#define LOG_SERVER_ONLY 16
-#define COMMERROR LOG_SERVER_ONLY
-#define INFO 17
-#define NOTICE 18
-#define WARNING 19
-#define PGWARNING 19
+#define DEBUG5              10
+#define DEBUG4              11
+#define DEBUG3              12
+#define DEBUG2              13
+#define DEBUG1              14
+#define LOG                 15
+#define LOG_SERVER_ONLY     16
+#define COMMERROR           LOG_SERVER_ONLY
+#define INFO                17
+#define NOTICE              18
+#define WARNING             19
+#define PGWARNING           19
 #define WARNING_CLIENT_ONLY 20
-#define ERROR 21
-#define PGERROR 21
-#define FATAL 22
-#define PANIC 23
+#define ERROR               21
+#define PGERROR             21
+#define FATAL               22
+#define PANIC               23
 
 /* SQLSTATE encoding (PostgreSQL MAKE_SQLSTATE). */
-#define PGSIXBIT(ch) (((ch) - '0') & 0x3F)
+#define PGSIXBIT(ch)    (((ch) - '0') & 0x3F)
 #define PGUNSIXBIT(val) (((val) & 0x3F) + '0')
-#define MAKE_SQLSTATE(ch1, ch2, ch3, ch4, ch5) \
-    (PGSIXBIT(ch1) + (PGSIXBIT(ch2) << 6) + (PGSIXBIT(ch3) << 12) + (PGSIXBIT(ch4) << 18) + (PGSIXBIT(ch5) << 24))
+#define MAKE_SQLSTATE(ch1, ch2, ch3, ch4, ch5)                                              \
+    (PGSIXBIT(ch1) + (PGSIXBIT(ch2) << 6) + (PGSIXBIT(ch3) << 12) + (PGSIXBIT(ch4) << 18) + \
+     (PGSIXBIT(ch5) << 24))
 
 #include "utils/errcodes.h"
 
@@ -63,13 +64,13 @@ extern int errhidecontext(bool hide_ctx);
 
 #define TEXTDOMAIN NULL
 
-#define ereport_domain(elevel, domain, ...)                                 \
-    do {                                                                    \
-        const int elevel_ = (elevel);                                       \
-        if (errstart(elevel_, domain))                                      \
-            __VA_ARGS__, errfinish(__FILE__, __LINE__, __func__);           \
-        if (elevel_ >= ERROR)                                               \
-            pg_unreachable();                                               \
+#define ereport_domain(elevel, domain, ...)                       \
+    do {                                                          \
+        const int elevel_ = (elevel);                             \
+        if (errstart(elevel_, domain))                            \
+            __VA_ARGS__, errfinish(__FILE__, __LINE__, __func__); \
+        if (elevel_ >= ERROR)                                     \
+            pg_unreachable();                                     \
     } while (0)
 
 #define ereport(elevel, ...) ereport_domain(elevel, TEXTDOMAIN, __VA_ARGS__)
@@ -88,26 +89,26 @@ extern __thread sigjmp_buf *PG_exception_stack;
         sigjmp_buf _local_sigjmp_buf##__VA_ARGS__;                           \
         bool _do_rethrow##__VA_ARGS__ = false;                               \
         if (_setjmp(_local_sigjmp_buf##__VA_ARGS__) == 0) {                  \
-            PG_exception_stack = &_local_sigjmp_buf##__VA_ARGS__
+        PG_exception_stack = &_local_sigjmp_buf##__VA_ARGS__
 
-#define PG_CATCH(...)                                         \
-    }                                                         \
-    else                                                      \
-    {                                                         \
+#define PG_CATCH(...) \
+    }                 \
+    else              \
+    {                 \
         PG_exception_stack = _save_exception_stack##__VA_ARGS__;
 
-#define PG_FINALLY(...)                                       \
-    }                                                         \
-    else _do_rethrow##__VA_ARGS__ = true;                     \
-    {                                                         \
+#define PG_FINALLY(...)                   \
+    }                                     \
+    else _do_rethrow##__VA_ARGS__ = true; \
+    {                                     \
         PG_exception_stack = _save_exception_stack##__VA_ARGS__;
 
-#define PG_END_TRY(...)                                          \
-    }                                                            \
-    if (_do_rethrow##__VA_ARGS__)                                \
-        PG_RE_THROW();                                           \
-    PG_exception_stack = _save_exception_stack##__VA_ARGS__;     \
-    }                                                            \
+#define PG_END_TRY(...)                                      \
+    }                                                        \
+    if (_do_rethrow##__VA_ARGS__)                            \
+        PG_RE_THROW();                                       \
+    PG_exception_stack = _save_exception_stack##__VA_ARGS__; \
+    }                                                        \
     while (0)
 
 #define PG_RE_THROW() pg_re_throw()

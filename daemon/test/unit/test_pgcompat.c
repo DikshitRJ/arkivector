@@ -58,7 +58,7 @@ TEST list_works(void)
     ASSERT_EQ(1000, list_length(l));
     int sum = 0;
     ListCell *lc;
-    foreach(lc, l)
+    foreach (lc, l)
         sum += lfirst_int(lc);
     ASSERT_EQ(999 * 1000 / 2, sum);
     MemoryContextSwitchTo(old);

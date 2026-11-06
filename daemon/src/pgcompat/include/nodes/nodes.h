@@ -7,22 +7,16 @@
 #ifndef NODES_H
 #define NODES_H
 
-typedef enum NodeTag {
-    T_Invalid = 0,
-    T_List,
-    T_IntList,
-    T_OidList,
-    T_XidList
-} NodeTag;
+typedef enum NodeTag { T_Invalid = 0, T_List, T_IntList, T_OidList, T_XidList } NodeTag;
 
 typedef struct Node {
     NodeTag type;
 } Node;
 
-#define nodeTag(nodeptr) (((const Node *) (nodeptr))->type)
-#define IsA(nodeptr, _type_) (nodeTag(nodeptr) == T_##_type_)
+#define nodeTag(nodeptr)          (((const Node *) (nodeptr))->type)
+#define IsA(nodeptr, _type_)      (nodeTag(nodeptr) == T_##_type_)
 #define castNode(_type_, nodeptr) ((_type_ *) (nodeptr))
-#define makeNode(_type_) ((_type_ *) newNode(sizeof(_type_), T_##_type_))
+#define makeNode(_type_)          ((_type_ *) newNode(sizeof(_type_), T_##_type_))
 
 static inline Node *newNode(size_t size, NodeTag tag)
 {

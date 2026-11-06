@@ -25,9 +25,9 @@ typedef struct MemoryContextCallback {
 
 extern __thread MemoryContext CurrentMemoryContext;
 
-#define MCXT_ALLOC_HUGE 0x01
+#define MCXT_ALLOC_HUGE   0x01
 #define MCXT_ALLOC_NO_OOM 0x02
-#define MCXT_ALLOC_ZERO 0x04
+#define MCXT_ALLOC_ZERO   0x04
 
 extern void *MemoryContextAlloc(MemoryContext context, Size size);
 extern void *MemoryContextAllocZero(MemoryContext context, Size size);
@@ -48,10 +48,10 @@ extern void pfree(void *pointer);
 extern Size add_size(Size s1, Size s2);
 extern Size mul_size(Size s1, Size s2);
 
-#define palloc_object(type) ((type *) palloc(sizeof(type)))
-#define palloc0_object(type) ((type *) palloc0(sizeof(type)))
-#define palloc_array(type, count) ((type *) palloc(mul_size(sizeof(type), count)))
-#define palloc0_array(type, count) ((type *) palloc0(mul_size(sizeof(type), count)))
+#define palloc_object(type)                  ((type *) palloc(sizeof(type)))
+#define palloc0_object(type)                 ((type *) palloc0(sizeof(type)))
+#define palloc_array(type, count)            ((type *) palloc(mul_size(sizeof(type), count)))
+#define palloc0_array(type, count)           ((type *) palloc0(mul_size(sizeof(type), count)))
 #define repalloc_array(pointer, type, count) ((type *) repalloc(pointer, mul_size(sizeof(type), count)))
 #define repalloc0_array(pointer, type, oldcount, count) \
     ((type *) repalloc0(pointer, mul_size(sizeof(type), oldcount), mul_size(sizeof(type), count)))

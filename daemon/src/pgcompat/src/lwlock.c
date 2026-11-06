@@ -10,7 +10,7 @@
 #include "storage/s_lock.h"
 
 #define LW_VAL_EXCLUSIVE ((uint32) 1 << 31)
-#define LW_SHARED_MASK (LW_VAL_EXCLUSIVE - 1)
+#define LW_SHARED_MASK   (LW_VAL_EXCLUSIVE - 1)
 
 typedef struct {
     LWLock *lock;
@@ -68,7 +68,8 @@ static bool try_acquire(LWLock *lock, LWLockMode mode)
     if (old & LW_VAL_EXCLUSIVE) {
         return false;
     }
-    return __atomic_compare_exchange_n(&lock->state, &old, old + 1, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
+    return __atomic_compare_exchange_n(&lock->state, &old, old + 1, false, __ATOMIC_ACQUIRE,
+                                       __ATOMIC_RELAXED);
 }
 
 static void remember(LWLock *lock, LWLockMode mode)

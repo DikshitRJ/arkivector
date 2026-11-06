@@ -25,81 +25,81 @@ static inline bool DatumGetBool(Datum X)
 }
 static inline Datum BoolGetDatum(bool X)
 {
-    return (Datum)(X ? 1 : 0);
+    return (Datum) (X ? 1 : 0);
 }
 static inline char DatumGetChar(Datum X)
 {
-    return (char)X;
+    return (char) X;
 }
 static inline Datum CharGetDatum(char X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline int16 DatumGetInt16(Datum X)
 {
-    return (int16)X;
+    return (int16) X;
 }
 static inline Datum Int16GetDatum(int16 X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline uint16 DatumGetUInt16(Datum X)
 {
-    return (uint16)X;
+    return (uint16) X;
 }
 static inline Datum UInt16GetDatum(uint16 X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline int32 DatumGetInt32(Datum X)
 {
-    return (int32)X;
+    return (int32) X;
 }
 static inline Datum Int32GetDatum(int32 X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline uint32 DatumGetUInt32(Datum X)
 {
-    return (uint32)X;
+    return (uint32) X;
 }
 static inline Datum UInt32GetDatum(uint32 X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline Oid DatumGetObjectId(Datum X)
 {
-    return (Oid)X;
+    return (Oid) X;
 }
 static inline Datum ObjectIdGetDatum(Oid X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline Pointer DatumGetPointer(Datum X)
 {
-    return (Pointer)X;
+    return (Pointer) X;
 }
-#define PointerGetDatum(X) ((Datum)(X))
+#define PointerGetDatum(X) ((Datum) (X))
 static inline char *DatumGetCString(Datum X)
 {
-    return (char *)DatumGetPointer(X);
+    return (char *) DatumGetPointer(X);
 }
 #define CStringGetDatum(X) PointerGetDatum(X)
 static inline int64 DatumGetInt64(Datum X)
 {
-    return (int64)X;
+    return (int64) X;
 }
 static inline Datum Int64GetDatum(int64 X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline uint64 DatumGetUInt64(Datum X)
 {
-    return (uint64)X;
+    return (uint64) X;
 }
 static inline Datum UInt64GetDatum(uint64 X)
 {
-    return (Datum)X;
+    return (Datum) X;
 }
 static inline float4 DatumGetFloat4(Datum X)
 {
@@ -137,7 +137,7 @@ static inline Datum Float8GetDatum(float8 X)
     myunion.value = X;
     return Int64GetDatum(myunion.retval);
 }
-#define Int64GetDatumFast(X) Int64GetDatum(X)
+#define Int64GetDatumFast(X)  Int64GetDatum(X)
 #define Float8GetDatumFast(X) Float8GetDatum(X)
 
 /* Common opaque backend types that copied headers mention in prototypes only. */

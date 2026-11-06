@@ -222,8 +222,9 @@ static void *alloc_chunk(MemoryContext context, Size size, Size align, int flags
         if (flags & MCXT_ALLOC_NO_OOM) {
             return NULL;
         }
-        ereport(ERROR, (errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory"),
-                        errdetail("Failed on request of size %zu in memory context \"%s\".", size, context->name)));
+        ereport(ERROR,
+                (errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory"),
+                 errdetail("Failed on request of size %zu in memory context \"%s\".", size, context->name)));
     }
     char *p = raw + align;
     ChunkHeader *h = (ChunkHeader *) (p - sizeof(ChunkHeader));
@@ -343,7 +344,8 @@ Size add_size(Size s1, Size s2)
 {
     Size result = s1 + s2;
     if (result < s1 || result < s2) {
-        ereport(ERROR, (errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED), errmsg("requested shared memory size overflows size_t")));
+        ereport(ERROR, (errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+                        errmsg("requested shared memory size overflows size_t")));
     }
     return result;
 }
@@ -356,7 +358,8 @@ Size mul_size(Size s1, Size s2)
     }
     result = s1 * s2;
     if (result / s2 != s1) {
-        ereport(ERROR, (errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED), errmsg("requested shared memory size overflows size_t")));
+        ereport(ERROR, (errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+                        errmsg("requested shared memory size overflows size_t")));
     }
     return result;
 }

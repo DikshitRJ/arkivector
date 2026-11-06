@@ -14,11 +14,11 @@ typedef struct av_arena_block {
     /* data follows, aligned to 16 */
 } av_arena_block;
 
-#define AV_ARENA_HDR (((sizeof(av_arena_block) + 15u) / 16u) * 16u)
-#define AV_ARENA_DEFAULT_BLOCK ((size_t)64 * 1024)
+#define AV_ARENA_HDR           (((sizeof(av_arena_block) + 15u) / 16u) * 16u)
+#define AV_ARENA_DEFAULT_BLOCK ((size_t) 64 * 1024)
 
 struct av_arena {
-    av_arena_block *head; /* current block (most recent) */
+    av_arena_block *head;  /* current block (most recent) */
     av_arena_block *first; /* oldest block, kept across resets */
     size_t block_size;
     size_t hard_cap;
@@ -67,7 +67,7 @@ av_arena *av_arena_create(const char *name, size_t block_size, size_t hard_cap)
 
 static inline uintptr_t align_up(uintptr_t p, size_t align)
 {
-    return (p + (align - 1)) & ~((uintptr_t)align - 1);
+    return (p + (align - 1)) & ~((uintptr_t) align - 1);
 }
 
 void *av_arena_alloc(av_arena *a, size_t n, size_t align)
@@ -86,14 +86,14 @@ void *av_arena_alloc(av_arena *a, size_t n, size_t align)
     }
     av_arena_block *b = a->head;
     if (b != NULL) {
-        uintptr_t base = (uintptr_t)b + AV_ARENA_HDR;
+        uintptr_t base = (uintptr_t) b + AV_ARENA_HDR;
         uintptr_t cur = base + b->used;
         uintptr_t p = align_up(cur, align);
-        size_t pad = (size_t)(p - cur);
+        size_t pad = (size_t) (p - cur);
         if (b->used + pad <= b->size && n <= b->size - b->used - pad) {
             b->used += pad + n;
             a->used += pad + n;
-            return (void *)p;
+            return (void *) p;
         }
     }
     /* New block; large requests get a dedicated block sized to fit. */
@@ -112,12 +112,12 @@ void *av_arena_alloc(av_arena *a, size_t n, size_t align)
         nb->next = a->head;
         a->head = nb;
     }
-    uintptr_t base = (uintptr_t)nb + AV_ARENA_HDR;
+    uintptr_t base = (uintptr_t) nb + AV_ARENA_HDR;
     uintptr_t p = align_up(base, align);
-    size_t pad = (size_t)(p - base);
+    size_t pad = (size_t) (p - base);
     nb->used = pad + n;
     a->used += pad + n;
-    return (void *)p;
+    return (void *) p;
 }
 
 void *av_arena_calloc(av_arena *a, size_t n, size_t align)

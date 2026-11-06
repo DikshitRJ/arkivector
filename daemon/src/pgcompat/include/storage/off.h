@@ -3,8 +3,8 @@
 #define OFF_H
 typedef uint16 OffsetNumber;
 #define InvalidOffsetNumber ((OffsetNumber) 0)
-#define FirstOffsetNumber ((OffsetNumber) 1)
-#define MaxOffsetNumber ((OffsetNumber) (BLCKSZ / sizeof(ItemIdData)))
+#define FirstOffsetNumber   ((OffsetNumber) 1)
+#define MaxOffsetNumber     ((OffsetNumber) (BLCKSZ / sizeof(ItemIdData)))
 #define OffsetNumberIsValid(offsetNumber) \
     ((bool) ((offsetNumber != InvalidOffsetNumber) && (offsetNumber <= MaxOffsetNumber)))
 #define OffsetNumberNext(offsetNumber) ((OffsetNumber) (1 + (offsetNumber)))

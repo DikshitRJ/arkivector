@@ -26,12 +26,12 @@ static inline void av_spin_release(volatile slock_t *lock)
     __atomic_store_n(lock, 0, __ATOMIC_RELEASE);
 }
 
-#define SpinLockInit(lock) av_spin_init(lock)
+#define SpinLockInit(lock)    av_spin_init(lock)
 #define SpinLockAcquire(lock) av_spin_acquire(lock)
 #define SpinLockRelease(lock) av_spin_release(lock)
-#define SpinLockFree(lock) (__atomic_load_n((lock), __ATOMIC_RELAXED) == 0)
-#define S_INIT_LOCK(lock) av_spin_init(lock)
-#define S_LOCK(lock) av_spin_acquire(lock)
-#define S_UNLOCK(lock) av_spin_release(lock)
+#define SpinLockFree(lock)    (__atomic_load_n((lock), __ATOMIC_RELAXED) == 0)
+#define S_INIT_LOCK(lock)     av_spin_init(lock)
+#define S_LOCK(lock)          av_spin_acquire(lock)
+#define S_UNLOCK(lock)        av_spin_release(lock)
 
 #endif /* S_LOCK_H */

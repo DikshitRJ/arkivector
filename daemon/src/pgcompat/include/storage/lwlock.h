@@ -23,11 +23,7 @@ typedef struct LWLock {
     uint32 state; /* accessed only with __atomic builtins */
 } LWLock;
 
-typedef enum LWLockMode {
-    LW_EXCLUSIVE,
-    LW_SHARED,
-    LW_WAIT_UNTIL_FREE
-} LWLockMode;
+typedef enum LWLockMode { LW_EXCLUSIVE, LW_SHARED, LW_WAIT_UNTIL_FREE } LWLockMode;
 
 #define MAX_SIMUL_LWLOCKS 200
 

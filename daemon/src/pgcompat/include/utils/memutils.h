@@ -9,30 +9,32 @@
 
 struct av_arena;
 
-#define MaxAllocSize ((Size) 0x3fffffff) /* 1 gigabyte - 1 */
-#define AllocSizeIsValid(size) ((Size) (size) <= MaxAllocSize)
-#define MaxAllocHugeSize (SIZE_MAX / 2)
-#define InvalidAllocSize SIZE_MAX
+#define MaxAllocSize               ((Size) 0x3fffffff) /* 1 gigabyte - 1 */
+#define AllocSizeIsValid(size)     ((Size) (size) <= MaxAllocSize)
+#define MaxAllocHugeSize           (SIZE_MAX / 2)
+#define InvalidAllocSize           SIZE_MAX
 #define AllocHugeSizeIsValid(size) ((Size) (size) <= MaxAllocHugeSize)
 
 extern __thread MemoryContext TopMemoryContext;
 extern __thread MemoryContext ErrorContext;
 extern __thread MemoryContext CurTransactionContext;
 
-#define ALLOCSET_DEFAULT_MINSIZE 0
+#define ALLOCSET_DEFAULT_MINSIZE  0
 #define ALLOCSET_DEFAULT_INITSIZE (8 * 1024)
-#define ALLOCSET_DEFAULT_MAXSIZE (8 * 1024 * 1024)
-#define ALLOCSET_DEFAULT_SIZES ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE
-#define ALLOCSET_SMALL_MINSIZE 0
+#define ALLOCSET_DEFAULT_MAXSIZE  (8 * 1024 * 1024)
+#define ALLOCSET_DEFAULT_SIZES  ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE
+#define ALLOCSET_SMALL_MINSIZE  0
 #define ALLOCSET_SMALL_INITSIZE (1 * 1024)
-#define ALLOCSET_SMALL_MAXSIZE (8 * 1024)
-#define ALLOCSET_SMALL_SIZES ALLOCSET_SMALL_MINSIZE, ALLOCSET_SMALL_INITSIZE, ALLOCSET_SMALL_MAXSIZE
+#define ALLOCSET_SMALL_MAXSIZE  (8 * 1024)
+#define ALLOCSET_SMALL_SIZES    ALLOCSET_SMALL_MINSIZE, ALLOCSET_SMALL_INITSIZE, ALLOCSET_SMALL_MAXSIZE
 #define ALLOCSET_START_SMALL_SIZES ALLOCSET_SMALL_MINSIZE, ALLOCSET_SMALL_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE
 
-extern MemoryContext AllocSetContextCreateInternal(MemoryContext parent, const char *name, Size minContextSize,
-                                                   Size initBlockSize, Size maxBlockSize);
+extern MemoryContext AllocSetContextCreateInternal(MemoryContext parent, const char *name,
+                                                   Size minContextSize, Size initBlockSize,
+                                                   Size maxBlockSize);
 #define AllocSetContextCreate AllocSetContextCreateInternal
-#define GenerationContextCreate(parent, name, min, init, max) AllocSetContextCreateInternal(parent, name, min, init, max)
+#define GenerationContextCreate(parent, name, min, init, max) \
+    AllocSetContextCreateInternal(parent, name, min, init, max)
 
 /*
  * Arkivector extension: create a context with a hard cap on total bytes (0 = none).

@@ -7,10 +7,10 @@
 #include "postgres.h"
 extern __thread volatile bool av_pg_interrupt_pending;
 extern void av_pg_process_interrupts(void);
-#define CHECK_FOR_INTERRUPTS() \
-    do { \
+#define CHECK_FOR_INTERRUPTS()                 \
+    do {                                       \
         if (unlikely(av_pg_interrupt_pending)) \
-            av_pg_process_interrupts(); \
+            av_pg_process_interrupts();        \
     } while (0)
 extern int maintenance_work_mem;
 extern int work_mem;
