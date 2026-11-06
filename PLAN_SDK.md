@@ -115,7 +115,7 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 `build(sdk): scaffolding for python and node packages` · `ci: sdk build, lint and golden-check workflow` · `docs(sdk): sdk README`
 
 ### Exit
-- [ ] Python and Node packages build/lint clean (empty implementations). CI green. Prism mock instructions verified locally.
+- [x] Python and Node packages build/lint clean (empty implementations). CI green. Prism mock instructions verified locally.
 
 ---
 
@@ -323,8 +323,8 @@ Runs on `push: ['**']` and `pull_request: ['**']`, with path filters `sdk/**`, `
 
 | Lang | S0 | S1 (M1) | S2 | S3 (M2) | S4 (M3) | S5 | S6 (M4) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Python | | | | | | | |
-| Node | | | | | | | |
+| Python | done | | | | | | |
+| Node | done | | | | | | |
 | C | deferred | | | | | | |
 | C++ | deferred | | | | | | |
 | Rust | deferred | | | | | | |
