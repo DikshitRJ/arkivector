@@ -9,6 +9,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "server/metrics.h"
+
 #include "postgres.h"
 #include "varatt.h"
 #include "vector.h"
@@ -140,4 +142,24 @@ void av_calibration_record_hnsw(double elapsed_ns, size_t count)
         g_calib.gamma = sqrt(g_calib.rho);
     }
     pthread_mutex_unlock(&g_calib_mu);
+}
+
+static av_mfamily *g_metric_recall = NULL;
+static pthread_once_t g_recall_once = PTHREAD_ONCE_INIT;
+
+static void init_recall_metric(void)
+{
+    static const char *const labels[] = {"collection"};
+    g_metric_recall = av_metric_register("arkivector_recall_at_k",
+                                         "Recall@k canary metric for approximate search",
+                                         AV_MTYPE_GAUGE, labels, 1);
+}
+
+void av_recall_canary_record(const char *collection, double recall)
+{
+    pthread_once(&g_recall_once, init_recall_metric);
+    if (g_metric_recall != NULL && collection != NULL) {
+        const char *label_vals[] = {collection};
+        av_metric_set(g_metric_recall, label_vals, recall);
+    }
 }

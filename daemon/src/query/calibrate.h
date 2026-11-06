@@ -27,4 +27,7 @@ void av_calibration_set(const av_calibration *c);
 void av_calibration_record_flat(double elapsed_ns, size_t count);
 void av_calibration_record_hnsw(double elapsed_ns, size_t count);
 
+/* Recall canary metric export */
+void av_recall_canary_record(const char *collection, double recall);
+
 #endif /* AV_QUERY_CALIBRATE_H */

@@ -22,6 +22,7 @@
 #include "filter/parser.h"
 #include "filter/value.h"
 #include "kernels/opclass.h"
+#include "query/calibrate.h"
 #include "query/executor.h"
 #include "query/planner.h"
 #include "server/json_io.h"
@@ -671,6 +672,34 @@ static void h_search(const av_http_req *req, const char *const *params, size_t n
     memset(&sres, 0, sizeof(sres));
 
     av_status st = av_execute_search(c, store, &sparams, cand, &sres, &e);
+
+    /* Recall canary: sample 1% of approximate searches and measure recall@k */
+    if (st == AV_OK && !sparams.exact && !sres.plan.exact && sres.n_hits > 0) {
+        if ((rand() % 100) == 0) {
+            av_search_params exact_params = sparams;
+            exact_params.exact = true;
+            exact_params.explain = false;
+            av_search_result exact_res;
+            memset(&exact_res, 0, sizeof(exact_res));
+            av_err err_exact;
+            av_err_clear(&err_exact);
+            if (av_execute_search(c, store, &exact_params, cand, &exact_res, &err_exact) == AV_OK) {
+                size_t matches = 0;
+                for (size_t i = 0; i < sres.n_hits; i++) {
+                    for (size_t j = 0; j < exact_res.n_hits; j++) {
+                        if (memcmp(sres.hits[i].key, exact_res.hits[j].key, 32) == 0) {
+                            matches++;
+                            break;
+                        }
+                    }
+                }
+                double recall = exact_res.n_hits > 0 ? ((double) matches / (double) exact_res.n_hits) : 1.0;
+                av_recall_canary_record(coldef->name, recall);
+                av_search_result_free(&exact_res);
+            }
+        }
+    }
+
     av_collection_read_unlock(c);
 
     if (cand != NULL) {
