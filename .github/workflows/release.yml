@@ -3,7 +3,7 @@ name: release
 # Tag vX.Y.Z (or daemon-vX.Y.Z) to publish:
 #   - GitHub Release: arkivectord linux-x86_64 tarball (libcurl bundled), Python wheel + sdist, npm tarball
 #   - GitHub Packages (npm): @dikshitrj/arkivector-client
-#   - PyPI: only when the PYPI_API_TOKEN secret is set (GitHub Packages has no pip registry)
+#   - PyPI: trusted publishing from job pypi-publish (environment `pypi`; GitHub Packages has no pip registry)
 on:
   push:
     tags: ['v*', 'daemon-v*']
@@ -79,8 +79,6 @@ jobs:
     name: Python SDK (wheel + sdist)
     needs: version
     runs-on: ubuntu-24.04
-    env:
-      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -94,17 +92,31 @@ jobs:
           python -m build
           twine check dist/*
           python -m venv /tmp/t && /tmp/t/bin/pip install dist/*.whl && /tmp/t/bin/python -c "import arkivector; print(arkivector.__name__, 'ok')"
-      - name: Publish to PyPI (optional)
-        if: ${{ env.PYPI_API_TOKEN != '' }}
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        working-directory: sdk/python
-        run: twine upload --skip-existing dist/*
       - uses: actions/upload-artifact@v4
         with:
           name: sdk-python
           path: sdk/python/dist/*
+
+  # PyPI trusted publishing (OIDC, no token). PyPI publisher settings must match:
+  #   owner DikshitRJ · repository arkivector · workflow release.yml · environment pypi
+  pypi-publish:
+    name: Publish Python SDK to PyPI
+    needs: sdk-python
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/arkivector
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-python
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true
 
   sdk-node:
     name: Node SDK (GitHub Packages)
