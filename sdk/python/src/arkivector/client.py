@@ -458,10 +458,13 @@ class Client:
             )
 
         if consistency is None:
-            if min_block is not None or timeout_ms is not None:
-                consistency = Consistency(min_block=min_block, timeout_ms=timeout_ms)
-            elif self.session_consistency and self.last_write_block is not None:
-                consistency = Consistency(min_block=self.last_write_block)
+            # explicit min_block wins; else session consistency supplies the last write block,
+            # and a custom timeout_ms must not discard it
+            mb = min_block
+            if mb is None and self.session_consistency:
+                mb = self.last_write_block
+            if mb is not None or timeout_ms is not None:
+                consistency = Consistency(min_block=mb, timeout_ms=timeout_ms)
 
         if consistency is not None:
             body["consistency"] = (
@@ -574,10 +577,13 @@ class Client:
             )
 
         if consistency is None:
-            if min_block is not None or timeout_ms is not None:
-                consistency = Consistency(min_block=min_block, timeout_ms=timeout_ms)
-            elif self.session_consistency and self.last_write_block is not None:
-                consistency = Consistency(min_block=self.last_write_block)
+            # explicit min_block wins; else session consistency supplies the last write block,
+            # and a custom timeout_ms must not discard it
+            mb = min_block
+            if mb is None and self.session_consistency:
+                mb = self.last_write_block
+            if mb is not None or timeout_ms is not None:
+                consistency = Consistency(min_block=mb, timeout_ms=timeout_ms)
 
         if consistency is not None:
             body["consistency"] = (
@@ -648,10 +654,13 @@ class Client:
             body["where"] = str(where)
 
         if consistency is None:
-            if min_block is not None or timeout_ms is not None:
-                consistency = Consistency(min_block=min_block, timeout_ms=timeout_ms)
-            elif self.session_consistency and self.last_write_block is not None:
-                consistency = Consistency(min_block=self.last_write_block)
+            # explicit min_block wins; else session consistency supplies the last write block,
+            # and a custom timeout_ms must not discard it
+            mb = min_block
+            if mb is None and self.session_consistency:
+                mb = self.last_write_block
+            if mb is not None or timeout_ms is not None:
+                consistency = Consistency(min_block=mb, timeout_ms=timeout_ms)
 
         if consistency is not None:
             body["consistency"] = (
