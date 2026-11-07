@@ -1,4 +1,4 @@
-# Arkivector
+![Uploading Gemini_Generated_Image_azlv7aazlv7aazlv.png…]()
 
 **pgvector for Arkiv.** Semantic search over data that lives on a decentralized chain, with pgvector's own distance math, behind one REST call.
 
