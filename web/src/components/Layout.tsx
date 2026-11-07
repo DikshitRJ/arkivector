@@ -80,17 +80,18 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
       <VectorField />
       <SoundToggle />
       <header className="bg-paper border-b-[1.5px] border-ink">
-        <div className="px-4 sm:px-6 pt-3 pb-2 lg:pb-3 flex flex-wrap items-center gap-x-2 sm:gap-x-6 gap-y-2">
+        {/* phones: logo + chip on one row, links scroll below; lg: 3 equal-sided columns so the links sit dead centre */}
+        <div className="px-4 sm:px-6 pt-3 pb-2 lg:pb-3 flex flex-wrap items-center gap-x-2 sm:gap-x-6 gap-y-2 lg:grid lg:grid-cols-[1fr_auto_1fr]">
           <Link to="/" className="flex items-center gap-2 no-underline" aria-label="Arkivector home">
             <Logo />
             <span className="font-display text-[19px] font-bold tracking-tight">arkivector</span>
           </Link>
-          <div className="ml-auto lg:order-3">
+          <div className="ml-auto lg:ml-0 lg:justify-self-end lg:order-3">
             <RepoChip />
           </div>
           <nav
             aria-label="Main"
-            className="order-last lg:order-2 w-full lg:w-auto lg:mx-auto -mx-1 px-1 flex items-center gap-4 sm:gap-5 text-[13.5px] overflow-x-auto"
+            className="order-last lg:order-2 w-full lg:w-auto lg:mx-0 -mx-1 px-1 flex items-center gap-4 sm:gap-5 text-[13.5px] overflow-x-auto lg:overflow-visible"
           >
             {NAV.map((n) => {
               const active = route === n.to;
