@@ -1,0 +1,12 @@
+// Cloudflare Workers static-assets deployment for the Arkivector site.
+// Unknown paths (/install, /architecture, ...) are served index.html so the client-side router
+// can handle them; this replaces a Netlify-style _redirects rule, which Workers rejects.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "arkivector",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

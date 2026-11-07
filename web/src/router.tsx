@@ -3,8 +3,9 @@ import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent, type R
 /*
  * History-API routing with clean URLs (/install, not #/install).
  * BASE comes from Vite's `base` (VITE_BASE at build time), so the site also works under a
- * sub-path such as /arkivector/ on GitHub Pages. Static hosts need an SPA fallback; see
- * public/404.html (GitHub Pages), public/_redirects (Netlify) and public/vercel.json.
+ * sub-path such as /arkivector/ on GitHub Pages. Static hosts need an SPA fallback: on
+ * Cloudflare Workers that is `not_found_handling` in wrangler.jsonc; public/404.html covers
+ * GitHub Pages.
  */
 
 export type Route = "/" | "/install" | "/architecture" | "/build" | "/next" | "/team" | "404";
