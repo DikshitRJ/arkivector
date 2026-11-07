@@ -103,8 +103,14 @@ export type Timeline = {
   seek: (ms: number) => void;
 };
 
-/** Seekable, pausable clock for the architecture film. Stops at `total`. */
-export function useTimeline(total: number): Timeline {
+/**
+ * Seekable, pausable clock for the architecture film. Stops at `total`.
+ * `limit` (optional) returns a time in ms the clock may not pass right now; the film uses it to
+ * hold on a subtitle until the narrator has finished reading it.
+ */
+export function useTimeline(total: number, limit?: () => number | null): Timeline {
+  const limitRef = useRef(limit);
+  limitRef.current = limit;
   const [t, setT] = useState(() => frozenAt() ?? 0);
   const [playing, setPlaying] = useState(false);
   const tRef = useRef(0);
@@ -116,7 +122,9 @@ export function useTimeline(total: number): Timeline {
     let last: number | null = null;
     const tick = (now: number) => {
       if (last !== null) {
-        const next = Math.min(total, tRef.current + (now - last));
+        let next = Math.min(total, tRef.current + (now - last));
+        const lim = limitRef.current?.();
+        if (lim !== null && lim !== undefined && next > lim) next = Math.max(tRef.current, lim);
         tRef.current = next;
         setT(next);
         if (next >= total) {
