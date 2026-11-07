@@ -3,6 +3,7 @@ import { useSound } from "../audio/sound";
 import { scribble } from "../ink/paths";
 import { ORANGE } from "../ink/colors";
 import { Link, type Route } from "../router";
+import { VectorField } from "./VectorField";
 
 export const REPO = "https://github.com/DikshitRJ/arkivector";
 
@@ -35,6 +36,7 @@ function GitHubMark() {
   );
 }
 
+/** Floating music control, bottom right on every page. */
 function SoundToggle() {
   const { music, toggleMusic } = useSound();
   return (
@@ -43,7 +45,7 @@ function SoundToggle() {
       onClick={toggleMusic}
       aria-pressed={music}
       title={music ? "Background music on (click to mute)" : "Background music off"}
-      className="flex items-center gap-1.5 whitespace-nowrap border-[1.5px] border-ink px-2 py-1 text-[12.5px] hover:bg-ink hover:text-paper group"
+      className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 whitespace-nowrap border-[1.5px] border-ink bg-paper px-3 py-2 text-[12.5px] shadow-[3px_3px_0_#fe7445] hover:bg-ink hover:text-paper active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
     >
       <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden className="shrink-0">
         <path d="M1 5h3l4-3.5v11L4 9H1z" fill="currentColor" />
@@ -64,7 +66,7 @@ function RepoChip() {
       href={REPO}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center gap-2 whitespace-nowrap border-2 border-arkiv-orange px-2.5 py-1 text-[12.5px] font-semibold shadow-[2px_2px_0_#fe7445] hover:bg-arkiv-orange"
+      className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap border-2 border-arkiv-orange bg-paper px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-[12.5px] font-semibold shadow-[2px_2px_0_#fe7445] hover:bg-arkiv-orange"
     >
       <GitHubMark />
       <span>[ DikshitRJ/arkivector ]</span>
@@ -75,19 +77,20 @@ function RepoChip() {
 export function Layout({ route, children }: { route: Route; children: ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
+      <VectorField />
+      <SoundToggle />
       <header className="bg-paper border-b-[1.5px] border-ink">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-3 pb-2 lg:pb-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="px-4 sm:px-6 pt-3 pb-2 lg:pb-3 flex flex-wrap items-center gap-x-2 sm:gap-x-6 gap-y-2">
           <Link to="/" className="flex items-center gap-2 no-underline" aria-label="Arkivector home">
             <Logo />
             <span className="font-display text-[19px] font-bold tracking-tight">arkivector</span>
           </Link>
-          <div className="ml-auto flex items-center gap-2 lg:order-3">
-            <SoundToggle />
+          <div className="ml-auto lg:order-3">
             <RepoChip />
           </div>
           <nav
             aria-label="Main"
-            className="order-last lg:order-2 w-full lg:w-auto -mx-1 px-1 flex items-center gap-4 sm:gap-5 text-[13.5px] overflow-x-auto"
+            className="order-last lg:order-2 w-full lg:w-auto lg:mx-auto -mx-1 px-1 flex items-center gap-4 sm:gap-5 text-[13.5px] overflow-x-auto"
           >
             {NAV.map((n) => {
               const active = route === n.to;
@@ -112,7 +115,7 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
       </header>
       <main className="flex-1">{children}</main>
       <footer className="bg-paper border-t-[1.5px] border-ink">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-[13px]">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 pb-20 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-[13px]">
           <p className="flex flex-wrap gap-x-4 gap-y-1">
             <span>Built for ETHGlobal Mumbai 2026.</span>
             <a className="ink-link" href={REPO} target="_blank" rel="noreferrer">source</a>
