@@ -39,8 +39,8 @@ export function Home() {
               <span className="marker">written on chain by your wallet</span>, and you query them with one REST call or from Python and Node.js.
             </p>
             <div className="mt-6 flex flex-wrap gap-4">
-              <Button href="#/install">Install</Button>
-              <Button href="#/architecture" variant="outline">
+              <Button href="/install">Install</Button>
+              <Button href="/architecture" variant="outline">
                 Watch how it works
               </Button>
             </div>
@@ -122,7 +122,7 @@ export function Home() {
               you always see your own write.
             </p>
             <div className="mt-5 flex flex-wrap gap-4">
-              <Button href="#/install">Get started</Button>
+              <Button href="/install">Get started</Button>
               <Button href={REPO} variant="outline" external>
                 Source on GitHub
               </Button>

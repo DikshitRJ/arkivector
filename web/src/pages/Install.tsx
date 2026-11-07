@@ -241,7 +241,7 @@ export function Install() {
           returned <C>cat</C> and <C>dog</C> with those distances a few blocks later.
         </P>
         <div className="mt-6 flex flex-wrap gap-4">
-          <Button href="#/architecture">See what happened inside</Button>
+          <Button href="/architecture">See what happened inside</Button>
           <Button href={`${REPO}#configuration-reference`} variant="outline" external>
             All configuration options
           </Button>

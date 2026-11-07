@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "../router";
 
 /** Solid ink button with a hard offset shadow that presses flat when clicked. */
 export function Button({
@@ -18,6 +19,13 @@ export function Button({
     "hover:-translate-x-px hover:-translate-y-px hover:shadow-[4px_4px_0_#000] " +
     "active:translate-x-[3px] active:translate-y-[3px] active:shadow-none";
   const look = variant === "solid" ? "bg-ink text-paper" : "bg-paper text-ink";
+  if (!external && href.startsWith("/")) {
+    return (
+      <Link to={href} className={`${base} ${look}`}>
+        {children}
+      </Link>
+    );
+  }
   return (
     <a href={href} className={`${base} ${look}`} {...(external ? { target: "_blank", rel: "noreferrer" } : {})}>
       {children}
