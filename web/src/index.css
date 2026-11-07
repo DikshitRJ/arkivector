@@ -25,9 +25,9 @@
     font-size: 15px;
     line-height: 1.65;
     color: #000;
-    /* dot-grid paper: one 1px black dot every 22px */
-    background-color: #fff;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Crect x='10' y='10' width='1' height='1' fill='%23000'/%3E%3C/svg%3E");
+    /* transparent on purpose: html carries the white, so the fixed vector-field canvas
+       (VectorField.tsx, z-index -10) paints above it and below the content */
+    background: transparent;
     overflow-x: hidden;
   }
   h1, h2, h3 {
@@ -55,6 +55,7 @@
 @layer components {
   /* Inline links: a solid underline that thickens on hover. */
   .ink-link {
+    color: #181ea9;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
@@ -79,7 +80,7 @@
 
   /* Highlighter: an orange band behind the lower part of the text, like a marker stroke. */
   .marker {
-    background-image: linear-gradient(transparent 52%, #fe7445 52%, #fe7445 96%, transparent 96%);
+    background-image: linear-gradient(transparent 12%, #fe7445 12%, #fe7445 94%, transparent 94%);
     padding: 0 0.12em;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;

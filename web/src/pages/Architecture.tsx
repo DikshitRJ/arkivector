@@ -1,22 +1,83 @@
-import { useCallback, useRef, type KeyboardEvent, type PointerEvent } from "react";
-import { Stage } from "../anim/film/Stage";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { ArchDiagram } from "../anim/ArchDiagram";
+import { Film } from "../anim/film/Stage";
 import { TALL, WIDE } from "../anim/film/layout";
 import { CHAPTERS, LINES, TOTAL, chapterAt, lineAt } from "../anim/film/script";
 import { useNarrow, useReducedMotion, useTimeline, type Timeline } from "../anim/time";
+import { speak, speechSupported, stopSpeaking } from "../audio/narrator";
+import { useSound } from "../audio/sound";
 import { Page, REPO } from "../components/Layout";
 import { Button, H2, Note } from "../components/ui";
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const VOICE_KEY = "arkivector-voice";
+
+function readVoicePref(): boolean {
+  try {
+    return localStorage.getItem(VOICE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
 
 export function Architecture() {
-  const tl = useTimeline(TOTAL * 1000);
   const narrow = useNarrow();
   const reduced = useReducedMotion();
+  const { duck } = useSound();
+  const [voice, setVoice] = useState(() => speechSupported() && readVoicePref());
+  const speaking = useRef(false);
+  const curRef = useRef(0);
+
+  // While the narrator is reading a line, the clock may not pass the start of the next line.
+  const limit = useCallback(() => {
+    if (!speaking.current) return null;
+    const next = LINES[curRef.current + 1];
+    return next ? next.t * 1000 - 30 : null;
+  }, []);
+  const tl = useTimeline(TOTAL * 1000, limit);
   const t = tl.t / 1000;
   const L = narrow ? TALL : WIDE;
   const chapter = chapterAt(t);
+  const cur = lineAt(t);
+  curRef.current = cur;
 
+  // narrate the current line
+  useEffect(() => {
+    if (!tl.playing || !voice) return;
+    speaking.current = true;
+    duck(true);
+    const cancel = speak(LINES[cur].say ?? LINES[cur].text, () => {
+      speaking.current = false;
+      duck(false);
+    });
+    return () => {
+      cancel();
+      speaking.current = false;
+      duck(false);
+    };
+  }, [cur, tl.playing, voice, duck]);
+
+  useEffect(() => () => stopSpeaking(), []);
+
+  const toggleVoice = () => {
+    setVoice((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(VOICE_KEY, next ? "on" : "off");
+      } catch {
+        /* ignore */
+      }
+      if (!next) stopSpeaking();
+      return next;
+    });
+  };
+
+  const filmRef = useRef<HTMLDivElement>(null);
   const jump = useCallback((s: number) => tl.seek(s * 1000), [tl]);
+  const jumpAndShow = (s: number) => {
+    jump(s);
+    filmRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const onKey = (e: KeyboardEvent) => {
     if (e.key === " " || e.key === "k") {
@@ -24,6 +85,7 @@ export function Architecture() {
       tl.toggle();
     } else if (e.key === "ArrowRight") jump(Math.min(TOTAL, t + 5));
     else if (e.key === "ArrowLeft") jump(Math.max(0, t - 5));
+    else if (e.key === "m") toggleVoice();
   };
 
   return (
@@ -32,21 +94,32 @@ export function Architecture() {
         <h1 className="text-[38px] sm:text-[50px]">
           <span className="bg-paper">How it works</span>
         </h1>
-        <p className="mt-3 max-w-[66ch] text-[16px] bg-paper">
-          A write, a sync, a search, an expiry and a reorg, followed through the daemon. Ninety seconds, no sound. Subtitles run
-          under the picture, and the full text is below if you would rather read.
+        <p className="mt-3 max-w-[64ch] text-[16px] bg-paper">
+          A write, a sync and a search followed through the daemon, then the math that ranks the results.
         </p>
       </Page>
 
       <Page className="pb-12">
+        <H2>The big picture</H2>
+        <ArchDiagram />
+        <p className="mt-3 max-w-[72ch] text-[13.5px] bg-paper">
+          Your code talks to <code className="chip">arkivectord</code> through an SDK. The daemon writes to Arkiv with signed
+          transactions and reads entities back into its local index. Search never leaves the daemon.
+        </p>
+      </Page>
+
+      <Page className="pb-12">
+        <div ref={filmRef} className="scroll-mt-4">
+          <H2>The film</H2>
+        </div>
         <div
           className="sheet outline-none focus-visible:outline-2 focus-visible:outline-dashed"
           tabIndex={0}
           onKeyDown={onKey}
-          aria-label="Architecture film. Space to play or pause, arrow keys to skip five seconds."
+          aria-label="Architecture film. Space to play or pause, arrow keys to skip five seconds, m to mute the narrator."
         >
           <div className="relative">
-            <Stage t={t} L={L} />
+            <Film t={t} L={L} />
             {!tl.playing && (t === 0 || tl.ended) && (
               <div className="absolute inset-0 grid place-items-center">
                 <button
@@ -59,69 +132,61 @@ export function Architecture() {
               </div>
             )}
           </div>
-          <Controls tl={tl} t={t} chapter={chapter} jump={jump} />
-          <Subtitles t={t} narrow={narrow} />
+          <Controls tl={tl} t={t} chapter={chapter} jump={jump} voice={voice} toggleVoice={toggleVoice} />
+          <Subtitles cur={cur} narrow={narrow} />
         </div>
         {reduced && <p className="mt-3 text-[13px]">Reduced motion is on: the film waits for you to press play.</p>}
+        {!speechSupported() && <p className="mt-3 text-[13px]">This browser has no speech synthesis, so the film plays with subtitles only.</p>}
       </Page>
 
       <Page className="pb-16">
-        <div className="grid md:grid-cols-[minmax(0,1fr)_16rem] gap-8 items-start">
-          <div className="min-w-0">
-            <H2>The same story, as text</H2>
-            {CHAPTERS.map((c, ci) => (
-              <section key={c.title} className="mb-6">
-                <h3 className="text-[19px] mb-1">
-                  <button type="button" className="text-left hover:underline underline-offset-4 bg-paper" onClick={() => jump(c.start)}>
-                    {ci + 1}. {c.title} <span className="font-mono text-[12.5px] font-normal">({fmt(c.start)})</span>
-                  </button>
-                </h3>
-                <p className="max-w-[72ch] bg-paper">
-                  {LINES.filter((l) => l.t >= c.start && l.t < c.end)
-                    .map((l) => l.text)
-                    .join(" ")}
+        <H2>The same story, short</H2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {CHAPTERS.map((c, i) => (
+            <button
+              key={c.title}
+              type="button"
+              onClick={() => jumpAndShow(c.start)}
+              className="sheet text-left hover:shadow-[3px_3px_0_#fe7445] transition-shadow"
+            >
+              <div className="pointer-events-none border-b border-dashed border-ink">
+                <Film t={c.still} L={WIDE} />
+              </div>
+              <div className="px-3 py-2">
+                <p className="font-semibold text-[14px]">
+                  {i + 1}. {c.title} <span className="font-normal text-[12px]">{fmt(c.start)}</span>
                 </p>
-              </section>
-            ))}
-          </div>
-          <aside className="md:sticky md:top-6">
-            <div className="sheet px-4 py-3">
-              <p className="font-semibold mb-2">Where to look in the code</p>
-              <ul className="space-y-1 text-[13px]">
-                <li>
-                  <code>daemon/src/server/</code> HTTP and REST
-                </li>
-                <li>
-                  <code>daemon/src/write/</code> writer, nonce, batches
-                </li>
-                <li>
-                  <code>daemon/src/arkiv/</code> ABI, RLP, signer
-                </li>
-                <li>
-                  <code>daemon/src/sync/</code> syncer, TTL, reorgs
-                </li>
-                <li>
-                  <code>daemon/src/filter/</code> filters, bitmaps
-                </li>
-                <li>
-                  <code>daemon/src/pgvector/</code> copied pgvector code
-                </li>
-              </ul>
-            </div>
-            <Note className="mt-4 -rotate-2">the film runs on a 30-line timeline engine. no video file.</Note>
-            <div className="mt-5">
-              <Button href={REPO} variant="outline" external>
-                Read the source
-              </Button>
-            </div>
-          </aside>
+                <p className="text-[13px] leading-snug">{c.summary}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <Button href={REPO} variant="outline" external>
+            Read the source
+          </Button>
+          <Note className="-rotate-1">no video file: every frame is drawn from the time value.</Note>
         </div>
       </Page>
     </>
   );
 }
 
-function Controls({ tl, t, chapter, jump }: { tl: Timeline; t: number; chapter: number; jump: (s: number) => void }) {
+function Controls({
+  tl,
+  t,
+  chapter,
+  jump,
+  voice,
+  toggleVoice,
+}: {
+  tl: Timeline;
+  t: number;
+  chapter: number;
+  jump: (s: number) => void;
+  voice: boolean;
+  toggleVoice: () => void;
+}) {
   const barRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
@@ -135,12 +200,13 @@ function Controls({ tl, t, chapter, jump }: { tl: Timeline; t: number; chapter: 
 
   const prev = () => jump(t - CHAPTERS[chapter].start > 1.5 ? CHAPTERS[chapter].start : CHAPTERS[Math.max(0, chapter - 1)].start);
   const next = () => jump(chapter + 1 < CHAPTERS.length ? CHAPTERS[chapter + 1].start : TOTAL);
+  const small = "whitespace-nowrap border-[1.5px] border-ink px-2 py-1 text-[13px] hover:bg-ink hover:text-paper";
 
   const pct = (t / TOTAL) * 100;
   return (
     <div className="border-t-[1.5px] border-ink px-3 py-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={tl.toggle}
@@ -149,12 +215,23 @@ function Controls({ tl, t, chapter, jump }: { tl: Timeline; t: number; chapter: 
           >
             {tl.playing ? "pause" : "play"}
           </button>
-          <button type="button" onClick={prev} aria-label="Previous chapter" className="whitespace-nowrap border-[1.5px] border-ink px-2 py-1 text-[13px] hover:bg-ink hover:text-paper">
+          <button type="button" onClick={prev} aria-label="Previous chapter" className={small}>
             ‹ prev
           </button>
-          <button type="button" onClick={next} aria-label="Next chapter" className="whitespace-nowrap border-[1.5px] border-ink px-2 py-1 text-[13px] hover:bg-ink hover:text-paper">
+          <button type="button" onClick={next} aria-label="Next chapter" className={small}>
             next ›
           </button>
+          {speechSupported() && (
+            <button
+              type="button"
+              onClick={toggleVoice}
+              aria-pressed={voice}
+              title="Narrator (m)"
+              className={`${small} ${voice ? "border-arkiv-orange shadow-[2px_2px_0_#fe7445]" : ""}`}
+            >
+              {voice ? "voice on" : "voice off"}
+            </button>
+          )}
         </div>
         <p className="text-[13px] tabular-nums whitespace-nowrap">
           {fmt(t)} / {fmt(TOTAL)}
@@ -205,15 +282,11 @@ function Controls({ tl, t, chapter, jump }: { tl: Timeline; t: number; chapter: 
 }
 
 /** Subtitles scroll upward like a teleprompter; the current line is set in bold with an orange rule. */
-function Subtitles({ t, narrow }: { t: number; narrow: boolean }) {
-  const cur = lineAt(t);
+function Subtitles({ cur, narrow }: { cur: number; narrow: boolean }) {
   const LINE_H = narrow ? 82 : 54;
   return (
     <div className="relative border-t-[1.5px] border-ink overflow-hidden" style={{ height: LINE_H * 2 + 24 }} aria-live="polite">
-      <div
-        className="transition-transform duration-300 ease-out"
-        style={{ transform: `translateY(${12 + LINE_H - cur * LINE_H}px)` }}
-      >
+      <div className="transition-transform duration-300 ease-out" style={{ transform: `translateY(${12 + LINE_H - cur * LINE_H}px)` }}>
         {LINES.map((l, i) => {
           const state = i < cur ? "past" : i === cur ? "now" : "next";
           return (

@@ -5,7 +5,7 @@ Arkivector is entered at ETHGlobal Mumbai 2026. Judges and developers need one p
 
 ## What changes
 - New `web/` folder: a static React + TypeScript + Tailwind site built with Vite. No backend.
-- Four pages: home, install, architecture, team.
+- Pages: home, install, architecture (diagram + narrated film), build artifacts, what's next, team, and a 404 page.
 - A pen-and-paper visual language in pure black (#000) and white (#fff): ruled and dotted paper, ink strokes that draw themselves, hand-lettered annotations.
 - SVG animations driven by a small timeline engine (no animation library):
   - text turning into a vector and landing in a rotating 3D space;
@@ -17,7 +17,7 @@ Arkivector is entered at ETHGlobal Mumbai 2026. Judges and developers need one p
 - `landing-site`: static marketing and documentation site for Arkivector.
 
 ## Out of scope
-Backend, analytics, a hosted demo against a live daemon, code documentation, integration tests, deployment workflow.
+Backend, analytics, a hosted demo against a live daemon, code documentation, integration tests, deployment workflow. Audio is synthesised in the browser (Web Audio, speech synthesis); no audio files ship.
 
 ## Impact
 New code under `web/` only. No change to the daemon, the SDKs, or the contract.

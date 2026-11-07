@@ -4,6 +4,7 @@ import { Arrow, Box, InkDefs, Stroke } from "../../ink/Ink";
 import { line, loop, rect } from "../../ink/paths";
 import { ease, lerp, seg } from "../time";
 import { bottom, cx, left, mid, right, top, type Layout, type R } from "./layout";
+import { MathScenes } from "./MathScenes";
 import { N } from "./script";
 
 type P2 = [number, number];
@@ -125,7 +126,17 @@ function asOf(t: number): number {
 
 /* ---------------- the stage ---------------- */
 
-export function Stage({ t, L }: { t: number; L: Layout }) {
+/**
+ * The whole film. Chapters 6 to 8 (56 to 100 s) are the math scenes; the diagram chapters after
+ * them reuse the diagram timeline shifted by 44 s.
+ */
+export function Film({ t, L }: { t: number; L: Layout }) {
+  if (t < 56) return <Stage t={t} L={L} clock={t} />;
+  if (t < 100) return <MathScenes t={t} L={L} />;
+  return <Stage t={t - 44} L={L} clock={t} />;
+}
+
+export function Stage({ t, L, clock }: { t: number; L: Layout; clock: number }) {
   if (t >= 74) return <Finale t={t} L={L} />;
 
   const fs = L.fs;
@@ -281,7 +292,7 @@ export function Stage({ t, L }: { t: number; L: Layout }) {
 
       {/* chapter heading in the corner, like a page header */}
       <T x={L.vw - 12} y={L.vh - 10} s={11 * fs} a="end">
-        {Math.floor(t)}s
+        {Math.floor(clock)}s
       </T>
     </svg>
   );

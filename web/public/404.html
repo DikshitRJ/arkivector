@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Arkivector</title>
+    <script>
+      // GitHub Pages serves this file for unknown paths. Keep the requested path and load the app,
+      // which restores it with history.replaceState (see src/router.tsx).
+      sessionStorage.setItem("spa-redirect", location.pathname + location.search + location.hash);
+      var base = (document.currentScript && document.currentScript.dataset.base) || "/";
+      var parts = location.pathname.split("/");
+      // project sites live under /<repo>/; user sites at /
+      var root = location.hostname.endsWith("github.io") && parts.length > 2 ? "/" + parts[1] + "/" : base;
+      location.replace(root);
+    </script>
+  </head>
+  <body></body>
+</html>
