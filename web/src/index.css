@@ -1,10 +1,13 @@
 @import "tailwindcss";
 
-/* Only two colors exist on this site: ink (#000) and paper (#fff).
+/* Palette: ink (#000) on paper (#fff), plus two Arkiv colors used like pens:
+   Arkiv blue for handwritten notes and the Arkiv mark, Arkiv orange as a highlighter.
    Tones come from line weight, dashes, hatching and dots, never from grey. */
 @theme {
   --color-ink: #000000;
   --color-paper: #ffffff;
+  --color-arkiv-blue: #181ea9;
+  --color-arkiv-orange: #fe7445;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-hand: "Caveat", "Comic Sans MS", cursive;
@@ -34,8 +37,8 @@
     letter-spacing: -0.01em;
   }
   ::selection {
-    background: #000;
-    color: #fff;
+    background: #fe7445;
+    color: #000;
   }
   a {
     color: inherit;
@@ -72,6 +75,14 @@
     padding: 0 0.3em;
     font-size: 0.92em;
     white-space: nowrap;
+  }
+
+  /* Highlighter: an orange band behind the lower part of the text, like a marker stroke. */
+  .marker {
+    background-image: linear-gradient(transparent 52%, #fe7445 52%, #fe7445 96%, transparent 96%);
+    padding: 0 0.12em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
 
   /* Diagonal hatching used as the only "grey" on the site. */

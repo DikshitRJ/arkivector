@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import { ORANGE } from "./colors";
 import { arrowHead, line, rect, scribble, type Pt } from "./paths";
 
 /**
@@ -41,6 +42,7 @@ export function Box({
   sw = 1.6,
   fill = "#fff",
   hatch = false,
+  color = "#000",
 }: {
   x: number;
   y: number;
@@ -51,24 +53,41 @@ export function Box({
   sw?: number;
   fill?: string;
   hatch?: boolean;
+  color?: string;
 }) {
   if (p <= 0) return null;
   return (
     <g>
       {p >= 1 && <rect x={x} y={y} width={w} height={h} fill={hatch ? "url(#hatch)" : fill} />}
-      <Stroke d={rect(x, y, w, h, seed)} p={p} w={sw} />
+      <Stroke d={rect(x, y, w, h, seed)} p={p} w={sw} stroke={color} />
     </g>
   );
 }
 
 /** Hand-drawn arrow from a to b. */
-export function Arrow({ a, b, seed = 1, p = 1, w = 1.6, dash }: { a: Pt; b: Pt; seed?: number; p?: number; w?: number; dash?: string }) {
+export function Arrow({
+  a,
+  b,
+  seed = 1,
+  p = 1,
+  w = 1.6,
+  dash,
+  color = "#000",
+}: {
+  a: Pt;
+  b: Pt;
+  seed?: number;
+  p?: number;
+  w?: number;
+  dash?: string;
+  color?: string;
+}) {
   if (p <= 0) return null;
   const tip: Pt = [a[0] + (b[0] - a[0]) * Math.min(1, p), a[1] + (b[1] - a[1]) * Math.min(1, p)];
   return (
     <g>
-      <Stroke d={line(a, tip, seed)} w={w} dash={dash} />
-      <Stroke d={arrowHead(a, tip, 8 + w)} w={w} />
+      <Stroke d={line(a, tip, seed)} w={w} dash={dash} stroke={color} />
+      <Stroke d={arrowHead(a, tip, 8 + w)} w={w} stroke={color} />
     </g>
   );
 }
@@ -95,7 +114,7 @@ export function Underline({ width, seed = 3 }: { width: number; seed?: number })
       height={8}
       viewBox={`0 0 ${width} 8`}
     >
-      <path d={scribble(1, 4, width - 2, seed)} fill="none" stroke="#000" strokeWidth={1.8} strokeLinecap="round" />
+      <path d={scribble(1, 4, width - 2, seed)} fill="none" stroke={ORANGE} strokeWidth={2.4} strokeLinecap="round" />
     </svg>
   );
 }

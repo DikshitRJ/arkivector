@@ -91,7 +91,7 @@ export function Tabs({ tabs }: { tabs: { id: string; label: string; body: ReactN
 
 /** A handwritten margin note. */
 export function Note({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <p className={`font-hand text-[22px] leading-tight ${className}`}>{children}</p>;
+  return <p className={`font-hand text-[22px] leading-tight text-arkiv-blue ${className}`}>{children}</p>;
 }
 
 /** Section heading with a short ink rule under it. */
@@ -100,5 +100,14 @@ export function H2({ children, id }: { children: ReactNode; id?: string }) {
     <h2 id={id} className="text-[26px] sm:text-[30px] mt-2 mb-3">
       <span className="bg-paper">{children}</span>
     </h2>
+  );
+}
+
+/** The Arkiv wordmark as Arkiv writes it: bracketed capitals, in Arkiv blue. */
+export function ArkivMark({ className = "" }: { className?: string }) {
+  return (
+    <span className={`font-display font-bold tracking-[0.02em] whitespace-nowrap text-arkiv-blue ${className}`} aria-label="Arkiv">
+      [&nbsp;ARKIV&nbsp;]
+    </span>
   );
 }

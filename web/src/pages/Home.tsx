@@ -1,7 +1,7 @@
 import { HeroDemo } from "../anim/HeroDemo";
 import { SearchDemo } from "../anim/SearchDemo";
 import { Page, REPO } from "../components/Layout";
-import { Button, CodeBlock, H2, Note } from "../components/ui";
+import { ArkivMark, Button, CodeBlock, H2, Note } from "../components/ui";
 
 const FACTS: { n: string; what: string }[] = [
   { n: "97", what: "parity tests against pgvector 0.8.7 running in Postgres. Every distance is bit-identical or within float32 rounding." },
@@ -29,12 +29,14 @@ export function Home() {
       <Page className="pt-10 sm:pt-16 pb-8">
         <div className="grid md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-6 items-end">
           <div>
-            <h1 className="text-[40px] sm:text-[56px] max-w-[14ch]">
-              <span className="bg-paper">Vector search for Arkiv.</span>
+            <h1 className="text-[40px] sm:text-[56px]">
+              <span className="bg-paper">Vector search for</span>
+              <br />
+              <ArkivMark className="bg-paper" />
             </h1>
             <p className="mt-4 max-w-[60ch] text-[16px] bg-paper">
-              Arkivector runs pgvector's distance functions over entities stored on the Arkiv chain. Your embeddings are
-              written on chain by your wallet, and you query them with one REST call or from Python and Node.js.
+              Arkivector runs pgvector's distance functions over entities stored on the Arkiv chain. Your embeddings are{" "}
+              <span className="marker">written on chain by your wallet</span>, and you query them with one REST call or from Python and Node.js.
             </p>
             <div className="mt-6 flex flex-wrap gap-4">
               <Button href="#/install">Install</Button>
@@ -65,7 +67,9 @@ export function Home() {
             </p>
           </section>
           <section className="sheet px-5 py-4">
-            <H2>Arkiv had no vector search</H2>
+            <H2>
+              <ArkivMark /> had no vector search
+            </H2>
             <p>
               Arkiv is a chain built for data: entities with typed attributes, an owner, and an expiry block, queried with a
               filter language. You could store an embedding there as bytes, but you could not ask which entities are closest to

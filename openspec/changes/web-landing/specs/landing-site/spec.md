@@ -7,10 +7,10 @@ The site SHALL build to static files with no backend and SHALL ship under 100 kB
 - **WHEN** `npm run build` runs in `web/`
 - **THEN** `web/dist` contains the complete site and the type check passes
 
-### Requirement: Black and white only
-All rendered color SHALL be #000000 or #ffffff. Tones SHALL come from line weight, dashes, hatching, and dots.
+### Requirement: Paper palette
+Rendered color SHALL be black (#000000) on a white (#ffffff) background, with Arkiv blue (#181EA9) for handwritten notes and the Arkiv mark and Arkiv orange (#FE7445) as a highlighter. Tones SHALL come from line weight, dashes, hatching, and dots.
 
-#### Scenario: No grey
+#### Scenario: No other colors
 - **WHEN** the stylesheets and SVGs are inspected
 - **THEN** no other color value, gradient, or opacity-based grey appears
 

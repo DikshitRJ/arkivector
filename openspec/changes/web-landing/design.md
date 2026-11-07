@@ -6,7 +6,7 @@
 - Fonts (Google Fonts): IBM Plex Mono for body and code, Space Grotesk for headings, Caveat for hand-written annotations only. No Inter/Roboto, no italic serif hero.
 
 ## Visual language
-- Only #000 and #fff. Tones come from line weight, dashes, hatching, and dot patterns, never grey fills or opacity.
+- Black (#000) ink on white (#fff) paper, plus two Arkiv colors (from arkiv.network) used like pens: Arkiv blue #181EA9 is the ballpoint for handwritten notes and the `[ ARKIV ]` mark; Arkiv orange #FE7445 is the highlighter for whatever moves or is chosen in an animation. The background stays white. Tones come from line weight, dashes, hatching, and dot patterns, never grey fills or opacity.
 - Paper: white page, a faint dot grid made of 1 px black dots (body background), a margin rule on wide screens.
 - Ink: strokes animate in with `stroke-dashoffset`; a deterministic "wobble" turns straight lines into hand-drawn ones (seeded, so it does not jitter between frames).
 - Boxes have square corners drawn as slightly irregular ink outlines. Primary buttons are solid black with a hard 3 px offset shadow; they press down on click. Active nav item gets a hand-drawn underline scribble.

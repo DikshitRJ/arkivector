@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { BLUE, ORANGE } from "../ink/colors";
 import { Arrow, Stroke } from "../ink/Ink";
 import { arc, loop } from "../ink/paths";
 import { useLoop } from "./time";
@@ -51,21 +52,30 @@ export function SearchDemo() {
             return (
               <g key={it.label}>
                 <Arrow a={[cx, cy]} b={tip} seed={60 + i} w={top.has(it.label) ? 1.8 : 1.1} dash={top.has(it.label) ? undefined : "3 3"} />
-                <text x={lab[0]} y={lab[1] + 5} fontSize="17" textAnchor={right ? "start" : "end"} style={{ fontFamily: "var(--font-hand)" }}>
+                <text x={lab[0]} y={lab[1] + 5} fontSize="17" textAnchor={right ? "start" : "end"} fill={BLUE} style={{ fontFamily: "var(--font-hand)" }}>
                   {it.label}
                 </text>
-                {top.has(it.label) && <Stroke d={loop(tip[0], tip[1], 9, 9, 70 + i)} w={1.4} />}
+                {top.has(it.label) && <Stroke d={loop(tip[0], tip[1], 10, 10, 70 + i)} w={2} stroke={ORANGE} />}
               </g>
             );
           })}
           {/* query */}
-          <Arrow a={[cx, cy]} b={at(qDeg, R * 0.92)} seed={80} w={2.8} />
-          <text x={at(qDeg, R * 0.92)[0] + (Math.cos(-rad(qDeg)) >= 0 ? -10 : 10)} y={at(qDeg, R * 0.92)[1] + 22} fontSize="13" fontWeight="600" textAnchor={Math.cos(-rad(qDeg)) >= 0 ? "end" : "start"}>
-            query
-          </text>
+          <Arrow a={[cx, cy]} b={at(qDeg, R * 0.92)} seed={80} w={3} color={ORANGE} />
+          {(() => {
+            // label the query beside its shaft, on the side away from the angle marker
+            const m = at(qDeg, R * 0.62);
+            const side = qDeg >= best.deg ? 1 : -1;
+            const nx = -Math.sin(-rad(qDeg)) * 16 * side;
+            const ny = Math.cos(-rad(qDeg)) * 16 * side;
+            return (
+              <text x={m[0] - nx} y={m[1] - ny + 4} fontSize="13" fontWeight="600" textAnchor="middle" fill={ORANGE}>
+                query
+              </text>
+            );
+          })()}
           {/* angle to the nearest */}
-          <Stroke d={arc(cx, cy, 38, -rad(Math.max(qDeg, best.deg)), -rad(Math.min(qDeg, best.deg)))} w={1.4} />
-          <text x={at((qDeg + best.deg) / 2, 50)[0]} y={at((qDeg + best.deg) / 2, 50)[1] + 4} fontSize="13" textAnchor="middle">
+          <Stroke d={arc(cx, cy, 30, -rad(Math.max(qDeg, best.deg)), -rad(Math.min(qDeg, best.deg)))} w={1.8} stroke={ORANGE} />
+          <text x={at((qDeg + best.deg) / 2, 42)[0]} y={at((qDeg + best.deg) / 2, 42)[1] + 4} fontSize="13" textAnchor="middle">
             θ
           </text>
         </svg>
@@ -75,7 +85,9 @@ export function SearchDemo() {
         <p className="text-[13px] mb-2">
           cosine distance, <span className="chip">{"<=>"}</span>
         </p>
-        <p className="font-display text-[22px] mb-3">d = 1 − cos θ</p>
+        <p className="font-display text-[22px] mb-3">
+          <span className="marker">d = 1 − cos θ</span>
+        </p>
         <table className="w-full text-[13px] border-collapse">
           <thead>
             <tr className="border-b-[1.5px] border-ink text-left">
@@ -88,7 +100,10 @@ export function SearchDemo() {
           <tbody>
             {ranked.map((r, i) => (
               <tr key={r.label} className={`border-b border-dashed border-ink ${i < K ? "font-semibold" : ""}`}>
-                <td className="py-1">{i < K ? `${i + 1} ✓` : i + 1}</td>
+                <td className="py-1">
+                  {i + 1}
+                  {i < K && <span className="ml-1 text-arkiv-orange">✓</span>}
+                </td>
                 <td className="py-1">{r.label}</td>
                 <td className="py-1 text-right tabular-nums">{r.theta.toFixed(0)}°</td>
                 <td className="py-1 text-right tabular-nums">{r.d.toFixed(3)}</td>

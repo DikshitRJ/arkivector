@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { BLUE, ORANGE } from "../ink/colors";
 import { Arrow, Box, InkDefs, Stroke } from "../ink/Ink";
 import { line, loop, rect } from "../ink/paths";
 import { ease, easeOut, lerp, project, seg, useLoop } from "./time";
@@ -121,11 +122,11 @@ function TextPanel({ s, erase }: { s: number; erase: number }) {
       {/* the column leaves as a point, heading to the right panel */}
       {pDot > 0 && (
         <g>
-          <circle cx={lerp(232, 344, easeOut(pDot))} cy={lerp(264, 246, easeOut(pDot))} r={5} fill="#000" />
-          <Stroke d={line([224, 264], [lerp(232, 338, easeOut(pDot)), lerp(264, 247, easeOut(pDot))], 41)} w={1} dash="2 4" />
+          <Stroke d={line([224, 264], [lerp(232, 338, easeOut(pDot)), lerp(264, 247, easeOut(pDot))], 41)} w={1.4} dash="2 4" stroke={ORANGE} />
+          <circle cx={lerp(232, 344, easeOut(pDot))} cy={lerp(264, 246, easeOut(pDot))} r={5.5} fill={ORANGE} />
         </g>
       )}
-      <text x="250" y="232" fontSize="20" style={{ fontFamily: "var(--font-hand)" }}>
+      <text x="250" y="232" fontSize="20" fill={BLUE} style={{ fontFamily: "var(--font-hand)" }}>
         {pNums > 0.9 ? "one vector" : ""}
       </text>
     </svg>
@@ -187,7 +188,7 @@ function SpacePanel({ s, erase }: { s: number; erase: number }) {
           <g key={it.label}>
             <Arrow a={[o[0], o[1]]} b={[x, y]} seed={it.seed} p={seg(pAxes, 0.4, 1)} w={1.2} dash={behind ? "3 3" : undefined} />
             {pAxes > 0.95 && (
-              <text x={x + (x > cx ? 8 : -8)} y={y + 4} fontSize="18" textAnchor={x > cx ? "start" : "end"} style={{ fontFamily: "var(--font-hand)" }}>
+              <text x={x + (x > cx ? 8 : -8)} y={y + 4} fontSize="18" textAnchor={x > cx ? "start" : "end"} fill={BLUE} style={{ fontFamily: "var(--font-hand)" }}>
                 {it.label}
               </text>
             )}
@@ -198,13 +199,13 @@ function SpacePanel({ s, erase }: { s: number; erase: number }) {
       {/* the new vector arrives */}
       {pArrive > 0 && (
         <g>
-          {pArrive >= 1 && <Arrow a={[o[0], o[1]]} b={[newPt[0], newPt[1]]} seed={7} w={2.4} />}
-          <circle cx={arrivedAt[0]} cy={arrivedAt[1]} r={5} fill="#000" />
+          {pArrive >= 1 && <Arrow a={[o[0], o[1]]} b={[newPt[0], newPt[1]]} seed={7} w={2.6} color={ORANGE} />}
+          <circle cx={arrivedAt[0]} cy={arrivedAt[1]} r={5.5} fill={ORANGE} />
         </g>
       )}
       {pArrive >= 1 && (
         <g>
-          <circle cx="26" cy="24" r="5" fill="#000" />
+          <circle cx="26" cy="24" r="5.5" fill={ORANGE} />
           <text x="38" y="29" fontSize="13" fontWeight="600">cats purr at night (new)</text>
         </g>
       )}
@@ -212,10 +213,10 @@ function SpacePanel({ s, erase }: { s: number; erase: number }) {
       {/* nearest neighbour */}
       {pNear > 0 && (
         <g>
-          <Stroke d={line([newPt[0], newPt[1]], [nearPt[0], nearPt[1]], 51)} p={pNear} w={1.2} dash="2 3" />
-          <Stroke d={loop(nearPt[0], nearPt[1], 12, 12, 52)} p={pNear} w={1.4} />
+          <Stroke d={line([newPt[0], newPt[1]], [nearPt[0], nearPt[1]], 51)} p={pNear} w={1.4} dash="2 3" stroke={ORANGE} />
+          <Stroke d={loop(nearPt[0], nearPt[1], 12, 12, 52)} p={pNear} w={2} stroke={ORANGE} />
           {pNear > 0.9 && (
-            <text x="24" y="314" fontSize="20" style={{ fontFamily: "var(--font-hand)" }}>
+            <text x="24" y="314" fontSize="20" fill={BLUE} style={{ fontFamily: "var(--font-hand)" }}>
               nearest stored vector: "kittens nap"
             </text>
           )}
