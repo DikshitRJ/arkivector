@@ -81,8 +81,8 @@ function Step({ n, title, children, last = false }: { n: number; title: string; 
   return (
     <section className="grid grid-cols-[2.5rem_minmax(0,1fr)] sm:grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 sm:gap-x-5">
       <div className="relative flex justify-center">
-        {!last && <div aria-hidden className="absolute top-12 bottom-0 border-l-[1.5px] border-dashed border-ink" />}
-        <div className="relative z-10 mt-1 h-10 w-10 sm:h-11 sm:w-11 grid place-items-center bg-ink text-paper font-display text-[20px] font-bold shadow-[3px_3px_0_#000] ring-[1.5px] ring-ink ring-offset-2 ring-offset-paper">
+        {!last && <div aria-hidden className="absolute top-12 bottom-0 border-l-2 border-dashed border-arkiv-blue" />}
+        <div className="relative z-10 mt-1 h-10 w-10 sm:h-11 sm:w-11 grid place-items-center bg-ink text-paper font-display text-[20px] font-bold shadow-[4px_4px_0_#fe7445]">
           {n}
         </div>
       </div>
@@ -106,7 +106,7 @@ export function Install() {
         <span className="bg-paper">Install</span>
       </h1>
       <p className="mt-3 mb-10 max-w-[64ch] text-[16px] bg-paper">
-        You need three things: the daemon (<C>arkivectord</C>), a funded Arkiv wallet if you want to write, and an SDK. Reading
+        You need <span className="marker">three things</span>: the daemon (<C>arkivectord</C>), a funded Arkiv wallet if you want to write, and an SDK. Reading
         works without a wallet.
       </p>
 
@@ -185,8 +185,10 @@ export function Install() {
             <tbody>
               {ENV.map((e) => (
                 <tr key={e.name} className="border-b border-dashed border-ink last:border-b-0 align-top">
-                  <td className="px-3 py-2 font-semibold whitespace-nowrap">{e.name}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{e.need}</td>
+                  <td className="px-3 py-2 font-semibold whitespace-nowrap text-arkiv-blue">{e.name}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <span className={e.need === "for writes" ? "marker" : ""}>{e.need}</span>
+                  </td>
                   <td className="px-3 py-2">{e.what}</td>
                 </tr>
               ))}
@@ -195,7 +197,7 @@ export function Install() {
         </div>
 
         <div className="my-6 grid md:grid-cols-[minmax(0,1fr)_14rem] gap-3 items-center">
-          <div className="sheet hatch p-1.5">
+          <div className="hatch p-1.5 border-[1.5px] border-arkiv-orange shadow-[3px_3px_0_#fe7445]">
             <p className="bg-paper px-3 py-2">
               Put the daemon wallet's address in each collection's <C>writers</C> list. A collection only indexes entities created by
               its writers, so without it your writes land on chain, never show up in search, and you lose an afternoon finding out why.

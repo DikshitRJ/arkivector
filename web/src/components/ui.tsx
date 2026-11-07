@@ -38,13 +38,13 @@ export function CodeBlock({ code, lang, title }: { code: string; lang: string; t
     }
   };
   return (
-    <figure className="sheet my-4 min-w-0">
-      <figcaption className="flex items-center justify-between border-b border-dashed border-ink px-3 py-1.5 text-[12.5px]">
-        <span>{title ?? lang}</span>
+    <figure className="my-4 min-w-0 bg-paper border-[1.5px] border-arkiv-blue shadow-[3px_3px_0_#181ea9]">
+      <figcaption className="flex items-center justify-between border-b border-dashed border-arkiv-blue px-3 py-1.5 text-[12.5px]">
+        <span className="text-arkiv-blue font-semibold">{title ?? lang}</span>
         <button
           type="button"
           onClick={copy}
-          className="whitespace-nowrap border border-ink px-2 py-0.5 hover:bg-ink hover:text-paper"
+          className={`whitespace-nowrap border border-arkiv-blue px-2 py-0.5 ${copied ? "bg-arkiv-orange text-ink border-ink" : "text-arkiv-blue hover:bg-arkiv-blue hover:text-paper"}`}
           aria-live="polite"
         >
           {copied ? "copied" : "copy"}
@@ -74,7 +74,7 @@ export function Tabs({ tabs }: { tabs: { id: string; label: string; body: ReactN
               onClick={() => setActive(t.id)}
               className={
                 "relative whitespace-nowrap border-[1.5px] border-ink px-3 py-1.5 text-[13.5px] " +
-                (on ? "z-10 border-b-paper bg-paper font-semibold" : "hatch hover:bg-paper")
+                (on ? "z-10 border-b-paper border-t-[5px] border-t-arkiv-orange bg-paper font-semibold" : "hatch hover:bg-paper")
               }
             >
               <span className={on ? "" : "bg-paper px-1"}>{t.label}</span>

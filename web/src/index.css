@@ -55,6 +55,7 @@
 @layer components {
   /* Inline links: a solid underline that thickens on hover. */
   .ink-link {
+    color: #181ea9;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
@@ -79,7 +80,7 @@
 
   /* Highlighter: an orange band behind the lower part of the text, like a marker stroke. */
   .marker {
-    background-image: linear-gradient(transparent 52%, #fe7445 52%, #fe7445 96%, transparent 96%);
+    background-image: linear-gradient(transparent 12%, #fe7445 12%, #fe7445 94%, transparent 94%);
     padding: 0 0.12em;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
