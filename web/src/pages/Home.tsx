@@ -45,7 +45,7 @@ export function Home() {
               </Button>
             </div>
           </div>
-          <Note className="hidden md:block -rotate-3 pb-2">
+          <Note className="hidden md:block -rotate-3 pb-2 text-[30px]! lg:text-[38px]! leading-[1.05]!">
             pgvector, except the rows live on a blockchain
           </Note>
         </div>
