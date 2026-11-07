@@ -10,8 +10,8 @@ import { useEffect, useRef } from "react";
 const SPACING = 58; // px between arrow centres
 const LEN = 38; // ~1 cm at 96 dpi
 const RGB = "24, 30, 169"; // Arkiv blue #181EA9
-const A_FAR = 0.13;
-const A_NEAR = 0.42;
+const A_FAR = 0.045;
+const A_NEAR = 0.14;
 
 export function VectorField() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -53,7 +53,7 @@ export function VectorField() {
       ctx.clearRect(0, 0, w, h);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.lineWidth = 1.7;
+      ctx.lineWidth = 1.4;
       const reach = Math.hypot(w, h) * 0.55;
       const ox = ((w % SPACING) + SPACING) / 2;
       const oy = ((h % SPACING) + SPACING) / 2;
