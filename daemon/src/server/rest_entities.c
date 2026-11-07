@@ -34,6 +34,17 @@ static void fail_internal(av_http_resp *resp, const char *msg, const char *insta
     av_problem_from_err(&e, resp, instance);
 }
 
+static int hex_nibble(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    return -1;
+}
+
 /* Parse a decimal integer query value; returns def when malformed, clamps to [lo, hi]. */
 static long parse_long_clamped(const char *s, long lo, long hi, long def)
 {
@@ -64,8 +75,22 @@ static bool get_query_param(const char *query, const char *key, char *out, size_
             if (vlen >= cap) {
                 vlen = cap - 1;
             }
-            memcpy(out, eq + 1, vlen);
-            out[vlen] = '\0';
+            /* percent-decode: clients (the SDKs included) encode "," as %2C */
+            const char *src = eq + 1;
+            size_t o = 0;
+            for (size_t i = 0; i < vlen; i++) {
+                if (src[i] == '%' && i + 2 < vlen) { /* need two hex digits after the % */
+                    int hi = hex_nibble(src[i + 1]);
+                    int lo = hex_nibble(src[i + 2]);
+                    if (hi >= 0 && lo >= 0) {
+                        out[o++] = (char) (hi * 16 + lo);
+                        i += 2;
+                        continue;
+                    }
+                }
+                out[o++] = src[i] == '+' ? ' ' : src[i];
+            }
+            out[o] = '\0';
             return true;
         }
         p = *amp == '&' ? amp + 1 : amp;
@@ -258,7 +283,12 @@ static void h_get_entity(const av_http_req *req, const char *const *params, size
         } else if (strncmp(at->name, "av.", 3) != 0 && strcmp(at->name, AV_ATTR_SCHEMA) != 0) {
             if (include_flags & AV_INCLUDE_ATTRIBUTES) {
                 yyjson_mut_val *tv = av_attr_to_typed_json(doc, at, req->arena);
-                yyjson_mut_obj_add_val(doc, attrs_obj, at->name, tv);
+                /* yyjson does not copy keys added with obj_add_val: copy it, the source may be short-lived */
+                {
+                    yyjson_mut_val *k_ = yyjson_mut_strcpy(doc, at->name);
+                    if (k_ != NULL && tv != NULL)
+                        yyjson_mut_obj_add(attrs_obj, k_, tv);
+                }
             }
         }
     }

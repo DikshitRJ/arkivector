@@ -169,7 +169,12 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
                                    strcmp(at->name, AV_ATTR_SCHEMA) != 0) {
                             if (params->include_flags & AV_INCLUDE_ATTRIBUTES) {
                                 yyjson_mut_val *tv = av_attr_to_typed_json(doc, at, row_arena);
-                                yyjson_mut_obj_add_val(doc, attrs_obj, at->name, tv);
+                                /* yyjson does not copy keys added with obj_add_val: copy it, the source may be short-lived */
+                                {
+                                    yyjson_mut_val *k_ = yyjson_mut_strcpy(doc, at->name);
+                                    if (k_ != NULL && tv != NULL)
+                                        yyjson_mut_obj_add(attrs_obj, k_, tv);
+                                }
                             }
                         }
                     }

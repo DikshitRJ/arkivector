@@ -333,6 +333,64 @@ static av_status parse_entity_vector(yyjson_val *vec_val, yyjson_val *vb_val, co
 }
 
 /* Helper to broadcast a batch of transactions and wait for receipts */
+
+/* Fallback gas limit when eth_estimateGas is unavailable: the old 50k per op was too low (a create
+ * costs about 110k on Rabdi), so 10-entity batches ran out of gas and reverted. */
+#define AV_GAS_PER_OP_FALLBACK 130000ULL
+
+/*
+ * Ask the chain what the transaction needs (eth_estimateGas) and add a 30% margin.
+ * Returns `fallback` when the call fails, so a flaky RPC never blocks a write.
+ */
+static uint64_t estimate_gas_limit(av_writer *w, const uint8_t from[20], const uint8_t *data, size_t data_len,
+                                   av_arena *arena, uint64_t fallback)
+{
+    if (w->rpc == NULL || from == NULL)
+        return fallback;
+    static const char hexd[] = "0123456789abcdef";
+    size_t cap = 160 + data_len * 2;
+    char *params = av_arena_alloc(arena, cap, 0);
+    if (params == NULL)
+        return fallback;
+    size_t n = 0;
+    n += (size_t) snprintf(params + n, cap - n, "[{\"from\":\"0x");
+    for (size_t i = 0; i < 20; i++) {
+        params[n++] = hexd[from[i] >> 4];
+        params[n++] = hexd[from[i] & 15];
+    }
+    n += (size_t) snprintf(params + n, cap - n, "\",\"to\":\"0x");
+    for (size_t i = 0; i < 20; i++) {
+        params[n++] = hexd[w->cfg.contract_addr[i] >> 4];
+        params[n++] = hexd[w->cfg.contract_addr[i] & 15];
+    }
+    n += (size_t) snprintf(params + n, cap - n, "\",\"data\":\"0x");
+    for (size_t i = 0; i < data_len; i++) {
+        params[n++] = hexd[data[i] >> 4];
+        params[n++] = hexd[data[i] & 15];
+    }
+    snprintf(params + n, cap - n, "\"}]");
+
+    yyjson_doc *doc = NULL;
+    yyjson_val *res = NULL;
+    int code = 0;
+    av_err ee;
+    av_err_clear(&ee);
+    uint64_t out = fallback;
+    if (av_rpc_call(w->rpc, "eth_estimateGas", params, &doc, &res, &code, &ee) == AV_OK && res != NULL) {
+        const char *hex = yyjson_get_str(res);
+        if (hex != NULL) {
+            char *end = NULL;
+            unsigned long long est = strtoull(hex, &end, 16);
+            if (end != hex && est > 0 && est < 30000000ULL) {
+                out = (uint64_t) est + (uint64_t) est * 3 / 10 + 21000;
+            }
+        }
+    }
+    if (doc != NULL)
+        yyjson_doc_free(doc);
+    return out;
+}
+
 static av_status broadcast_and_wait(av_writer *w, av_collection *col, av_op_batch *batches, size_t n_batches,
                                     av_write_wait_mode wait_mode, int timeout_ms, av_arena *arena,
                                     char (**out_hashes)[67], size_t *out_n_hashes, uint64_t *out_block_number,
@@ -364,7 +422,9 @@ static av_status broadcast_and_wait(av_writer *w, av_collection *col, av_op_batc
         desc.nonce = nonce;
         desc.max_priority_fee_per_gas = w->cfg.max_priority_fee_per_gas;
         desc.max_fee_per_gas = w->cfg.max_fee_per_gas;
-        desc.gas_limit = w->cfg.gas_limit + batches[i].n_ops * 50000;
+        desc.gas_limit = estimate_gas_limit(w, av_signer_get_address(w->signer), batches[i].calldata,
+                                            batches[i].calldata_len, arena,
+                                            w->cfg.gas_limit + batches[i].n_ops * AV_GAS_PER_OP_FALLBACK);
         memcpy(desc.to, w->cfg.contract_addr, 20);
         desc.data = batches[i].calldata;
         desc.data_len = batches[i].calldata_len;
@@ -1186,7 +1246,7 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
         snprintf(txs[b].to, sizeof(txs[b].to), "%s", AV_ARKIV_CONTRACT_ADDR);
         snprintf(txs[b].value, sizeof(txs[b].value), "%s", "0x0");
         txs[b].nonce = b;
-        txs[b].gas_estimate = w->cfg.gas_limit + batches[b].n_ops * 50000;
+        txs[b].gas_estimate = w->cfg.gas_limit + batches[b].n_ops * AV_GAS_PER_OP_FALLBACK;
 
         size_t c_len = batches[b].calldata_len;
         char *hex_str = av_arena_alloc(arena, c_len * 2 + 3, 0);

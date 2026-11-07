@@ -223,3 +223,38 @@ def test_search_consistency_wait_and_timeout(
     )
     assert status == 504, f"Expected 504 consistency timeout, got {status}: {resp_timeout}"
     assert resp_timeout.get("code") == "consistency_timeout"
+
+
+def test_search_attributes_survive_response_serialization(
+    daemon: DaemonClient, collection_name: str, demo_fixture_data: dict[str, Any]
+) -> None:
+    """Regression: attribute names in the response pointed into a freed arena (heap use-after-free).
+
+    Under the release build this crashed the daemon on the first search that returned attributes.
+    Many searches in a row make a stale pointer far more likely to be overwritten."""
+    vec = demo_fixture_data["queries"][0]["request"]["vector"]
+    for _ in range(40):
+        status, resp = daemon.post(
+            f"/v1/collections/{collection_name}/search",
+            {"vector": vec, "k": 20, "include": ["attributes", "document"]},
+        )
+        assert status == 200
+        names = {name for hit in resp["results"] for name in hit["attributes"]}
+        assert names, "hits should carry attributes"
+        assert all(n.isidentifier() or n.replace(".", "").replace("_", "").isalnum() for n in names), names
+
+
+def test_get_entity_decodes_percent_encoded_include(
+    daemon: DaemonClient, collection_name: str, demo_fixture_data: dict[str, Any]
+) -> None:
+    """Regression: include=attributes%2Cdocument (what the SDKs send) used to be ignored."""
+    vec = demo_fixture_data["queries"][0]["request"]["vector"]
+    status, resp = daemon.post(f"/v1/collections/{collection_name}/search", {"vector": vec, "k": 1})
+    assert status == 200
+    ref = resp["results"][0]["id"]
+    status, plain = daemon.get(f"/v1/collections/{collection_name}/entities/{ref}?include=attributes,document")
+    status2, encoded = daemon.get(f"/v1/collections/{collection_name}/entities/{ref}?include=attributes%2Cdocument")
+    assert status == status2 == 200
+    assert isinstance(plain["entity"].get("document"), str)
+    assert encoded["entity"].get("document") == plain["entity"]["document"]
+    assert encoded["entity"].get("attributes") == plain["entity"]["attributes"]

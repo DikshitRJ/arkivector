@@ -1103,7 +1103,12 @@ static void h_scroll(const av_http_req *req, const char *const *params, size_t n
                     } else if (strncmp(at->name, "av.", 3) != 0 && strcmp(at->name, AV_ATTR_SCHEMA) != 0) {
                         if (include_flags & AV_INCLUDE_ATTRIBUTES) {
                             yyjson_mut_val *tv = av_attr_to_typed_json(doc, at, req->arena);
-                            yyjson_mut_obj_add_val(doc, attrs_obj, at->name, tv);
+                            /* yyjson does not copy keys added with obj_add_val: copy it, the source may be short-lived */
+                            {
+                                yyjson_mut_val *k_ = yyjson_mut_strcpy(doc, at->name);
+                                if (k_ != NULL && tv != NULL)
+                                    yyjson_mut_obj_add(attrs_obj, k_, tv);
+                            }
                         }
                     }
                 }
@@ -1691,7 +1696,12 @@ static void h_debug_entity(const av_http_req *req, const char *const *params, si
     yyjson_mut_val *at_obj = yyjson_mut_obj(doc);
     for (size_t i = 0; i < n_attrs; i++) {
         yyjson_mut_val *tv = av_attr_to_typed_json(doc, &attrs[i], req->arena);
-        yyjson_mut_obj_add_val(doc, at_obj, attrs[i].name, tv);
+        /* yyjson does not copy keys added with obj_add_val: copy it, the source may be short-lived */
+        {
+            yyjson_mut_val *k_ = yyjson_mut_strcpy(doc, attrs[i].name);
+            if (k_ != NULL && tv != NULL)
+                yyjson_mut_obj_add(at_obj, k_, tv);
+        }
     }
     yyjson_mut_obj_add_val(doc, root, "attributes", at_obj);
 
