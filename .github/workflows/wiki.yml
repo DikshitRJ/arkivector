@@ -4,6 +4,8 @@ name: wiki
 # this workflow publishes it to the GitHub wiki (docs/tools/wiki_sync.py renames pages and rewrites
 # links). Every push and pull request checks links, anchors and SUMMARY.md; pushes to main publish.
 # The wiki must exist: enable it in Settings -> Features and create any first page once.
+# Pushes use GITHUB_TOKEN (contents: write covers the repository's wiki). If an organisation policy
+# blocks that, add a fine-grained token with Contents read/write as the WIKI_TOKEN secret.
 on:
   push:
     branches: ['**']
@@ -38,10 +40,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check out the wiki
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WIKI_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           if ! git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
-            echo "::error::Cannot clone the wiki. Enable it (Settings -> Features -> Wikis) and create one page in the web UI first."
+            echo "::error::Cannot clone the wiki. Enable it (Settings -> Features -> Wikis) and create one page in the web UI first; if it exists, set a WIKI_TOKEN secret."
             exit 1
           fi
       - name: Render pages
