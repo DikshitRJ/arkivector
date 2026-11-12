@@ -27,8 +27,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/DikshitRJ/arkivector"
-Documentation = "https://github.com/DikshitRJ/arkivector/tree/main/docs/api"
+Homepage = "https://arkivector.dikshitrj.in"
+Documentation = "https://arkivector.dikshitrj.in/docs/python"
+Changelog = "https://github.com/DikshitRJ/arkivector/blob/main/CHANGELOG.md"
 Repository = "https://github.com/DikshitRJ/arkivector"
 
 [project.optional-dependencies]

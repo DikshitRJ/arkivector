@@ -3,10 +3,13 @@
 
 **pgvector for Arkiv.** Semantic search over data that lives on a decentralized chain, with pgvector's own distance math, behind one REST call.
 
+**[Website](https://arkivector.dikshitrj.in)** · **[Documentation](https://arkivector.dikshitrj.in/docs)** · [Wiki](https://github.com/DikshitRJ/arkivector/wiki) · [Releases](https://github.com/DikshitRJ/arkivector/releases)
+
 [![Release](https://img.shields.io/github/v/release/DikshitRJ/arkivector)](https://github.com/DikshitRJ/arkivector/releases)
 [![PyPI](https://img.shields.io/pypi/v/arkivector)](https://pypi.org/project/arkivector/)
 [![Container](https://img.shields.io/badge/ghcr.io-arkivectord-blue)](https://github.com/DikshitRJ/arkivector/pkgs/container/arkivectord)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-arkivector.dikshitrj.in-fe7445)](https://arkivector.dikshitrj.in/docs)
 
 > **Your AI agent's long-term memory is a row in someone else's database. One expired credit card and it has amnesia.**
 
@@ -21,6 +24,7 @@ That query runs against vectors that were written to a blockchain. Nobody can de
 ## Contents
 
 - [Documentation](#documentation)
+- [Use it from an AI agent (MCP)](#use-it-from-an-ai-agent-mcp)
 - [Why this exists](#why-this-exists)
 - [What you get](#what-you-get)
 - [Quick start](#quick-start)
@@ -44,13 +48,20 @@ That query runs against vectors that were written to a blockchain. Nobody can de
 
 ## Documentation
 
-| Guide | |
-| :--- | :--- |
-| [REST API with curl](docs/guide/api.md) | Every endpoint, with real requests and responses |
-| [Python SDK](docs/guide/python.md) | `pip install arkivector` |
-| [Node.js / TypeScript SDK](docs/guide/node.md) | `npm install @dikshitrj/arkivector` |
+The full documentation lives in [`docs/wiki/`](docs/wiki/README.md), one Markdown page per topic. The same files are rendered at **[arkivector.dikshitrj.in/docs](https://arkivector.dikshitrj.in/docs)** and published to the [GitHub wiki](https://github.com/DikshitRJ/arkivector/wiki) on every push to `main`.
 
-The same guides are on the project website under `/docs` and in the [GitHub wiki](https://github.com/DikshitRJ/arkivector/wiki). The formal API contract is [`spec/openapi.yaml`](spec/openapi.yaml), with field-level rules in [`docs/api/`](docs/api/).
+| Section | Pages |
+| :--- | :--- |
+| Getting started | [Installation](docs/wiki/getting-started/installation.md) · [Quick start](docs/wiki/getting-started/quickstart.md) · [Concepts](docs/wiki/getting-started/concepts.md) · [Configuration](docs/wiki/getting-started/configuration.md) |
+| REST API (curl) | [Overview](docs/wiki/api/README.md) · [Health and version](docs/wiki/api/health.md) · [Collections](docs/wiki/api/collections.md) · [Upsert](docs/wiki/api/entities-upsert.md) · [Get](docs/wiki/api/entities-get.md) · [Delete and extend](docs/wiki/api/entities-delete-extend.md) · [Prepare](docs/wiki/api/entities-prepare.md) · [Search](docs/wiki/api/search.md) · [Batch search](docs/wiki/api/search-batch.md) · [Scroll](docs/wiki/api/scroll.md) · [Count](docs/wiki/api/count.md) · [Filters](docs/wiki/api/filters.md) · [Vectors](docs/wiki/api/vectors.md) · [Consistency](docs/wiki/api/consistency.md) · [Errors](docs/wiki/api/errors.md) · [Qdrant](docs/wiki/api/qdrant.md) |
+| Python SDK | [Overview](docs/wiki/python/README.md) · [Client](docs/wiki/python/client.md) · [Collections](docs/wiki/python/collections.md) · [Writing](docs/wiki/python/writing.md) · [Searching](docs/wiki/python/searching.md) · [Reading](docs/wiki/python/reading.md) · [Filters](docs/wiki/python/filters.md) · [Types](docs/wiki/python/types.md) · [Errors](docs/wiki/python/errors.md) · [LangChain and LlamaIndex](docs/wiki/python/integrations.md) |
+| Node.js SDK | [Overview](docs/wiki/node/README.md) · [Client](docs/wiki/node/client.md) · [Collections](docs/wiki/node/collections.md) · [Writing](docs/wiki/node/writing.md) · [Searching](docs/wiki/node/searching.md) · [Reading](docs/wiki/node/reading.md) · [Filters](docs/wiki/node/filters.md) · [Types](docs/wiki/node/types.md) · [Errors](docs/wiki/node/errors.md) · [LangChain.js](docs/wiki/node/integrations.md) |
+| MCP server | [Overview](docs/wiki/mcp/README.md) · [Connect a client](docs/wiki/mcp/setup.md) · [Tools](docs/wiki/mcp/tools.md) |
+| Architecture | [Overview](docs/wiki/architecture/README.md) · [Chain sync](docs/wiki/architecture/sync.md) · [Storage](docs/wiki/architecture/storage.md) · [Search and HNSW](docs/wiki/architecture/search.md) · [Write path](docs/wiki/architecture/write-path.md) · [pgvector inside the daemon](docs/wiki/architecture/pgvector.md) · [VectorBytes](docs/wiki/architecture/vectorbytes.md) |
+| Operations | [Deployment](docs/wiki/operations/deployment.md) · [Security](docs/wiki/operations/security.md) · [Monitoring](docs/wiki/operations/monitoring.md) · [Troubleshooting](docs/wiki/operations/troubleshooting.md) |
+| Development | [Contributing](docs/wiki/development/README.md) · [Testing](docs/wiki/development/testing.md) · [Releasing](docs/wiki/development/releasing.md) |
+
+The formal API contract is [`spec/openapi.yaml`](spec/openapi.yaml), with field-level rules in [`docs/api/`](docs/api/). The design rationale is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Why this exists
 
@@ -68,7 +79,7 @@ What Arkiv did not have was vector search. You could store an embedding as bytes
 - Filters on typed attributes, as a JSON tree or as Arkiv-style `where` strings, combined with vector search in one request.
 - Writes that go on chain. The daemon builds, signs, and submits the Arkiv transaction, waits for the receipt, then indexes the entity when it syncs back.
 - Read-your-writes consistency. Every response carries the block it reflects (`as_of_block`), and the SDKs can wait for the block of your last write before reading.
-- SDKs for Python and Node.js, an MCP endpoint so AI agents can call search as a tool, and a Qdrant-compatible search subset.
+- SDKs for Python and Node.js, an [MCP server](#use-it-from-an-ai-agent-mcp) so AI agents can search and store memories, and a Qdrant-compatible search subset.
 - One small daemon: an 18 MB container image or a single Linux binary.
 
 ## Quick start
@@ -199,6 +210,16 @@ curl -s http://127.0.0.1:8080/v1/collections/agent.memory/search \
   -H 'content-type: application/json' \
   -d '{"vector":[1,0.05,0,0],"k":2,"filter":{"eq":{"topic":"pets"}}}'
 ```
+
+## Use it from an AI agent (MCP)
+
+The daemon is also a [Model Context Protocol](https://modelcontextprotocol.io) server at `POST /mcp`, so agents can search your collections, read entities and, with a wallet, store memories on chain:
+
+```bash
+claude mcp add --transport http arkivector http://127.0.0.1:8080/mcp      # Claude Code
+```
+
+Tools: `arkivector_list_collections`, `arkivector_search` (vector + `where`/`filter`), `arkivector_get`, `arkivector_count`, and `arkivector_upsert` when the daemon has a signer. Each tool runs the matching REST endpoint, and API-key scopes apply per tool. Setup for Claude Desktop, Cursor, VS Code and other clients: [MCP docs](docs/wiki/mcp/setup.md).
 
 ## How it works
 
@@ -386,9 +407,10 @@ daemon/          arkivectord: C11 sources, tests, fuzzers, mock Arkiv node, Dock
 sdk/python/      Python SDK (stdlib only, fully typed, LangChain adapter)
 sdk/node/        Node.js / TypeScript SDK (zero runtime dependencies, LangChain.js adapter)
 spec/            The daemon/SDK contract: OpenAPI, error codes, golden test vectors
-docs/guide/      User guides: REST API with curl, Python SDK, Node.js SDK (also on the website and the wiki)
+docs/wiki/       The documentation (rendered at arkivector.dikshitrj.in/docs and mirrored to the GitHub wiki)
 docs/api/        The API contract in prose, field by field
 openspec/        Specs and change proposals for spec-driven development
+web/             The website, arkivector.dikshitrj.in (React + Vite on Cloudflare Workers)
 ```
 
 To hack on it locally, `daemon/tools/dev-up.sh up` starts a mock Arkiv node with 200 demo entities and the daemon on `:8080`. Both SDKs' `examples/golden_check` and `examples/quickstart --write` run against it.

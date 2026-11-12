@@ -26,7 +26,7 @@
     "url": "git+https://github.com/DikshitRJ/arkivector.git",
     "directory": "sdk/node"
   },
-  "homepage": "https://github.com/DikshitRJ/arkivector#readme",
+  "homepage": "https://arkivector.dikshitrj.in/docs/node",
   "bugs": {
     "url": "https://github.com/DikshitRJ/arkivector/issues"
   },
