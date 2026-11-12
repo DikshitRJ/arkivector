@@ -20,6 +20,7 @@ That query runs against vectors that were written to a blockchain. Nobody can de
 
 ## Contents
 
+- [Documentation](#documentation)
 - [Why this exists](#why-this-exists)
 - [What you get](#what-you-get)
 - [Quick start](#quick-start)
@@ -41,6 +42,16 @@ That query runs against vectors that were written to a blockchain. Nobody can de
 - [AI disclosure](#ai-disclosure)
 - [License](#license)
 
+## Documentation
+
+| Guide | |
+| :--- | :--- |
+| [REST API with curl](docs/guide/api.md) | Every endpoint, with real requests and responses |
+| [Python SDK](docs/guide/python.md) | `pip install arkivector` |
+| [Node.js / TypeScript SDK](docs/guide/node.md) | `npm install @dikshitrj/arkivector` |
+
+The same guides are on the project website under `/docs` and in the [GitHub wiki](https://github.com/DikshitRJ/arkivector/wiki). The formal API contract is [`spec/openapi.yaml`](spec/openapi.yaml), with field-level rules in [`docs/api/`](docs/api/).
+
 ## Why this exists
 
 [pgvector](https://github.com/pgvector/pgvector) is the reason "just use Postgres" became an acceptable answer to "where do I put my embeddings?". It is a Postgres extension with more than 23,000 GitHub stars that adds vector types and similarity search to the database you already run. You write `ORDER BY embedding <=> $1 LIMIT 5` and your RAG pipeline has retrieval, without adding a service or learning a new query language. That simplicity is why it sits underneath a large share of today's agent and RAG stacks.
@@ -52,6 +63,7 @@ What Arkiv did not have was vector search. You could store an embedding as bytes
 ## What you get
 
 - Similarity search over Arkiv entities with all four pgvector types (`vector`, `halfvec`, `sparsevec`, `bit`) and all six pgvector distance operators.
+- pgvector's HNSW index for large collections, with pgvector 0.8's iterative scans for filtered queries, and an exact scan whenever that is faster or you ask for 100% recall.
 - Results that match real pgvector. A parity suite runs 97 tests against pgvector 0.8.7 in Postgres and checks that every distance is bit-identical or within float32 rounding.
 - Filters on typed attributes, as a JSON tree or as Arkiv-style `where` strings, combined with vector search in one request.
 - Writes that go on chain. The daemon builds, signs, and submits the Arkiv transaction, waits for the receipt, then indexes the entity when it syncs back.
@@ -87,7 +99,7 @@ The daemon now listens on `http://127.0.0.1:8080` and syncs from the Arkiv Rabdi
 Download the latest release and run it:
 
 ```bash
-VERSION=1.0.1
+VERSION=1.1.0
 curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/arkivectord-${VERSION}-linux-x86_64.tar.gz
 tar xzf arkivectord-${VERSION}-linux-x86_64.tar.gz
 cd arkivectord-${VERSION}-linux-x86_64
@@ -130,6 +142,7 @@ pip install arkivector
 
 ```bash
 echo "@dikshitrj:registry=https://npm.pkg.github.com" >> .npmrc
+echo "//npm.pkg.github.com/:_authToken=<GITHUB_TOKEN with read:packages>" >> .npmrc
 npm install @dikshitrj/arkivector
 ```
 
@@ -268,7 +281,7 @@ The daemon never indexes a write optimistically. An entity shows up in search on
 1. Parse the request and the filter (JSON tree or `where` string).
 2. If `min_block` is set, wait until the collection has synced that far, or time out with `504 consistency_timeout`.
 3. Evaluate the filter on the attribute bitmaps, intersected with the entities that are live at `as_of_block`.
-4. Score every candidate with the pgvector kernel for the requested operator, keeping the top `k` in a heap with ties broken by entity key.
+4. Plan: small or very selective candidate sets are scored exactly with the pgvector kernel for the requested operator. Larger ones walk the collection's HNSW graph (with pgvector's iterative scan when there is a filter); every hit is then rescored with the real operator, and if the walk finds fewer than `k` matches the query falls back to the exact scan. Ties are broken by entity key.
 5. Return hits with `distance`, `score`, attributes, the document and, if you ask, the raw vector, plus the `as_of_block` the answer reflects.
 
 ### How vectors are stored on chain
@@ -311,7 +324,7 @@ pgvector's HNSW index is in the daemon too: the multi-layer proximity graph from
 
 $$\ell = \left\lfloor -\ln(U) \cdot m_L \right\rfloor, \quad U \sim \mathcal{U}(0,1), \quad m_L = \frac{1}{\ln M}$$
 
-and its defaults of $M = 16$, `ef_construction = 64`, and `ef_search = 40`, plus pgvector 0.8's iterative scan for filtered queries. The planner is meant to choose between an exact scan and HNSW depending on how selective your filter is. Right now every collection still runs the exact scan; see [limitations](#limitations-and-what-comes-next).
+and its defaults of $M = 16$, `ef_construction = 64`, and `ef_search = 40`, plus pgvector 0.8's iterative scan for filtered queries. Every collection created with `"method": "hnsw"` keeps a graph next to its exact vectors, and the planner chooses per query: candidate sets of 2,048 or fewer, very selective filters, and `exact: true` get an exact scan; larger ones use the graph, which an end-to-end test holds to recall@10 ≥ 0.9 against exact search. `ef_search`, `iterative_scan` and `max_scan_tuples` can be set per search, and `explain: true` shows the plan that ran.
 
 ## Why C
 
@@ -354,7 +367,7 @@ This was built for a hackathon. Everything in the quick start works and was test
 
 | Limitation | Effect today | Plan |
 | :--- | :--- | :--- |
-| HNSW is compiled in but not connected to collections | Every search is an exact scan. Results are correct, but large collections are slower than they need to be. | Build HNSW segments as collections grow, then add expiry-banded compaction so whole segments can be dropped when their entities expire. |
+| HNSW graphs live in memory | Graphs are rebuilt from the local store when the daemon starts, and rebuilds after many updates run on the sync thread, so very large collections start slower and briefly pause sync while rebuilding. | Persist sealed graphs next to the vector segments, rebuild in the background, and add expiry-banded segments so whole graphs drop when their entities expire. |
 | Transactions are signed with a private key in an environment variable | The daemon holds a hot wallet. | The `entities:prepare` endpoint already returns unsigned transactions. Next is letting the SDK hand them to the user's own wallet (MetaMask, WalletConnect, a hardware wallet), plus encrypted keystore files and remote signers for servers. |
 | Predicted entity keys ignore the wallet's on-chain nonce | Keys returned by a write can be wrong if the wallet already created entities elsewhere. The entities themselves are fine and appear in search after sync. | Read `entityNonce` from the contract before predicting keys. |
 | Fixed gas limit | Each write reserves more gas than it uses (a single create used about 135k gas on Rabdi). | Use `eth_estimateGas` and fee history. |
@@ -362,7 +375,7 @@ This was built for a hackathon. Everything in the quick start works and was test
 | Tested on the Rabdi testnet only | Mainnet is configurable through `rpc_urls` and `chain_id` but has not been tried. | Run the sync and write tests against mainnet once its endpoints are published. |
 | Linux only | macOS and Windows use the Docker image. | Port the few glibc-specific calls. |
 
-The open work is tracked task by task in `openspec/changes/integration-e2e-verify/tasks.md`.
+The open work is tracked task by task in `openspec/changes/integration-e2e-verify/tasks.md` and `openspec/changes/daemon-hnsw-ci-fix/tasks.md`.
 
 ## Repository layout
 
@@ -373,7 +386,8 @@ daemon/          arkivectord: C11 sources, tests, fuzzers, mock Arkiv node, Dock
 sdk/python/      Python SDK (stdlib only, fully typed, LangChain adapter)
 sdk/node/        Node.js / TypeScript SDK (zero runtime dependencies, LangChain.js adapter)
 spec/            The daemon/SDK contract: OpenAPI, error codes, golden test vectors
-docs/api/        Human-readable API documentation
+docs/guide/      User guides: REST API with curl, Python SDK, Node.js SDK (also on the website and the wiki)
+docs/api/        The API contract in prose, field by field
 openspec/        Specs and change proposals for spec-driven development
 ```
 

@@ -40,6 +40,9 @@ export function Home() {
             </p>
             <div className="mt-6 flex flex-wrap gap-4">
               <Button href="/install">Install</Button>
+              <Button href="/docs" variant="outline">
+                Docs
+              </Button>
               <Button href="/architecture" variant="outline">
                 Watch how it works
               </Button>

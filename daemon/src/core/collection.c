@@ -76,7 +76,8 @@ struct av_collection {
      * not in the graph (graph full, zero-norm cosine vectors, insert errors): searches scan it exactly.
      */
     pthread_rwlock_t hnsw_lock;
-    av_segment *hnsw;
+    bool hnsw_enabled; /* set once in create, never changes: lock-free "has a graph" for readers */
+    av_segment *hnsw;  /* read by query threads only under hnsw_lock; written by the applier under it */
     roaring_bitmap_t *hnsw_tail;
     bool hnsw_full;
 
@@ -317,7 +318,7 @@ static av_status hnsw_build(av_collection *c, const roaring_bitmap_t *ids, av_se
 /* Applier: index a docid that was just stored in the flat segment. Never fails the batch. */
 static void hnsw_add(av_collection *c, av_docid id, const void *pg)
 {
-    if (c->hnsw == NULL)
+    if (!c->hnsw_enabled)
         return;
     (void) pthread_rwlock_wrlock(&c->hnsw_lock);
     hnsw_put(c->hnsw, c->hnsw_tail, &c->hnsw_full, id, pg, c->def.name);
@@ -331,7 +332,7 @@ static void hnsw_add(av_collection *c, av_docid id, const void *pg)
  */
 static void hnsw_maybe_rebuild(av_collection *c)
 {
-    if (c->hnsw == NULL)
+    if (!c->hnsw_enabled)
         return;
     size_t graph_n = av_segment_count(c->hnsw);
     size_t tail_n = (size_t) roaring_bitmap_get_cardinality(c->hnsw_tail);
@@ -520,6 +521,7 @@ av_collection *av_collection_create_opts(const av_coldef *def, av_store *store, 
     if (c->def.method == AV_INDEX_HNSW && c->def.opclass != NULL &&
         hnsw_build(c, av_live_current(c->live), &c->hnsw, &c->hnsw_tail, &c->hnsw_full, e) != AV_OK)
         goto fail;
+    c->hnsw_enabled = c->hnsw != NULL; /* before the collection is shared with any other thread */
     c->next_docid = ls.any ? ls.max_docid + 1 : 0;
     if (meta.has_next_docid && meta.next_docid > c->next_docid)
         c->next_docid = meta.next_docid;
@@ -701,12 +703,12 @@ const av_segment *av_collection_segment(const av_collection *c)
 
 bool av_collection_has_hnsw(const av_collection *c)
 {
-    return c != NULL && c->hnsw != NULL;
+    return c != NULL && c->hnsw_enabled;
 }
 
 av_status av_collection_rebuild_hnsw(av_collection *c, av_err *e)
 {
-    if (c == NULL || c->hnsw == NULL)
+    if (c == NULL || !c->hnsw_enabled)
         return AV_OK;
     av_segment *g = NULL;
     roaring_bitmap_t *tail = NULL;
@@ -785,7 +787,7 @@ av_status av_collection_search_hnsw(av_collection *c, const void *query, const a
                                     int max_scan_tuples, size_t limit, av_hit *out, size_t *n_out, av_err *e)
 {
     *n_out = 0;
-    if (c->hnsw == NULL) {
+    if (!c->hnsw_enabled) {
         av_err_set(e, "internal", "collection %s has no hnsw index", c->def.name);
         return AV_ERR;
     }
@@ -893,7 +895,7 @@ void av_collection_get_stats(av_collection *c, av_collection_stats *out)
     av_collection_read_lock(c);
     out->live = av_collection_live_count(c);
     out->tombstones = av_docmap_high(c->docmap) > out->live ? av_docmap_high(c->docmap) - out->live : 0;
-    out->segments = c->hnsw != NULL ? 2 : 1;
+    out->segments = c->hnsw_enabled ? 2 : 1;
     av_collection_read_unlock(c);
     size_t q = 0;
     av_err e;

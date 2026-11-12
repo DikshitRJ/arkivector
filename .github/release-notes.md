@@ -1,5 +1,9 @@
 **Arkivector** is pgvector for [Arkiv](https://arkiv.network): `arkivectord` syncs entities from the Arkiv chain, indexes their vectors with pgvector's own code, and serves vector search over REST. The Python and Node SDKs are thin clients of the daemon. MIT licensed.
 
+## What's new
+
+See [CHANGELOG.md](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) for the changes in ${TAG}. Guides: [REST API](https://github.com/${REPO}/blob/${TAG}/docs/guide/api.md) · [Python SDK](https://github.com/${REPO}/blob/${TAG}/docs/guide/python.md) · [Node.js SDK](https://github.com/${REPO}/blob/${TAG}/docs/guide/node.md) · [wiki](https://github.com/${REPO}/wiki).
+
 ## Assets
 
 | File | What |
@@ -106,5 +110,5 @@ Add the daemon wallet's address to each collection's `writers`, otherwise the da
 
 ## Known limitations
 - Verified on the Arkiv **Rabdi testnet** only; mainnet is untested.
-- Search runs exact (flat) scans; the HNSW index path is not wired to collections yet.
+- HNSW graphs are kept in memory and rebuilt from the local store at startup; rebuilds after many updates run on the sync thread.
 - The signer comes from `ARKIV_PRIVATE_KEY` only (keystore and remote signers are not wired); gas uses a fixed limit.
