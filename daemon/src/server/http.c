@@ -131,10 +131,18 @@ static void abuf_free(abuf *b)
     b->cap = 0;
 }
 
-typedef enum { H_CONTENT_TYPE = 0, H_AUTHORIZATION, H_IDEMPOTENCY, H_REQUEST_ID, H_EXPECT, H_COUNT } hkind;
+typedef enum {
+    H_CONTENT_TYPE = 0,
+    H_AUTHORIZATION,
+    H_IDEMPOTENCY,
+    H_REQUEST_ID,
+    H_EXPECT,
+    H_ORIGIN,
+    H_COUNT
+} hkind;
 
 static const char *const k_hnames[H_COUNT] = {"content-type", "authorization", "idempotency-key",
-                                              "x-request-id", "expect"};
+                                              "x-request-id", "expect",        "origin"};
 
 struct av_httpp {
     llhttp_t parser;
@@ -370,6 +378,7 @@ static bool build_request(av_httpp *p)
     p->req.content_type = hval(p, H_CONTENT_TYPE);
     p->req.authorization = hval(p, H_AUTHORIZATION);
     p->req.idempotency_key = hval(p, H_IDEMPOTENCY);
+    p->req.origin = hval(p, H_ORIGIN);
     char rid[27];
     const char *client_rid = hval(p, H_REQUEST_ID);
     if (client_rid != NULL && av_request_id_valid(client_rid)) {
@@ -1366,6 +1375,11 @@ void av_http_shutdown(av_http_server *s, void (*done)(void *ctx), void *ctx)
         c = next;
     }
     server_maybe_finish(s);
+}
+
+const struct av_auth *av_http_auth(const av_http_server *s)
+{
+    return s != NULL && s->auth != NULL && av_auth_is_enabled(s->auth) ? s->auth : NULL;
 }
 
 void av_http_destroy(av_http_server *s)
