@@ -43,3 +43,20 @@ Branch `claude/busy-babbage-k4puq6` (restarted from `main` @ adc0aed after #8 me
       no broken internal links
 - [x] 5.7 favicon.png as the site icon; canonical and Open Graph tags with https://arkivector.dikshitrj.in
 - [x] 5.8 Site URL in README, SDK READMEs, pyproject/package.json metadata, release notes, wiki sidebar and footer
+
+## 6. After #9 merged (2026-11-12 18:14)
+#9 was merged at 96c30e1, before the MCP server, the docs/wiki restructure, the website viewer and
+the ruff fix were pushed. Those commits (and main's merge commit, merged back in) go in a follow-up PR.
+`main`'s sdk workflow is red until then: the README quick start from 592e0dc is not ruff-formatted
+(fixed by 9d0e368).
+
+Graphify review of #9, checked:
+- [x] Docker quick start put the wallet key on the command line (shell history): **fixed** everywhere
+      (README, docs, release notes, install page): `read -rs ARKIV_PRIVATE_KEY`, and docker `-e ARKIV_PRIVATE_KEY`
+      inherits the variable without a value
+- [x] GitHub token written into a project-local .npmrc (risk of committing it): **fixed**: `.npmrc` holds the
+      reference `${NODE_AUTH_TOKEN}` (npm expands it), the token stays in the environment
+- [x] "Wiki publish cannot authenticate with GITHUB_TOKEN": GITHUB_TOKEN with `contents: write` can push to the
+      repository's wiki (that is how the common wiki-publishing actions work), so not changed; added an optional
+      WIKI_TOKEN secret fallback for organisations that restrict it
+- [x] "DOCS fans out to 7 callees": coupling metric, no change
