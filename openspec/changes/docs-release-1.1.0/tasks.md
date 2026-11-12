@@ -27,3 +27,19 @@ Branch `claude/busy-babbage-k4puq6` (restarted from `main` @ adc0aed after #8 me
 - [x] 4.3 README: Documentation section, HNSW in features/search/math/limitations, v1.1.0, npm token
 - [x] 4.4 SDK READMEs with quick start (shown on PyPI / GitHub Packages)
 - [x] 4.5 CHANGELOG.md; release-notes.md links it and the guides; HNSW limitation updated
+
+## 5. Restructure (owner request, 2026-11-12)
+- [x] 5.1 `docs/guide/` → `docs/wiki/`, split into folders: getting-started (4), api (16: one page per endpoint group with
+      curl, request fields, responses), python (10), node (10), mcp (3), architecture (7), operations (4), development (3)
+- [x] 5.2 `SUMMARY.md` is the single navigation tree for the website sidebar and the wiki `_Sidebar.md`
+- [x] 5.3 Facts re-checked against the code and a live daemon: config keys and defaults from config.c, CLI flags from
+      --help, capabilities from /v1/version, SDK signatures by running them, vector input forms from docs/api/vectors.md;
+      found and documented: Qdrant search returns no payload yet
+- [x] 5.4 `docs/tools/check_docs.py`: links, anchors (GitHub slugs), SUMMARY coverage, unique wiki names (CI job in wiki.yml)
+- [x] 5.5 `docs/tools/wiki_sync.py`: unique page names (api/search.md → API-Search), link rewriting, sidebar from SUMMARY,
+      removes pages it published before whose source is gone
+- [x] 5.6 Website: /docs/<folder>/<page> routes over docs/wiki via import.meta.glob; folder-tree sidebar with filter,
+      breadcrumbs, previous/next, "on this page", mobile menu; all 58 pages render in Chromium with no console errors and
+      no broken internal links
+- [x] 5.7 favicon.png as the site icon; canonical and Open Graph tags with https://arkivector.dikshitrj.in
+- [x] 5.8 Site URL in README, SDK READMEs, pyproject/package.json metadata, release notes, wiki sidebar and footer
