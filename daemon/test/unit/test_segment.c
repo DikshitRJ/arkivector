@@ -191,9 +191,73 @@ TEST test_hnsw_corrupt_footer_rejected(void)
     PASS();
 }
 
+/* Regression: iterative_scan = off (and any search of an empty graph) never allocates the discarded
+ * heap; av_hnsw_scan_mem used to call pairingheap_is_empty(NULL) and crash. */
+TEST test_hnsw_search_off_and_empty(void)
+{
+    av_err err;
+    av_err_clear(&err);
+    const av_opclass *oc = av_opclass_find("vector_l2_ops");
+    ASSERT(oc != NULL);
+    av_segment *seg = NULL;
+    ASSERT_EQ(AV_OK, av_segment_create_hnsw(NULL, AV_VT_VECTOR, 4, oc, 16, 64, 8 * 1024 * 1024, &seg, &err));
+    Vector *q = alloc_test_vec(4, 3.0f);
+    av_hit hits[5];
+    size_t n = 99;
+    for (int mode = 0; mode <= 2; mode++) {
+        ASSERT_EQ(AV_OK, av_segment_search_hnsw(seg, q, 40, mode, 1000, NULL, 0, 5, hits, &n, &err));
+        ASSERT_EQ(0u, (unsigned) n);
+    }
+    for (int i = 0; i < 30; i++) {
+        Vector *v = alloc_test_vec(4, (float) i);
+        ASSERT_EQ(AV_OK, av_segment_insert(seg, (av_docid) i, v, &err));
+        free(v);
+    }
+    for (int mode = 0; mode <= 2; mode++) {
+        ASSERT_EQ(AV_OK, av_segment_search_hnsw(seg, q, 40, mode, 1000, NULL, 0, 5, hits, &n, &err));
+        ASSERT_EQ(5u, (unsigned) n);
+        ASSERT_EQ(3u, hits[0].id);
+    }
+    free(q);
+    av_segment_destroy(seg);
+    PASS();
+}
+
+/* Zero-norm vectors are not indexable under cosine (pgvector skips them): AV_SKIPPED, and a zero
+ * query returns no hits instead of NaN distances. */
+TEST test_hnsw_cosine_zero_norm(void)
+{
+    av_err err;
+    av_err_clear(&err);
+    const av_opclass *oc = av_opclass_find("vector_cosine_ops");
+    ASSERT(oc != NULL);
+    av_segment *seg = NULL;
+    ASSERT_EQ(AV_OK, av_segment_create_hnsw(NULL, AV_VT_VECTOR, 4, oc, 16, 64, 8 * 1024 * 1024, &seg, &err));
+    Vector *zero = alloc_test_vec(4, 0.0f);
+    for (int i = 0; i < 4; i++)
+        zero->x[i] = 0.0f;
+    ASSERT_EQ(AV_SKIPPED, av_segment_insert(seg, 0, zero, &err));
+    ASSERT(av_segment_get(seg, 0) == NULL);
+    Vector *v = alloc_test_vec(4, 1.0f);
+    ASSERT_EQ(AV_OK, av_segment_insert(seg, 1, v, &err));
+    av_hit hits[2];
+    size_t n = 99;
+    ASSERT_EQ(AV_OK, av_segment_search_hnsw(seg, zero, 40, 1, 1000, NULL, 0, 2, hits, &n, &err));
+    ASSERT_EQ(0u, (unsigned) n);
+    ASSERT_EQ(AV_OK, av_segment_search_hnsw(seg, v, 40, 1, 1000, NULL, 0, 2, hits, &n, &err));
+    ASSERT_EQ(1u, (unsigned) n);
+    ASSERT_EQ(1u, hits[0].id);
+    free(zero);
+    free(v);
+    av_segment_destroy(seg);
+    PASS();
+}
+
 SUITE(segment_suite)
 {
     RUN_TEST(test_flat_segment_lifecycle);
     RUN_TEST(test_hnsw_segment_seal_and_open);
     RUN_TEST(test_hnsw_corrupt_footer_rejected);
+    RUN_TEST(test_hnsw_search_off_and_empty);
+    RUN_TEST(test_hnsw_cosine_zero_norm);
 }

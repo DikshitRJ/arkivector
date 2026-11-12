@@ -41,6 +41,10 @@ av_status av_segment_create_flat(const char *path, av_vtype type, int dim, size_
 av_status av_segment_create_hnsw(const char *path, av_vtype type, int dim, const av_opclass *oc, int m,
                                  int ef_construction, size_t reserve_bytes, av_segment **out, av_err *e);
 
+/* Address-space reservation (bytes) for an HNSW segment holding about max_vectors vectors
+ * (virtual: pages are committed on use). Capped at AV_SEG_DEFAULT_RESERVE. */
+size_t av_segment_hnsw_reserve(av_vtype type, int dim, int m, size_t max_vectors);
+
 /* Open an existing sealed HNSW segment (read-only mmap with footer validation). */
 av_status av_segment_open_sealed(const char *path, av_segment **out, av_err *e);
 
@@ -52,7 +56,8 @@ void av_segment_destroy(av_segment *s);
 av_seg_kind av_segment_kind(const av_segment *s);
 
 /* Copy a pgvector struct (varlena header set) in as docid id. Duplicate ids are rejected.
- * For HNSW segments, returns AV_SEAL_NEEDED when the arena reservation memory is full. */
+ * For HNSW segments, returns AV_SEAL_NEEDED when the arena reservation memory is full and
+ * AV_SKIPPED for a zero-norm vector under a normalizing opclass (pgvector does not index those). */
 av_status av_segment_insert(av_segment *s, av_docid id, const void *pgvec, av_err *e);
 size_t av_segment_count(const av_segment *s);
 /* The stored struct, or NULL when id is not in this segment. */
@@ -76,7 +81,10 @@ av_status av_segment_scan_exact(const av_segment *s, const void *query, const av
 
 /*
  * Approximate HNSW search. Runs GetScanItems (and ResumeScanItems if iterative != off)
- * over the in-memory/sealed graph, rechecking cand.
+ * over the in-memory/sealed graph, rechecking cand. Distances are the INDEX distances
+ * (l2: squared, ip: negative, cosine: on normalized values); callers that report distances
+ * recompute them with the operator (av_collection_search_hnsw). A zero-norm query under a
+ * normalizing opclass returns no hits. pgvector errors are caught and returned as AV_ERR.
  */
 av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_search, int iterative_mode,
                                  int max_scan_tuples, const roaring_bitmap_t *cand, size_t offset, size_t k,

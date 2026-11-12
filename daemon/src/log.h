@@ -18,7 +18,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef enum { AV_OK = 0, AV_ERR = 1, AV_SEAL_NEEDED = 2 } av_status;
+/* AV_SKIPPED: the value is valid but cannot be indexed (zero norm for a normalizing HNSW opclass). */
+typedef enum { AV_OK = 0, AV_ERR = 1, AV_SEAL_NEEDED = 2, AV_SKIPPED = 3 } av_status;
 
 typedef struct {
     char code[40];     /* spec/error-codes.json code, "" when unset */
