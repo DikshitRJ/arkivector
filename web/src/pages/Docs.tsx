@@ -1,72 +1,124 @@
-import { useEffect, useMemo, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Page, REPO } from "../components/Layout";
 import { CodeBlock } from "../components/ui";
-import { Link, navigate, type Route } from "../router";
+import { Link, navigate } from "../router";
 
 /*
- * /docs renders the Markdown guides in docs/guide/ (the same files are mirrored to the GitHub
- * wiki), so the site, the repository and the wiki never drift apart. Links between guides
- * ("python.md#errors") become in-app routes ("/docs/python#errors").
+ * /docs renders docs/wiki/ (the same Markdown files are published to the GitHub wiki), so the
+ * repository, the wiki and the site never drift apart. SUMMARY.md is the navigation tree.
+ * Routes: README.md -> /docs, api/README.md -> /docs/api, api/search.md -> /docs/api/search.
  */
-import overview from "../../../docs/guide/README.md?raw";
-import api from "../../../docs/guide/api.md?raw";
-import python from "../../../docs/guide/python.md?raw";
-import node from "../../../docs/guide/node.md?raw";
+const FILES = import.meta.glob("../../../docs/wiki/**/*.md", { query: "?raw", import: "default", eager: true }) as Record<
+  string,
+  string
+>;
 
-export type DocRoute = Extract<Route, `/docs${string}`>;
+const SOURCES: Record<string, string> = {};
+for (const [path, text] of Object.entries(FILES)) SOURCES[path.replace(/^.*\/docs\/wiki\//, "")] = text;
 
-export const DOCS: { route: DocRoute; file: string; label: string; source: string }[] = [
-  { route: "/docs", file: "README.md", label: "overview", source: overview },
-  { route: "/docs/api", file: "api.md", label: "REST API (curl)", source: api },
-  { route: "/docs/python", file: "python.md", label: "Python SDK", source: python },
-  { route: "/docs/node", file: "node.md", label: "Node.js SDK", source: node },
-];
+export function routeOf(rel: string): string {
+  const p = rel.replace(/\.md$/, "").replace(/(^|\/)README$/, "");
+  return p ? `/docs/${p}` : "/docs";
+}
 
-const FILE_TO_ROUTE = new Map(DOCS.map((d) => [d.file, d.route]));
+const ROUTE_TO_FILE = new Map(Object.keys(SOURCES).map((rel) => [routeOf(rel), rel]));
 
+export function docTitle(rel: string): string {
+  const m = /^#\s+(.+)$/m.exec(SOURCES[rel] ?? "");
+  return m ? m[1].replace(/`/g, "") : rel;
+}
+
+/* ------------------------------------------------------------------ navigation tree */
+
+type NavItem = { kind: "page"; title: string; rel: string } | { kind: "section"; title: string; children: NavItem[] };
+
+function parseSummary(md: string): NavItem[] {
+  const root: NavItem[] = [];
+  const stack: { indent: number; items: NavItem[] }[] = [{ indent: -1, items: root }];
+  for (const line of md.split("\n")) {
+    const m = /^(\s*)- (?:\[([^\]]+)\]\(([^)]+)\)|(.+))$/.exec(line);
+    if (!m) continue;
+    const indent = m[1].length;
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop();
+    const parent = stack[stack.length - 1].items;
+    if (m[3]) {
+      parent.push({ kind: "page", title: m[2], rel: m[3] });
+    } else {
+      const sec: NavItem = { kind: "section", title: m[4].trim(), children: [] };
+      parent.push(sec);
+      stack.push({ indent, items: sec.children });
+    }
+  }
+  return root;
+}
+
+const NAV = parseSummary(SOURCES["SUMMARY.md"] ?? "");
+
+function flatten(items: NavItem[], trail: string[] = []): { rel: string; title: string; trail: string[] }[] {
+  return items.flatMap((it) =>
+    it.kind === "page" ? [{ rel: it.rel, title: it.title, trail }] : flatten(it.children, [...trail, it.title]),
+  );
+}
+const ORDER = flatten(NAV);
+
+/* ------------------------------------------------------------------ markdown */
+
+/** GitHub-style heading anchor (same rule as the GitHub wiki and docs/tools/check_docs.py). */
 function slug(text: string): string {
   return text
-    .toLowerCase()
     .replace(/<[^>]+>/g, "")
-    .replace(/[`*_~]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}_\- ]/gu, "")
+    .replace(/ /g, "-");
 }
 
-/** Rewrite links to sibling guides into site routes; leave everything else alone. */
-function rewriteHref(href: string): string {
-  const m = /^([a-z]+\.md|README\.md)(#.*)?$/i.exec(href);
-  if (!m) return href;
-  const route = FILE_TO_ROUTE.get(m[1]);
-  return route ? route + (m[2] ?? "") : href;
+function decodeEntities(s: string): string {
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
+
+/** Resolve a link inside page `from`: sibling .md files become site routes. */
+function resolveHref(from: string, href: string): { href: string; internal: boolean } {
+  if (/^[a-z]+:/i.test(href) || href.startsWith("/")) return { href, internal: false };
+  if (href.startsWith("#")) return { href, internal: true };
+  const [target, anchor] = href.split("#");
+  if (!target.endsWith(".md")) return { href, internal: false };
+  const parts = from.split("/").slice(0, -1);
+  for (const seg of target.split("/")) {
+    if (seg === "..") parts.pop();
+    else if (seg !== "." && seg !== "") parts.push(seg);
+  }
+  const rel = parts.join("/");
+  if (!(rel in SOURCES)) return { href: `${REPO}/blob/main/docs/wiki/${rel}${anchor ? "#" + anchor : ""}`, internal: false };
+  return { href: routeOf(rel) + (anchor ? "#" + anchor : ""), internal: true };
+}
+
+let currentFile = "README.md"; // renderer context (render is synchronous)
 
 marked.use({
   gfm: true,
   renderer: {
     heading({ tokens, depth }) {
-      const text = this.parser.parseInline(tokens);
-      const id = slug(text);
-      return `<h${depth} id="${id}"><a class="doc-anchor" href="#${id}">${text}</a></h${depth}>`;
+      const html = this.parser.parseInline(tokens);
+      const id = slug(decodeEntities(html));
+      return `<h${depth} id="${id}"><a class="doc-anchor" href="#${id}">${html}</a></h${depth}>`;
     },
     link({ href, title, tokens }) {
       const text = this.parser.parseInline(tokens);
-      const to = rewriteHref(href);
-      const external = /^https?:\/\//.test(to);
+      const r = resolveHref(currentFile, href);
       const t = title ? ` title="${title}"` : "";
-      return external
-        ? `<a href="${to}"${t} target="_blank" rel="noreferrer">${text}</a>`
-        : `<a href="${to}"${t} data-internal="1">${text}</a>`;
+      return r.internal
+        ? `<a href="${r.href}"${t} data-internal="1">${text}</a>`
+        : `<a href="${r.href}"${t} target="_blank" rel="noreferrer">${text}</a>`;
     },
   },
 });
 
 type Block = { kind: "html"; html: string } | { kind: "code"; code: string; lang: string };
 
-/** Code fences become <CodeBlock> (copy button); everything else is rendered HTML. */
-function toBlocks(md: string): Block[] {
+/** Top-level code fences become <CodeBlock> (copy button); everything else is HTML. */
+function render(rel: string): Block[] {
+  currentFile = rel;
   const blocks: Block[] = [];
   let pending: Token[] = [];
   const flush = () => {
@@ -77,107 +129,246 @@ function toBlocks(md: string): Block[] {
       pending = [];
     }
   };
-  for (const tok of marked.lexer(md)) {
+  for (const tok of marked.lexer(SOURCES[rel] ?? "")) {
     if (tok.type === "code") {
       flush();
-      const c = tok as Tokens.Code;
-      blocks.push({ kind: "code", code: c.text, lang: c.lang || "text" });
-    } else {
-      pending.push(tok);
-    }
+      blocks.push({ kind: "code", code: (tok as Tokens.Code).text, lang: (tok as Tokens.Code).lang || "text" });
+    } else pending.push(tok);
   }
   flush();
   return blocks;
 }
 
-function headings(md: string): { id: string; text: string }[] {
+function headings(rel: string): { id: string; text: string }[] {
   return marked
-    .lexer(md)
+    .lexer(SOURCES[rel] ?? "")
     .filter((t): t is Tokens.Heading => t.type === "heading" && t.depth === 2)
-    .map((h) => ({ id: slug(h.text), text: h.text.replace(/`/g, "") }));
+    .map((h) => {
+      const plain = h.text.replace(/`/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+      return { id: slug(decodeEntities(marked.parseInline(h.text) as string)), text: plain };
+    });
 }
 
-export function Docs({ route }: { route: DocRoute }) {
-  const doc = DOCS.find((d) => d.route === route) ?? DOCS[0];
-  const blocks = useMemo(() => toBlocks(doc.source), [doc]);
-  const toc = useMemo(() => headings(doc.source), [doc]);
+/* ------------------------------------------------------------------ sidebar */
 
-  // Jump to #anchor after navigation (the router scrolls to the top first).
+function contains(item: NavItem, rel: string): boolean {
+  return item.kind === "page" ? item.rel === rel : item.children.some((c) => contains(c, rel));
+}
+
+function FolderIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="14" height="12" viewBox="0 0 14 12" aria-hidden className="shrink-0">
+      <path d="M1 2h4l1.5 1.5H13v7.5H1z" fill={open ? "#fe7445" : "none"} stroke="#000" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+function PageIcon() {
+  return (
+    <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden className="shrink-0">
+      <path d="M1 1h5l3 3v7H1z" fill="none" stroke="#181ea9" strokeWidth="1.1" />
+    </svg>
+  );
+}
+
+function Tree({ items, active, filter, depth = 0 }: { items: NavItem[]; active: string; filter: string; depth?: number }) {
+  return (
+    <ul className={depth ? "ml-3 border-l border-dashed border-ink pl-2" : ""}>
+      {items.map((it) =>
+        it.kind === "page" ? (
+          !filter || it.title.toLowerCase().includes(filter) ? (
+            <li key={it.rel}>
+              <Link
+                to={routeOf(it.rel)}
+                aria-current={it.rel === active ? "page" : undefined}
+                className={`flex items-center gap-1.5 no-underline px-1.5 py-[3px] ${it.rel === active ? "bg-ink text-paper" : "hover:bg-arkiv-orange"}`}
+              >
+                <PageIcon />
+                <span>{it.title}</span>
+              </Link>
+            </li>
+          ) : null
+        ) : (
+          <Section key={it.title} item={it} active={active} filter={filter} depth={depth} />
+        ),
+      )}
+    </ul>
+  );
+}
+
+function Section({ item, active, filter, depth }: { item: Extract<NavItem, { kind: "section" }>; active: string; filter: string; depth: number }) {
+  const [open, setOpen] = useState(() => contains(item, active));
   useEffect(() => {
+    if (contains(item, active)) setOpen(true);
+  }, [active, item]);
+  const matches = !filter || flatten(item.children).some((p) => p.title.toLowerCase().includes(filter));
+  if (!matches) return null;
+  const shown = open || !!filter;
+  return (
+    <li className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={shown}
+        className="flex w-full items-center gap-1.5 px-1.5 py-[3px] text-left font-semibold hover:underline underline-offset-4"
+      >
+        <FolderIcon open={shown} />
+        <span>{item.title}</span>
+      </button>
+      {shown && <Tree items={item.children} active={active} filter={filter} depth={depth + 1} />}
+    </li>
+  );
+}
+
+/* ------------------------------------------------------------------ page */
+
+export function Docs({ path }: { path: string }) {
+  const rel = ROUTE_TO_FILE.get(path.replace(/\/+$/, "") || "/docs");
+  const [filter, setFilter] = useState("");
+  const [menu, setMenu] = useState(false);
+  const blocks = useMemo(() => (rel ? render(rel) : []), [rel]);
+  const toc = useMemo(() => (rel ? headings(rel) : []), [rel]);
+  const idx = ORDER.findIndex((o) => o.rel === rel);
+  const prev = idx > 0 ? ORDER[idx - 1] : null;
+  const next = idx >= 0 && idx < ORDER.length - 1 ? ORDER[idx + 1] : null;
+  const trail = idx >= 0 ? ORDER[idx].trail : [];
+
+  useEffect(() => {
+    document.title = rel ? `${docTitle(rel)} · Docs · Arkivector` : "Page not found · Docs · Arkivector";
+    setMenu(false);
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (id) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
-  }, [route]);
+  }, [rel]);
 
-  // Client-side navigation for links between guides.
   const onClick = (e: MouseEvent<HTMLElement>) => {
     const a = (e.target as HTMLElement).closest("a");
     if (!a || a.dataset.internal !== "1" || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     const href = a.getAttribute("href") ?? "";
-    if (href.startsWith("#")) return; // same-page anchor: let the browser scroll
-    if (href.startsWith("/docs")) {
-      e.preventDefault();
-      const [path, hash] = href.split("#");
-      navigate(path);
-      if (hash) {
-        window.history.replaceState({}, "", window.location.pathname + "#" + hash);
-        requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView());
-      }
+    if (href.startsWith("#")) return;
+    e.preventDefault();
+    const [p, hash] = href.split("#");
+    navigate(p);
+    if (hash) {
+      window.history.replaceState({}, "", window.location.pathname + "#" + hash);
+      requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView());
     }
   };
 
+  const sidebar = (
+    <nav aria-label="Documentation" className="sheet px-2.5 py-3 text-[13px]">
+      <div className="flex items-center justify-between px-1.5 mb-2">
+        <Link to="/docs" className="font-display font-bold text-[16px] no-underline">
+          docs
+        </Link>
+        <span className="text-[11px] text-arkiv-blue">v1.1</span>
+      </div>
+      <input
+        type="search"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value.toLowerCase())}
+        placeholder="filter pages…"
+        aria-label="Filter pages"
+        className="mb-2 w-full border-[1.5px] border-ink bg-paper px-2 py-1 text-[12.5px] outline-none focus:shadow-[2px_2px_0_#fe7445]"
+      />
+      <Tree items={NAV} active={rel ?? ""} filter={filter} />
+      <p className="mt-4 px-1.5 text-[11.5px] leading-snug">
+        Same pages on the{" "}
+        <a className="ink-link" href={`${REPO}/wiki`} target="_blank" rel="noreferrer">
+          GitHub wiki
+        </a>
+        . Source:{" "}
+        <a className="ink-link" href={`${REPO}/tree/main/docs/wiki`} target="_blank" rel="noreferrer">
+          docs/wiki
+        </a>
+        .
+      </p>
+    </nav>
+  );
+
   return (
-    <Page className="py-10 sm:py-14">
-      <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-6 self-start">
-          <nav aria-label="Documentation" className="sheet px-3 py-3 text-[13.5px]">
-            <p className="font-display font-bold text-[15px] mb-2">docs</p>
-            <ul className="space-y-1">
-              {DOCS.map((d) => (
-                <li key={d.route}>
-                  <Link
-                    to={d.route}
-                    aria-current={d.route === doc.route ? "page" : undefined}
-                    className={`block no-underline px-1.5 py-0.5 ${d.route === doc.route ? "bg-ink text-paper" : "hover:underline underline-offset-4"}`}
-                  >
-                    {d.label}
-                  </Link>
+    <Page className="py-8 sm:py-12 max-w-7xl">
+      <button
+        type="button"
+        className="lg:hidden mb-3 border-[1.5px] border-ink bg-paper px-3 py-1.5 text-[13px] shadow-[3px_3px_0_#000]"
+        aria-expanded={menu}
+        onClick={() => setMenu(!menu)}
+      >
+        {menu ? "close menu" : "☰ docs menu"}
+      </button>
+      <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_12rem]">
+        <aside className={`${menu ? "block" : "hidden"} lg:block lg:sticky lg:top-4 self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto`}>
+          {sidebar}
+        </aside>
+
+        <div className="min-w-0">
+          {rel ? (
+            <>
+              <p className="mb-2 text-[12px] flex flex-wrap gap-1 items-center">
+                <Link to="/docs" className="ink-link">
+                  docs
+                </Link>
+                {trail.map((t) => (
+                  <span key={t}>/ {t}</span>
+                ))}
+                {rel !== "README.md" && <span>/ {docTitle(rel)}</span>}
+              </p>
+              <article className="doc-prose sheet px-4 sm:px-8 py-6" onClick={onClick}>
+                {blocks.map((b, i) =>
+                  b.kind === "code" ? <CodeBlock key={i} code={b.code} lang={b.lang} /> : <div key={i} dangerouslySetInnerHTML={{ __html: b.html }} />,
+                )}
+              </article>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
+                <div>
+                  {prev && (
+                    <Link to={routeOf(prev.rel)} className="sheet block px-3 py-2 no-underline hover:shadow-[3px_3px_0_#fe7445]">
+                      <span className="block text-[11px] text-arkiv-blue">← previous</span>
+                      {prev.title}
+                    </Link>
+                  )}
+                </div>
+                <div className="text-right">
+                  {next && (
+                    <Link to={routeOf(next.rel)} className="sheet block px-3 py-2 no-underline hover:shadow-[3px_3px_0_#fe7445]">
+                      <span className="block text-[11px] text-arkiv-blue">next →</span>
+                      {next.title}
+                    </Link>
+                  )}
+                </div>
+              </div>
+              <p className="mt-3 text-[12px]">
+                <a className="ink-link" href={`${REPO}/edit/main/docs/wiki/${rel}`} target="_blank" rel="noreferrer">
+                  edit this page on GitHub
+                </a>
+              </p>
+            </>
+          ) : (
+            <article className="doc-prose sheet px-6 py-8">
+              <h1>Page not found</h1>
+              <p>
+                There is no documentation page at <code>{path}</code>. Pick one from the menu, or start at the{" "}
+                <Link to="/docs" className="ink-link">
+                  documentation home
+                </Link>
+                .
+              </p>
+            </article>
+          )}
+        </div>
+
+        {toc.length > 0 && (
+          <aside className="hidden xl:block sticky top-4 self-start text-[12.5px]">
+            <p className="font-display font-bold mb-1">on this page</p>
+            <ul className="space-y-1 border-l-2 border-arkiv-orange pl-2">
+              {toc.map((h) => (
+                <li key={h.id}>
+                  <a className="ink-link" href={`#${h.id}`}>
+                    {h.text}
+                  </a>
                 </li>
               ))}
             </ul>
-            {toc.length > 0 && (
-              <div className="hidden lg:block">
-                <p className="font-display font-bold text-[13px] mt-4 mb-1">on this page</p>
-                <ul className="space-y-0.5 text-[12.5px]">
-                  {toc.map((h) => (
-                    <li key={h.id}>
-                      <a className="ink-link" href={`#${h.id}`}>
-                        {h.text}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <p className="mt-4 text-[12px]">
-              <a className="ink-link" href={`${REPO}/blob/main/docs/guide/${doc.file}`} target="_blank" rel="noreferrer">
-                edit on GitHub
-              </a>{" "}
-              ·{" "}
-              <a className="ink-link" href={`${REPO}/wiki`} target="_blank" rel="noreferrer">
-                wiki
-              </a>
-            </p>
-          </nav>
-        </aside>
-        <article className="doc-prose sheet min-w-0 px-4 sm:px-7 py-6" onClick={onClick}>
-          {blocks.map((b, i) =>
-            b.kind === "code" ? (
-              <CodeBlock key={i} code={b.code} lang={b.lang} />
-            ) : (
-              <div key={i} dangerouslySetInnerHTML={{ __html: b.html }} />
-            ),
-          )}
-        </article>
+          </aside>
+        )}
       </div>
     </Page>
   );

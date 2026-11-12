@@ -104,7 +104,7 @@
   .doc-prose th, .doc-prose td { border: 1px solid #000; padding: 0.35em 0.6em; text-align: left; vertical-align: top; }
   .doc-prose th { background: #fe7445; }
   .doc-prose strong { font-weight: 700; }
-  .doc-prose pre { overflow-x: auto; margin: 0.8em 0; padding: 0.7em 0.9em; font-size: 13px; line-height: 1.6;
+  .doc-prose div > pre, .doc-prose li > pre { overflow-x: auto; margin: 0.8em 0; padding: 0.7em 0.9em; font-size: 13px; line-height: 1.6;
     border: 1.5px solid #181ea9; box-shadow: 3px 3px 0 #181ea9; background: #fff; }
   .doc-prose blockquote { border-left: 4px solid #fe7445; padding-left: 0.9em; margin: 1em 0; }
 
