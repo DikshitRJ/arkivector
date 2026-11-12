@@ -33,6 +33,26 @@ Branch `claude/busy-babbage-k4puq6` (from `main` @ 8cff8dd). Legend: [x] done ·
       leak, duplicated rebuild code
 - [ ] 3.5 CI green on the PR head
 
+## 3b. Graphify review of #8 (2026-11-12, after merge; fixed on the follow-up branch)
+Graphify posted 5 advisory findings (check run "Graphify", review marked partial) and 7 inline
+"health regression" notes. Each was checked against the code:
+- [x] allocatorLock held across an ereport inside PG_TRY (segment.c av_hnsw_insert): **not a bug**.
+      LWLockAcquire records every lock in a per-thread held list; PG_TRY saves its depth and PG_CATCH
+      calls av_pg_unwind_restore, which releases every lock taken since (pgcompat lwlock.c release_to).
+      Unit test test_pgcompat.c error_releases_lwlocks covers exactly this pattern.
+- [x] c->hnsw read without hnsw_lock in av_collection_has_hnsw, the early check of
+      av_collection_search_hnsw and av_collection_get_stats: **real (benign) data race, fixed**. New
+      immutable `hnsw_enabled` flag, set in create before the collection is shared; lock-free readers use
+      it, and the graph pointer is read by query threads only under hnsw_lock. Applier-side reads stay
+      unlocked (the applier is the only writer).
+- [x] NULL candidate bitmap with a non-empty tail: **false positive**. av_collection_search_hnsw replaces
+      a NULL cand with the live bitmap before taking the lock or touching the tail.
+- [x] NULL opclass dereference in av_collection_search_hnsw: **false positive**. A graph is built only when
+      def.opclass is set (create_opts), so oc falls back to a non-NULL column opclass whenever a graph exists.
+- [x] 7 inline notes (hnsw_build, av_collection_search_hnsw, av_segment_create_hnsw, parse_hnsw_knobs and
+      three test functions "fan out to 6-12 callees"): coupling metrics, not defects. No change.
+- [x] The formal-verification check abstained on all 14 changed functions (unsupported types): nothing to act on.
+
 ## 4. Follow-ups (not in this change)
 - [ ] Persist sealed graphs (restart currently rebuilds the graph from LMDB)
 - [ ] Rebuild on a background thread instead of the applier
