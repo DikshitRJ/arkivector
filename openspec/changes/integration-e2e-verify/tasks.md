@@ -15,23 +15,23 @@ Legend: [x] done · [ ] open · (decision) = approach chosen.
       cursor parse, atoi/sscanf, duplicated TypedValue JSON → filter/value_json.c); 2 idiomatic checks disabled with reasons
 - [ ] clang-tidy version pinned in CI (local 23.x vs apt 18)
 - [ ] cppcheck clean
-- [ ] integration job builds the dev binary BEFORE pytest (today daemon suites silently skip)
-- [ ] unit tests ASan/UBSan + TSan green
-- [ ] integration, contract, parity, fuzz smoke green
+- [x] integration job builds the dev binary BEFORE pytest (today daemon suites silently skip)
+- [x] unit tests ASan/UBSan + TSan green (TSan root cause: pgvector ifunc resolvers; see daemon-hnsw-ci-fix)
+- [ ] integration, contract, parity, fuzz smoke green (integration, parity, fuzz smoke green in daemon-hnsw-ci-fix; contract tests not in CI yet)
 
 ## B. Math (daemon)
-- [ ] B1 HNSW returns index distance (L2², -ip) as API distance → recompute true operator distance for returned hits
-- [ ] B2 cosine HNSW segments store normalized vectors; flat stores raw → keep raw vectors for exact/non-index operators
-- [ ] B3 zero-norm vectors: NaN distances break JSON → reject zero vectors for cosine insert/query (pgvector skips them in HNSW), never emit NaN
-- [ ] B4 strict_order guard broken for negative distances (previous_distance = -1) → -INFINITY like upstream
+- [x] B1 HNSW returns index distance (L2², -ip) as API distance → recompute true operator distance for returned hits
+- [x] B2 cosine HNSW segments store normalized vectors; flat stores raw → keep raw vectors for exact/non-index operators
+- [x] B3 zero-norm vectors: NaN distances break JSON → reject zero vectors for cosine insert/query (pgvector skips them in HNSW), never emit NaN (graph skips them, NaN hits dropped; inserts are not rejected)
+- [x] B4 strict_order guard broken for negative distances (previous_distance = -1) → -INFINITY like upstream
 - [ ] B5 Qdrant Manhattan score sign
-- [ ] B6 HNSW tie-break by key (search.md:37), not docid
+- [x] B6 HNSW tie-break by key (search.md:37), not docid
 - [ ] B7 TTL: validate before converting; odd seconds rejected; 0 lifetime rejected
-- [ ] B8 ef_search ≥ offset+k; iterative bump uses offset+k; Qdrant limit/offset bounds
-- [ ] B9 iterative_scan off + empty first batch null deref (hnswscan_mem.c)
+- [ ] B8 ef_search ≥ offset+k; iterative bump uses offset+k; Qdrant limit/offset bounds (ef_search/iterative bump done in daemon-hnsw-ci-fix; Qdrant bounds open)
+- [x] B9 iterative_scan off + empty first batch null deref (hnswscan_mem.c)
 
 ## C. Daemon features (plan gaps)
-- [ ] C1 HNSW reachable: collections with an hnsw index build/seal HNSW segments (today always FLAT)
+- [x] C1 HNSW reachable: collections with an hnsw index build/seal HNSW segments (today always FLAT)
 - [ ] C2 multi-segment collections + expiry-banded compaction + compactor thread + TTL segment drop (D4.6, D4.7)
 - [ ] C3 sealed segments reloaded on restart
 - [ ] C4 calibration runs at start; planner uses measured constants
