@@ -107,8 +107,25 @@ size_t av_collection_live_count(const av_collection *c); /* atomic; no lock need
 const roaring_bitmap_t *av_collection_live(const av_collection *c);
 const av_docmap *av_collection_docmap(const av_collection *c);
 const av_attr_index *av_collection_attr_index(const av_collection *c);
-const av_segment *av_collection_segment(const av_collection *c);
-av_status av_collection_swap_segment(av_collection *c, av_segment *new_seg, av_err *e);
+const av_segment *av_collection_segment(const av_collection *c); /* the flat segment (raw vectors) */
+
+/*
+ * HNSW index (collections whose index method is hnsw). The graph indexes the docids of the flat
+ * segment; docids it could not take (graph full, zero-norm cosine vectors) form an exact "tail".
+ * The applier rebuilds the graph after publish when the tail or the dead share grows large.
+ */
+bool av_collection_has_hnsw(const av_collection *c);
+/* Applier thread only: rebuild the graph from the published live docids now. */
+av_status av_collection_rebuild_hnsw(av_collection *c, av_err *e);
+/*
+ * Approximate search under the read lock: graph search (pgvector GetScanItems/ResumeScanItems with
+ * ef_search >= limit) over cand (NULL = live) plus an exact scan of the tail. Distances are
+ * recomputed with oc (NULL = column opclass) on the raw vectors; out[0..*n_out) holds the best
+ * limit hits ascending by (distance, key). Fewer than limit hits means the graph walk ran out.
+ */
+av_status av_collection_search_hnsw(av_collection *c, const void *query, const av_opclass *oc,
+                                    const roaring_bitmap_t *cand, int ef_search, int iterative_mode,
+                                    int max_scan_tuples, size_t limit, av_hit *out, size_t *n_out, av_err *e);
 
 /*
  * Exact search: scores (filter AND live), or all live docids when filter is NULL. The caller

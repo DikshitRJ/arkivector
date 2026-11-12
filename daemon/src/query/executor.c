@@ -47,16 +47,20 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
                          av_collection_live_count(col), &plan, e);
 
     size_t n_raw = 0;
-    if ((plan.strategy == AV_STRAT_HNSW || plan.strategy == AV_STRAT_HNSW_ITERATIVE) && seg != NULL &&
-        av_segment_kind(seg) == AV_SEG_HNSW) {
+    bool hnsw_done = false;
+    if ((plan.strategy == AV_STRAT_HNSW || plan.strategy == AV_STRAT_HNSW_ITERATIVE) &&
+        av_collection_has_hnsw(col)) {
+        size_t limit = offset + k;
         int ef_search = params->ef_search > 0 ? params->ef_search : 40;
         if (plan.strategy == AV_STRAT_HNSW_ITERATIVE && plan.selectivity > 0.0) {
-            int bumped = (int) ceil(1.5 * (double) k / plan.selectivity);
+            int bumped = (int) ceil(1.5 * (double) limit / plan.selectivity);
             if (bumped > ef_search)
                 ef_search = bumped;
-            if (ef_search > 1000)
-                ef_search = 1000;
         }
+        if (ef_search < (int) limit)
+            ef_search = (int) limit;
+        if (ef_search > 1000)
+            ef_search = 1000;
         int iter_mode = 1; /* relaxed_order */
         if (params->iterative_scan != NULL) {
             if (strcmp(params->iterative_scan, "off") == 0)
@@ -64,19 +68,34 @@ av_status av_execute_search(av_collection *col, av_store *store, const av_search
             else if (strcmp(params->iterative_scan, "strict_order") == 0)
                 iter_mode = 2;
         }
-        if (av_segment_search_hnsw(seg, params->query_vec, ef_search, iter_mode,
-                                   (int) params->max_scan_tuples, cand, offset, k, raw_hits, &n_raw,
-                                   e) != AV_OK) {
-            n_raw = 0;
+        av_hit *buf = malloc(limit * sizeof *buf);
+        size_t nb = 0;
+        av_err he;
+        av_err_clear(&he);
+        if (buf != NULL &&
+            av_collection_search_hnsw(col, params->query_vec, params->oc, cand, ef_search, iter_mode,
+                                      (int) params->max_scan_tuples, limit, buf, &nb, &he) == AV_OK) {
+            size_t avail =
+                cand != NULL ? (size_t) roaring_bitmap_get_cardinality(cand) : av_collection_live_count(col);
+            /* S2 -> S1 fallback: the graph walk found fewer than offset + k of the candidates */
+            if (nb >= limit || nb >= avail) {
+                if (nb > offset) {
+                    n_raw = nb - offset < k ? nb - offset : k;
+                    memcpy(raw_hits, buf + offset, n_raw * sizeof *raw_hits);
+                }
+                hnsw_done = true;
+            }
         }
-        /* S2 -> S1 fallback when < k */
-        if (n_raw < k && (cand == NULL || roaring_bitmap_get_cardinality(cand) > n_raw)) {
-            n_raw = 0;
-            (void) av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw,
-                                e);
+        free(buf);
+        if (!hnsw_done) {
+            plan.strategy = AV_STRAT_EXACT_FLAT;
+            plan.exact = true;
         }
-    } else {
-        if (av_flat_scan(seg, docmap, params->query_vec, params->oc, cand, offset, k, raw_hits, &n_raw, e) !=
+    }
+    if (!hnsw_done) {
+        /* Without a filter, score the live docids only (the segment also holds replaced versions). */
+        const roaring_bitmap_t *scan = cand != NULL ? cand : av_collection_live(col);
+        if (av_flat_scan(seg, docmap, params->query_vec, params->oc, scan, offset, k, raw_hits, &n_raw, e) !=
             AV_OK) {
             free(raw_hits);
             return AV_ERR;

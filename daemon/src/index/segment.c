@@ -16,6 +16,8 @@
 #include "storage/itemptr.h"
 #include "storage/lwlock.h"
 #include "store/arena_file.h"
+#include "utils/elog.h"
+#include "utils/memutils.h"
 #include "varatt.h"
 #include "version.h"
 
@@ -93,11 +95,32 @@ static void *segment_hnsw_alloc(Size size, void *state)
 
 static size_t estimate_hnsw_reserve(size_t max_vectors, av_vtype type, int dim, int m)
 {
-    (void) type;
-    size_t val_sz = (size_t) dim * sizeof(float) + 4;
+    size_t d = dim > 0 ? (size_t) dim : 1;
+    size_t val_sz;
+    switch (type) {
+    case AV_VT_HALFVEC:
+        val_sz = 2 * d + 8;
+        break;
+    case AV_VT_BIT:
+        val_sz = (d + 7) / 8 + 8;
+        break;
+    case AV_VT_SPARSEVEC:
+        val_sz = 8 * (d < 1000 ? d : 1000) + 16; /* nnz unknown: assume at most 1000 */
+        break;
+    default:
+        val_sz = 4 * d + 8;
+        break;
+    }
+    /* element + value + level-0 (2m) and upper-level (m per level, ~1/ln(m) levels) neighbour arrays */
     size_t per_vec = val_sz + sizeof(HnswElementData) + (size_t) (3 * m * 16) + 64;
     size_t total = sizeof(HnswGraph) + (size_t) ((double) (max_vectors * per_vec) * 1.2) + (1024 * 1024);
     return total;
+}
+
+size_t av_segment_hnsw_reserve(av_vtype type, int dim, int m, size_t max_vectors)
+{
+    size_t r = estimate_hnsw_reserve(max_vectors, type, dim, m > 0 ? m : HNSW_DEFAULT_M);
+    return r < AV_SEG_DEFAULT_RESERVE ? r : AV_SEG_DEFAULT_RESERVE;
 }
 
 av_status av_segment_create_hnsw(const char *path, av_vtype type, int dim, const av_opclass *oc, int m,
@@ -353,32 +376,64 @@ static av_status av_hnsw_insert(av_segment *s, av_docid id, const void *pgvec, a
     HnswGraph *graph = s->graph;
     HnswMemBuildState *bs = &s->bs;
     char *base = (char *) av_arena_file_base(s->data);
-    Datum value = PointerGetDatum(pgvec);
 
-    if (bs->support.normprocinfo != NULL) {
-        value = HnswNormValue(bs->typeInfo, bs->support.collation, value);
+    /* pgvector code reports errors with ereport(ERROR): catch them here, never abort the daemon. */
+    MemoryContext old = CurrentMemoryContext;
+    MemoryContext volatile ctx = NULL;
+    volatile av_status st = AV_OK;
+    char *volatile valuePtr = NULL;
+    PG_TRY();
+    {
+        ctx = AllocSetContextCreate(NULL, "hnsw_insert", ALLOCSET_DEFAULT_SIZES);
+        MemoryContextSwitchTo(ctx);
+        Datum in = PointerGetDatum(pgvec);
+        bool isnull = false;
+        Datum value;
+        /* Upstream InsertTuple: check the value, skip zero-norm vectors, normalize (cosine). */
+        if (!HnswFormIndexValue(&value, &in, &isnull, bs->typeInfo, &bs->support)) {
+            st = AV_SKIPPED;
+        } else {
+            ItemPointerData tid;
+            av_docid_to_tid(id, &tid);
+            HnswCheckDim(bs->dimensions, bs->typeInfo, bs->support.collation, value);
+            Size valueSize = (Size) VARSIZE_ANY(DatumGetPointer(value));
+            Size memoryMargin =
+                (graph->memoryTotal > 4 * 1024 * 1024) ? (1024 * 1024) : (graph->memoryTotal / 16);
+
+            LWLockAcquire(&graph->allocatorLock, LW_EXCLUSIVE);
+            if (add_size(add_size(graph->memoryUsed, memoryMargin), valueSize) >= graph->memoryTotal) {
+                LWLockRelease(&graph->allocatorLock);
+                st = AV_SEAL_NEEDED;
+            } else {
+                HnswElement element =
+                    HnswInitElement(base, &tid, bs->m, bs->ml, bs->maxLevel, &bs->allocator);
+                valuePtr = HnswAlloc(&bs->allocator, valueSize);
+                LWLockRelease(&graph->allocatorLock);
+
+                memcpy(valuePtr, DatumGetPointer(value), valueSize);
+                HnswPtrStore(base, element->value, (char *) valuePtr);
+                LWLockInitialize(&element->lock, hnsw_lock_tranche_id);
+
+                AvHnswInsertTupleInMemory(bs, element);
+            }
+        }
     }
-
-    ItemPointerData tid;
-    av_docid_to_tid(id, &tid);
-    HnswCheckDim(bs->dimensions, bs->typeInfo, bs->support.collation, value);
-    Size valueSize = (Size) VARSIZE_ANY(DatumGetPointer(value));
-    Size memoryMargin = (graph->memoryTotal > 4 * 1024 * 1024) ? (1024 * 1024) : (graph->memoryTotal / 16);
-
-    LWLockAcquire(&graph->allocatorLock, LW_EXCLUSIVE);
-    if (add_size(graph->memoryUsed, memoryMargin) >= graph->memoryTotal) {
-        LWLockRelease(&graph->allocatorLock);
-        return AV_SEAL_NEEDED;
+    PG_CATCH();
+    {
+        av_err_set(e, "internal", "hnsw insert of docid %u: %s", id, av_pg_error_data()->message);
+        FlushErrorState();
+        st = AV_ERR;
     }
-    HnswElement element = HnswInitElement(base, &tid, bs->m, bs->ml, bs->maxLevel, &bs->allocator);
-    Pointer valuePtr = HnswAlloc(&bs->allocator, valueSize);
-    LWLockRelease(&graph->allocatorLock);
-
-    memcpy(valuePtr, DatumGetPointer(value), valueSize);
-    HnswPtrStore(base, element->value, (char *) valuePtr);
-    LWLockInitialize(&element->lock, hnsw_lock_tranche_id);
-
-    AvHnswInsertTupleInMemory(bs, element);
+    PG_END_TRY();
+    MemoryContextSwitchTo(old);
+    if (ctx != NULL)
+        MemoryContextDelete(ctx);
+    if (st != AV_OK)
+        return st;
+    if (valuePtr == NULL) {
+        av_err_set(e, "internal", "hnsw insert of docid %u stored no value", id);
+        return AV_ERR;
+    }
 
     table[id] = (uint64_t) ((char *) valuePtr - base);
     size_t len = atomic_load_explicit(&s->table_len, memory_order_relaxed);
@@ -465,18 +520,39 @@ av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_
         return AV_OK;
 
     char *base = (char *) av_arena_file_base(s->data);
-    Datum qval = PointerGetDatum(query);
-
-    if (s->support.normprocinfo != NULL) {
-        qval = HnswNormValue(s->typeInfo, s->support.collation, qval);
-    }
-
     bool prev_ro = av_lwlock_readonly_arena;
     av_lwlock_readonly_arena = s->sealed;
 
-    HnswSupport supp = s->support;
-    av_status st = av_hnsw_scan_mem(base, s->graph, &supp, s->m, qval, ef_search, iterative_mode,
-                                    max_scan_tuples, cand, offset, k, out, n_out, e);
+    MemoryContext old = CurrentMemoryContext;
+    MemoryContext volatile ctx = NULL;
+    volatile av_status st = AV_OK;
+    PG_TRY();
+    {
+        ctx = AllocSetContextCreate(NULL, "hnsw_search", ALLOCSET_DEFAULT_SIZES);
+        MemoryContextSwitchTo(ctx);
+        Datum qval = PointerGetDatum(query);
+        HnswSupport supp = s->support;
+        /* Upstream hnswscan.c: a zero-norm query has no cosine neighbours (no index results). */
+        if (supp.normprocinfo != NULL && !HnswCheckNorm(&supp, qval)) {
+            *n_out = 0;
+        } else {
+            if (supp.normprocinfo != NULL)
+                qval = HnswNormValue(s->typeInfo, supp.collation, qval);
+            st = av_hnsw_scan_mem(base, s->graph, &supp, s->m, qval, ef_search, iterative_mode,
+                                  max_scan_tuples, cand, offset, k, out, n_out, e);
+        }
+    }
+    PG_CATCH();
+    {
+        av_err_set(e, "internal", "hnsw search: %s", av_pg_error_data()->message);
+        FlushErrorState();
+        *n_out = 0;
+        st = AV_ERR;
+    }
+    PG_END_TRY();
+    MemoryContextSwitchTo(old);
+    if (ctx != NULL)
+        MemoryContextDelete(ctx);
 
     av_lwlock_readonly_arena = prev_ro;
     return st;

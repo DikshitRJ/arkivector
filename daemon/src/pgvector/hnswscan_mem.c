@@ -125,7 +125,7 @@ av_status av_hnsw_scan_mem(char *base, HnswGraph *graph, HnswSupport *support, i
     so.max_scan_tuples = max_scan_tuples > 0 ? max_scan_tuples : hnsw_max_scan_tuples;
     so.max_memory = (Size) ((double) work_mem * hnsw_scan_mem_multiplier * 1024.0 + 256.0);
     so.tuples = 0;
-    so.previous_distance = -1.0;
+    so.previous_distance = -INFINITY; /* upstream hnswscan.c: negative distances (<#>) must pass */
     so.tmpCtx = tmpCtx;
 
     HnswInitSearchState(&so.searchState, NULL, false);
@@ -149,7 +149,9 @@ av_status av_hnsw_scan_mem(char *base, HnswGraph *graph, HnswSupport *support, i
     size_t target_count = offset + k;
     bool done_extra_batch = false;
 
-    while (so.w != NIL || (!pairingheap_is_empty(so.discarded) && so.iterative_scan != HNSW_ITERATIVE_SCAN_OFF))
+    /* so.discarded stays NULL with iterative_scan = off and for an empty graph: never dereference it then */
+    while (so.w != NIL || (so.iterative_scan != HNSW_ITERATIVE_SCAN_OFF && so.discarded != NULL &&
+                           !pairingheap_is_empty(so.discarded)))
     {
         while (so.w != NIL) {
             /* w is ordered furthest-first, so llast(w) is the closest candidate */
@@ -168,7 +170,7 @@ av_status av_hnsw_scan_mem(char *base, HnswGraph *graph, HnswSupport *support, i
                     continue;
 
                 if (so.iterative_scan == HNSW_ITERATIVE_SCAN_STRICT) {
-                    if (so.previous_distance >= 0.0 && sc->distance < so.previous_distance)
+                    if (sc->distance < so.previous_distance)
                         continue;
                     so.previous_distance = sc->distance;
                 } else {
@@ -224,7 +226,7 @@ av_status av_hnsw_scan_mem(char *base, HnswGraph *graph, HnswSupport *support, i
                     if (cand != NULL && !roaring_bitmap_contains(cand, docid))
                         continue;
                     if (so.iterative_scan == HNSW_ITERATIVE_SCAN_STRICT) {
-                        if (so.previous_distance >= 0.0 && sc->distance < so.previous_distance)
+                        if (sc->distance < so.previous_distance)
                             continue;
                         so.previous_distance = sc->distance;
                     } else {

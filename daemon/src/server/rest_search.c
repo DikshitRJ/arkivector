@@ -369,6 +369,54 @@ static av_status parse_filter_or_where(yyjson_val *root, const av_coldef *coldef
 }
 
 /* POST /v1/collections/{name}/search */
+
+/*
+ * ef_search (1..1000), iterative_scan ("off" | "relaxed_order" | "strict_order"), max_scan_tuples
+ * (1..1000000): pgvector's hnsw.* settings per search (docs/api/search.md). prefix is the JSON
+ * pointer of obj ("" for a single search, "/searches/<i>" in a batch). Absent fields keep defaults.
+ */
+static av_status parse_hnsw_knobs(yyjson_val *obj, const char *prefix, av_search_params *sp, av_err *e)
+{
+    char ptr[96];
+    yyjson_val *v = yyjson_obj_get(obj, "ef_search");
+    if (v != NULL) {
+        if (!yyjson_is_int(v) || yyjson_get_int(v) < 1 || yyjson_get_int(v) > 1000) {
+            av_err_set(e, "invalid_argument", "ef_search must be an integer in 1..1000");
+            (void) snprintf(ptr, sizeof ptr, "%s/ef_search", prefix);
+            av_err_field(e, ptr);
+            return AV_ERR;
+        }
+        sp->ef_search = (int) yyjson_get_int(v);
+    }
+    v = yyjson_obj_get(obj, "iterative_scan");
+    if (v != NULL) {
+        static const char *const modes[] = {"off", "relaxed_order", "strict_order"};
+        const char *str = yyjson_get_str(v);
+        sp->iterative_scan = NULL;
+        for (size_t i = 0; str != NULL && i < sizeof modes / sizeof modes[0]; i++)
+            if (strcmp(str, modes[i]) == 0)
+                sp->iterative_scan = modes[i]; /* static storage: outlives the request document */
+        if (sp->iterative_scan == NULL) {
+            av_err_set(e, "invalid_argument",
+                       "iterative_scan must be one of off, relaxed_order, strict_order");
+            (void) snprintf(ptr, sizeof ptr, "%s/iterative_scan", prefix);
+            av_err_field(e, ptr);
+            return AV_ERR;
+        }
+    }
+    v = yyjson_obj_get(obj, "max_scan_tuples");
+    if (v != NULL) {
+        if (!yyjson_is_int(v) || yyjson_get_int(v) < 1 || yyjson_get_int(v) > 1000000) {
+            av_err_set(e, "invalid_argument", "max_scan_tuples must be an integer in 1..1000000");
+            (void) snprintf(ptr, sizeof ptr, "%s/max_scan_tuples", prefix);
+            av_err_field(e, ptr);
+            return AV_ERR;
+        }
+        sp->max_scan_tuples = (size_t) yyjson_get_int(v);
+    }
+    return AV_OK;
+}
+
 static void h_search(const av_http_req *req, const char *const *params, size_t n_params, av_http_resp *resp,
                      void *ctx)
 {
@@ -593,6 +641,16 @@ static void h_search(const av_http_req *req, const char *const *params, size_t n
         min_sc = yyjson_get_num(ms_val);
     }
 
+    /* HNSW knobs (parsed while req_doc is alive) */
+    av_search_params knobs;
+    memset(&knobs, 0, sizeof knobs);
+    if (parse_hnsw_knobs(root, "", &knobs, &e) != AV_OK) {
+        av_collection_release(c);
+        yyjson_doc_free(req_doc);
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+
     /* Parse filter or where */
     av_filter *ast = NULL;
     uint64_t filt_hash = 0;
@@ -618,6 +676,9 @@ static void h_search(const av_http_req *req, const char *const *params, size_t n
     sparams.exact = exact;
     sparams.include_flags = include_flags;
     sparams.explain = explain;
+    sparams.ef_search = knobs.ef_search;
+    sparams.iterative_scan = knobs.iterative_scan;
+    sparams.max_scan_tuples = knobs.max_scan_tuples;
 
     /* Execute search under read lock */
     av_collection_read_lock(c);
@@ -1478,6 +1539,13 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
         sparams.offset = offset;
         sparams.exact = exact;
         sparams.include_flags = inc_flags;
+        {
+            char pfx[32];
+            (void) snprintf(pfx, sizeof pfx, "/searches/%zu", sidx);
+            av_err ke; /* batch: lenient like the other fields; keep the error out of e */
+            av_err_clear(&ke);
+            (void) parse_hnsw_knobs(sitem, pfx, &sparams, &ke);
+        }
         sparams.explain = explain;
 
         av_search_result sres;
