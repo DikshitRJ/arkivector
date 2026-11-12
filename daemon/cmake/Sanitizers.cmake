@@ -27,6 +27,11 @@ if(AV_UBSAN)
 endif()
 if(AV_TSAN)
   list(APPEND _av_san_flags -fsanitize=thread -fno-omit-frame-pointer)
+  # pgvector's target_clones kernels (vector_kernels.c, bitutils.c) compile to GNU ifuncs. glibc runs
+  # ifunc resolvers during relocation, before the TSan runtime is initialised; TSan instruments the
+  # resolver (__tsan_func_entry) and every TSan binary segfaults before main(). pgvector's own
+  # DISABLE_DISPATCH switch (halfvec.h) turns dispatch off, so TSan builds use the portable kernels.
+  add_compile_definitions(DISABLE_DISPATCH)
 endif()
 
 if(_av_san_flags)
