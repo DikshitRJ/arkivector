@@ -28,6 +28,9 @@ Branch `claude/busy-babbage-k4puq6` (from `main` @ 8cff8dd). Legend: [x] done ·
       modes, zero vectors, deletes/updates, knob validation. 171/171 integration tests pass
 - [x] 3.3 HNSW/search/Qdrant/MCP integration tests against the ASan daemon binary: clean
 - [x] 3.4 clang-format 23.1.4, clang-tidy, cppcheck, check_provenance.py clean
+- [x] 3.6 Review (code-review skill; the gemini-reviewer backend is not available here): fixed writer
+      starvation (writer-preferring hnsw_lock), GNU qsort_r portability, dead-ratio overestimate, batch error
+      leak, duplicated rebuild code
 - [ ] 3.5 CI green on the PR head
 
 ## 4. Follow-ups (not in this change)
@@ -35,3 +38,5 @@ Branch `claude/busy-babbage-k4puq6` (from `main` @ 8cff8dd). Legend: [x] done ·
 - [ ] Rebuild on a background thread instead of the applier
 - [ ] Batch search: reject invalid searches instead of skipping them (search.md: whole batch fails)
 - [ ] Contract tests (schemathesis) in CI
+- [ ] Planner: expired-but-unswept rows make unfiltered REST plans report hnsw_iterative (results are correct)
+- [ ] Share one (distance, key, NaN-last) comparator between flat.c, hnswscan_mem.c and collection.c
