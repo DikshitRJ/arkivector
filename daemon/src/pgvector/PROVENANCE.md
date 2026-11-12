@@ -33,6 +33,7 @@ Files in this directory build with pgvector's own flags (`-ftree-vectorize -fass
 | `sparsevec_kernels.c` | `src/sparsevec.c` | F (tiered) | CheckDims, SparsevecL2SquaredDistance, sparsevec_l2_distance, sparsevec_l2_squared_distance, SparsevecInnerProduct, sparsevec_inner_product, sparsevec_negative_inner_product, sparsevec_cosine_distance, sparsevec_l1_distance | none | D1 |
 | `sparsevec_funcs.c` | `src/sparsevec.c` | F | CheckElement, AppendElement, FinishAppend, sparsevec_vector_dims, sparsevec_l2_norm, sparsevec_l2_normalize | none | D1 |
 | `av_tier.h` | — | ARKIVECTOR-owned | force-included per kernel tier; renames exported kernel symbols with `_t3`/`_t4` | — | D1 |
+| `hnswscan_mem.c`, `hnswscan_mem.h` | `src/hnswscan.c` (GetScanItems, ResumeScanItems, hnswgettuple loop) | P | algorithm port over arena graphs: GetScanItemsMem, ResumeScanItemsMem, av_hnsw_scan_mem (iterative scan, strict/relaxed order, max_scan_tuples / scan_mem_multiplier limits) | strict_order guard starts at -INFINITY like upstream; the discarded heap is NULL with iterative_scan = off and for an empty graph (never dereferenced) | D4 |
 | `av_hnsw_glue.c` | — | ARKIVECTOR-owned | hnsw GUC variables with pgvector defaults, `HnswInitLockTranche`, per-thread PRNG, interrupt hook | — | D0 spike |
 
 ## Known upstream quirks
