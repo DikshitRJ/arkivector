@@ -1,0 +1,42 @@
+name: wiki
+
+# Publishes docs/guide/*.md to the GitHub wiki (docs/tools/wiki_sync.py renames pages and rewrites
+# links). The wiki must exist: enable it in Settings -> Features and create any first page once.
+on:
+  push:
+    branches: [main]
+    paths: ['docs/guide/**', 'docs/tools/wiki_sync.py', '.github/workflows/wiki.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the wiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
+            echo "::error::Cannot clone the wiki. Enable it (Settings -> Features -> Wikis) and create one page in the web UI first."
+            exit 1
+          fi
+      - name: Render pages
+        run: python3 -I docs/tools/wiki_sync.py wiki
+      - name: Push
+        working-directory: wiki
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "wiki already up to date"; exit 0; fi
+          git commit -m "Sync from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7} (docs/guide)"
+          git push
