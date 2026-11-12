@@ -39,8 +39,7 @@ av_status av_plan_query(const av_collection *col, const void *query, const av_op
     out->kernel = av_kernel_tier();
     out->elapsed_ms = 0.0;
 
-    const av_segment *seg = col != NULL ? av_collection_segment(col) : NULL;
-    if (seg == NULL || av_segment_kind(seg) != AV_SEG_HNSW) {
+    if (col == NULL || !av_collection_has_hnsw(col)) {
         out->strategy = AV_STRAT_EXACT_FLAT;
         out->exact = true;
         return AV_OK;
@@ -71,7 +70,10 @@ av_status av_plan_query(const av_collection *col, const void *query, const av_op
         out->strategy = AV_STRAT_EXACT_FLAT;
         out->exact = true;
     } else {
-        out->strategy = (cand == NULL) ? AV_STRAT_HNSW : AV_STRAT_HNSW_ITERATIVE;
+        /* REST passes (filter AND live) even without a filter: a candidate set that covers every
+         * live docid is an unfiltered plan. */
+        out->strategy =
+            (cand == NULL || out->candidates >= live_total) ? AV_STRAT_HNSW : AV_STRAT_HNSW_ITERATIVE;
         out->exact = false;
     }
 
