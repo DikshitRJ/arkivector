@@ -1542,7 +1542,9 @@ static void h_search_batch(const av_http_req *req, const char *const *params, si
         {
             char pfx[32];
             (void) snprintf(pfx, sizeof pfx, "/searches/%zu", sidx);
-            (void) parse_hnsw_knobs(sitem, pfx, &sparams, &e); /* batch: lenient like the other fields */
+            av_err ke; /* batch: lenient like the other fields; keep the error out of e */
+            av_err_clear(&ke);
+            (void) parse_hnsw_knobs(sitem, pfx, &sparams, &ke);
         }
         sparams.explain = explain;
 

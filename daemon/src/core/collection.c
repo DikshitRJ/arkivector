@@ -241,6 +241,8 @@ static void *fatal_oom(void)
 
 /* ------------------------------------------------------------ HNSW index */
 
+av_status av_collection_rebuild_hnsw(av_collection *c, av_err *e);
+
 #define AV_HNSW_MIN_CAPACITY ((size_t) 65536)
 
 /* Graph capacity for a (re)build over n vectors: room to double before the tail grows. */
@@ -334,7 +336,9 @@ static void hnsw_maybe_rebuild(av_collection *c)
     size_t graph_n = av_segment_count(c->hnsw);
     size_t tail_n = (size_t) roaring_bitmap_get_cardinality(c->hnsw_tail);
     size_t live_n = atomic_load_explicit(&c->pub_count, memory_order_acquire);
-    size_t live_in_graph = live_n > tail_n ? live_n - tail_n : 0;
+    /* the tail also holds dead docids (deleted, discarded batches): count only its live part */
+    size_t tail_live = (size_t) roaring_bitmap_and_cardinality(c->hnsw_tail, av_live_current(c->live));
+    size_t live_in_graph = live_n > tail_live ? live_n - tail_live : 0;
     size_t dead_n = graph_n > live_in_graph ? graph_n - live_in_graph : 0;
     size_t tail_limit = graph_n / 10 > 1024 ? graph_n / 10 : 1024;
     bool tail_big = c->hnsw_full && tail_n > tail_limit;
@@ -342,27 +346,14 @@ static void hnsw_maybe_rebuild(av_collection *c)
     if (!tail_big && !dead_big)
         return;
 
-    const roaring_bitmap_t *live = av_live_current(c->live); /* only the applier swaps it */
     struct timespec t0, t1;
     clock_gettime(CLOCK_MONOTONIC, &t0);
-    av_segment *g = NULL;
-    roaring_bitmap_t *tail = NULL;
-    bool full = false;
     av_err e;
     av_err_clear(&e);
-    if (hnsw_build(c, live, &g, &tail, &full, &e) != AV_OK) {
+    if (av_collection_rebuild_hnsw(c, &e) != AV_OK) {
         av_log(AV_LOG_WARN, "collection", "%s: hnsw rebuild failed: %s", c->def.name, e.msg);
         return;
     }
-    (void) pthread_rwlock_wrlock(&c->hnsw_lock);
-    av_segment *old_g = c->hnsw;
-    roaring_bitmap_t *old_tail = c->hnsw_tail;
-    c->hnsw = g;
-    c->hnsw_tail = tail;
-    c->hnsw_full = full;
-    (void) pthread_rwlock_unlock(&c->hnsw_lock);
-    av_segment_destroy(old_g);
-    roaring_bitmap_free(old_tail);
     clock_gettime(CLOCK_MONOTONIC, &t1);
     double ms = (double) (t1.tv_sec - t0.tv_sec) * 1e3 + (double) (t1.tv_nsec - t0.tv_nsec) / 1e6;
     av_log(AV_LOG_INFO, "collection",
@@ -474,7 +465,14 @@ av_collection *av_collection_create_opts(const av_coldef *def, av_store *store, 
         return NULL;
     }
     (void) pthread_rwlock_init(&c->lock, NULL);
-    (void) pthread_rwlock_init(&c->hnsw_lock, NULL);
+    /* Writer-preferring: a steady search load must not starve the applier's graph inserts. */
+    pthread_rwlockattr_t hla;
+    (void) pthread_rwlockattr_init(&hla);
+#ifdef __GLIBC__ /* musl (Alpine image) has no rwlock kinds */
+    (void) pthread_rwlockattr_setkind_np(&hla, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
+#endif
+    (void) pthread_rwlock_init(&c->hnsw_lock, &hla);
+    (void) pthread_rwlockattr_destroy(&hla);
     (void) pthread_mutex_init(&c->wait_mu, NULL);
     pthread_condattr_t ca;
     (void) pthread_condattr_init(&ca);
@@ -760,24 +758,26 @@ static bool hit_push_cb(uint32_t id, void *p)
     return pc->ok;
 }
 
+typedef struct {
+    av_hit h;
+    const uint8_t *key; /* NULL sorts by docid */
+} keyed_hit;
+
 /* (distance, key) ascending, NaN last: the order of exact scans (docs/api/search.md). */
-static int hit_key_cmp(const void *pa, const void *pb, void *dm)
+static int keyed_hit_cmp(const void *pa, const void *pb)
 {
-    const av_hit *a = pa, *b = pb;
-    const av_docmap *sort_docmap = dm;
-    bool an = isnan(a->distance), bn = isnan(b->distance);
+    const keyed_hit *a = pa, *b = pb;
+    bool an = isnan(a->h.distance), bn = isnan(b->h.distance);
     if (an != bn)
         return an ? 1 : -1;
-    if (!an && a->distance != b->distance)
-        return a->distance < b->distance ? -1 : 1;
-    const uint8_t *ka = av_docmap_key(sort_docmap, a->id);
-    const uint8_t *kb = av_docmap_key(sort_docmap, b->id);
-    if (ka != NULL && kb != NULL) {
-        int r = memcmp(ka, kb, 32);
+    if (!an && a->h.distance != b->h.distance)
+        return a->h.distance < b->h.distance ? -1 : 1;
+    if (a->key != NULL && b->key != NULL) {
+        int r = memcmp(a->key, b->key, 32);
         if (r != 0)
             return r;
     }
-    return (a->id > b->id) - (a->id < b->id);
+    return (a->h.id > b->h.id) - (a->h.id < b->h.id);
 }
 
 av_status av_collection_search_hnsw(av_collection *c, const void *query, const av_opclass *oc,
@@ -850,10 +850,21 @@ out:
         free(v.items);
         return AV_OK;
     }
-    qsort_r(v.items, v.n, sizeof *v.items, hit_key_cmp, c->docmap);
+    keyed_hit *kh = malloc(v.n * sizeof *kh);
+    if (kh == NULL) {
+        free(v.items);
+        return oom(e);
+    }
+    for (size_t i = 0; i < v.n; i++) {
+        kh[i].h = v.items[i];
+        kh[i].key = av_docmap_key(c->docmap, v.items[i].id);
+    }
+    qsort(kh, v.n, sizeof *kh, keyed_hit_cmp);
 
     size_t take = v.n < limit ? v.n : limit;
-    memcpy(out, v.items, take * sizeof *out);
+    for (size_t i = 0; i < take; i++)
+        out[i] = kh[i].h;
+    free(kh);
     *n_out = take;
     free(v.items);
     return AV_OK;
