@@ -8,9 +8,9 @@ import { line, loop } from "../ink/paths";
 
 const ITEMS: { title: string; today: string; plan: string }[] = [
   {
-    title: "HNSW is compiled in but not connected",
-    today: "Every search is an exact scan. Results are correct; large collections are slower than they need to be.",
-    plan: "Build pgvector HNSW segments as collections grow, with expiry-banded compaction so whole segments drop when their entities expire.",
+    title: "HNSW graphs live in memory",
+    today: "Since v1.1.0 every hnsw collection searches a real pgvector graph. The graph is rebuilt from the local store at startup, and rebuilds after many updates run on the sync thread.",
+    plan: "Persist sealed graphs next to the vector segments, rebuild in the background, and add expiry-banded segments so whole graphs drop when their entities expire.",
   },
   {
     title: "The daemon signs with a key in an environment variable",
@@ -183,11 +183,12 @@ export function Next() {
       </Page>
 
       <Page className="pb-16">
-        <H2>Turning on HNSW</H2>
+        <H2>How HNSW search works</H2>
         <p className="mb-4 max-w-[70ch] bg-paper">
-          pgvector's HNSW graph is already in the binary. A search starts at the top layer, walks greedily towards the query, then
-          drops a layer and repeats, so it scores a small fraction of the vectors. Wiring it into collections means building these
-          graphs in the segment files and choosing between the graph and the exact scan per query.
+          Collections with an hnsw index keep pgvector's graph next to the exact vectors. A search starts at the top layer, walks
+          greedily towards the query, then drops a layer and repeats, so it scores a small fraction of the vectors. The planner picks
+          the graph for large candidate sets and an exact scan for small or very selective ones, and every hit is rescored with the
+          real operator. Next: graphs that survive restarts instead of being rebuilt.
         </p>
         <HnswSketch />
         <div className="mt-8 flex flex-wrap items-center gap-4">

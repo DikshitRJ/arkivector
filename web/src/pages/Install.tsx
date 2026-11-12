@@ -13,7 +13,7 @@ const DOCKER = `docker run -d --name arkivectord \\
 
 curl http://127.0.0.1:8080/healthz      # {"status":"ok"}`;
 
-const LINUX = `VERSION=1.0.1
+const LINUX = `VERSION=1.1.0
 curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v\${VERSION}/arkivectord-\${VERSION}-linux-x86_64.tar.gz
 tar xzf arkivectord-\${VERSION}-linux-x86_64.tar.gz
 cd arkivectord-\${VERSION}-linux-x86_64
@@ -26,6 +26,7 @@ export ARKIVECTOR_STORAGE_DATA_DIR="$HOME/.local/share/arkivector"
 
 const PIP = `pip install arkivector`;
 const NPM = `echo "@dikshitrj:registry=https://npm.pkg.github.com" >> .npmrc
+echo "//npm.pkg.github.com/:_authToken=<GITHUB_TOKEN with read:packages>" >> .npmrc
 npm install @dikshitrj/arkivector`;
 
 const PY = `from arkivector import Client, EntityInput, F
@@ -241,7 +242,8 @@ export function Install() {
           returned <C>cat</C> and <C>dog</C> with those distances a few blocks later.
         </P>
         <div className="mt-6 flex flex-wrap gap-4">
-          <Button href="/architecture">See what happened inside</Button>
+          <Button href="/docs">Read the docs</Button>
+          <Button href="/architecture" variant="outline">See what happened inside</Button>
           <Button href={`${REPO}#configuration-reference`} variant="outline" external>
             All configuration options
           </Button>

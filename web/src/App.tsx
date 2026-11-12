@@ -7,6 +7,7 @@ import { Install } from "./pages/Install";
 // heavier pages load on demand
 const Architecture = lazy(() => import("./pages/Architecture").then((m) => ({ default: m.Architecture })));
 const Build = lazy(() => import("./pages/Build").then((m) => ({ default: m.Build })));
+const Docs = lazy(() => import("./pages/Docs").then((m) => ({ default: m.Docs })));
 const Next = lazy(() => import("./pages/Next").then((m) => ({ default: m.Next })));
 import { Team } from "./pages/Team";
 import { NotFound } from "./pages/NotFound";
@@ -14,6 +15,10 @@ import { NotFound } from "./pages/NotFound";
 const TITLES: Record<Route, string> = {
   "/": "Arkivector: vector search for Arkiv",
   "/install": "Install · Arkivector",
+  "/docs": "Docs · Arkivector",
+  "/docs/api": "REST API (curl) · Docs · Arkivector",
+  "/docs/python": "Python SDK · Docs · Arkivector",
+  "/docs/node": "Node.js SDK · Docs · Arkivector",
   "/architecture": "Architecture · Arkivector",
   "/build": "Build artifacts · Arkivector",
   "/next": "What's next · Arkivector",
@@ -32,6 +37,7 @@ export function App() {
         <Suspense fallback={<p className="mx-auto max-w-5xl px-6 py-16">loading…</p>}>
         {route === "/" && <Home />}
         {route === "/install" && <Install />}
+        {route.startsWith("/docs") && <Docs route={route as "/docs"} />}
         {route === "/architecture" && <Architecture />}
         {route === "/build" && <Build />}
         {route === "/next" && <Next />}

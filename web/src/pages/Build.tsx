@@ -3,7 +3,7 @@ import { ArchDiagram } from "../anim/ArchDiagram";
 import { Page, REPO } from "../components/Layout";
 import { CodeBlock, H2, Note } from "../components/ui";
 
-const V = "1.0.1";
+const V = "1.1.0";
 
 type Artifact = { n: number; what: string; where: { label: string; url: string }[]; cmd: string; lang: string; note: ReactNode };
 
@@ -64,7 +64,7 @@ tar xzf arkivectord-${V}-linux-x86_64.tar.gz`,
 ];
 
 const PIPE = [
-  { t: "git tag v1.0.1", s: "push the tag" },
+  { t: `git tag v${V}`, s: "push the tag" },
   { t: "release.yml", s: "GitHub Actions" },
   { t: "build", s: "binary · image · wheel · npm" },
   { t: "smoke test", s: "binary and image report the version" },

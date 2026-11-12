@@ -86,6 +86,28 @@
     box-decoration-break: clone;
   }
 
+  /* Rendered Markdown guides (/docs). */
+  .doc-prose { font-size: 14.5px; }
+  .doc-prose h1 { font-size: 34px; margin: 0 0 0.6em; }
+  .doc-prose h2 { font-size: 25px; margin: 1.8em 0 0.5em; padding-top: 0.4em; border-top: 1.5px dashed #000; }
+  .doc-prose h3 { font-size: 19px; margin: 1.4em 0 0.4em; }
+  .doc-prose .doc-anchor { text-decoration: none; }
+  .doc-prose .doc-anchor:hover { text-decoration: underline; text-decoration-color: #fe7445; text-decoration-thickness: 3px; }
+  .doc-prose p, .doc-prose ul, .doc-prose ol { margin: 0.7em 0; }
+  .doc-prose ul { list-style: square; padding-left: 1.4em; }
+  .doc-prose ol { list-style: decimal; padding-left: 1.6em; }
+  .doc-prose li { margin: 0.25em 0; }
+  .doc-prose a:not(.doc-anchor) { color: #181ea9; text-decoration: underline; text-underline-offset: 3px; }
+  .doc-prose a:not(.doc-anchor):hover { text-decoration-thickness: 3px; }
+  .doc-prose :not(pre) > code { border: 1px solid #000; padding: 0 0.3em; font-size: 0.9em; overflow-wrap: anywhere; }
+  .doc-prose table { display: block; overflow-x: auto; border-collapse: collapse; margin: 1em 0; font-size: 13.5px; }
+  .doc-prose th, .doc-prose td { border: 1px solid #000; padding: 0.35em 0.6em; text-align: left; vertical-align: top; }
+  .doc-prose th { background: #fe7445; }
+  .doc-prose strong { font-weight: 700; }
+  .doc-prose pre { overflow-x: auto; margin: 0.8em 0; padding: 0.7em 0.9em; font-size: 13px; line-height: 1.6;
+    border: 1.5px solid #181ea9; box-shadow: 3px 3px 0 #181ea9; background: #fff; }
+  .doc-prose blockquote { border-left: 4px solid #fe7445; padding-left: 0.9em; margin: 1em 0; }
+
   /* Diagonal hatching used as the only "grey" on the site. */
   .hatch {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M-1 7 L7 -1' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E");

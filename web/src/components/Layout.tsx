@@ -10,6 +10,7 @@ export const REPO = "https://github.com/DikshitRJ/arkivector";
 const NAV: { to: Exclude<Route, "404">; label: string }[] = [
   { to: "/", label: "home" },
   { to: "/install", label: "install" },
+  { to: "/docs", label: "docs" },
   { to: "/architecture", label: "architecture" },
   { to: "/build", label: "build" },
   { to: "/next", label: "what's next" },
@@ -94,7 +95,7 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
             className="order-last lg:order-2 w-full lg:w-auto lg:mx-0 -mx-1 px-1 flex items-center gap-4 sm:gap-5 text-[13.5px] overflow-x-auto lg:overflow-visible"
           >
             {NAV.map((n) => {
-              const active = route === n.to;
+              const active = route === n.to || (n.to === "/docs" && route.startsWith("/docs"));
               return (
                 <Link
                   key={n.to}
