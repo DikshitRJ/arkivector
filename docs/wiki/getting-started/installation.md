@@ -7,11 +7,12 @@ Arkivector has two parts: the daemon `arkivectord`, which does the work, and opt
 ### Docker (any OS, recommended)
 
 ```bash
+read -rs ARKIV_PRIVATE_KEY && export ARKIV_PRIVATE_KEY   # paste the wallet key: not echoed, not saved in shell history
 docker run -d --name arkivectord \
   -p 127.0.0.1:8080:8080 \
   -v arkivector-data:/data \
   -e ARKIVECTOR_ARKIV_ACCESS_KEY="<your Arkiv Hub access key>" \
-  -e ARKIV_PRIVATE_KEY="<wallet private key>" \
+  -e ARKIV_PRIVATE_KEY \
   ghcr.io/dikshitrj/arkivectord:latest
 
 curl http://127.0.0.1:8080/healthz      # {"status":"ok"}
@@ -28,7 +29,7 @@ tar xzf arkivectord-${VERSION}-linux-x86_64.tar.gz
 cd arkivectord-${VERSION}-linux-x86_64
 
 export ARKIVECTOR_ARKIV_ACCESS_KEY="<your Arkiv Hub access key>"
-export ARKIV_PRIVATE_KEY="<wallet private key>"
+read -rs ARKIV_PRIVATE_KEY && export ARKIV_PRIVATE_KEY   # paste the wallet key: not echoed, not saved in shell history
 export ARKIVECTOR_STORAGE_DATA_DIR="$HOME/.local/share/arkivector"
 
 ./bin/arkivectord --config arkivector.example.toml
@@ -66,7 +67,8 @@ pip install arkivector                       # Python 3.9+
 
 ```bash
 echo "@dikshitrj:registry=https://npm.pkg.github.com" >> .npmrc
-echo "//npm.pkg.github.com/:_authToken=<GITHUB_TOKEN with read:packages>" >> .npmrc
+read -rs NODE_AUTH_TOKEN && export NODE_AUTH_TOKEN   # GitHub token with read:packages
+echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc   # a reference, not the token
 npm install @dikshitrj/arkivector            # Node 18+
 ```
 
