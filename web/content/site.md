@@ -128,9 +128,9 @@ tar xzf arkivectord-{{VERSION}}-linux-x86_64.tar.gz
 
 **Arkiv Rabdi testnet** (not something we ship: the chain the daemon reads from and writes to). Chain id 7794095 (`0x76edaf`), 2 s blocks, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network`. Test GLM from the faucet at <https://hub.arkiv.network/faucet>.
 
-## What's next
+## Roadmap
 
-Page: [{{SITE}}/next]({{SITE}}/next). Roadmap issue: <https://github.com/DikshitRJ/arkivector/issues/19>. Everything in the install guide works and was tested end to end, including on the Rabdi testnet. These are the parts that are not finished yet.
+Tracked on GitHub: <https://github.com/DikshitRJ/arkivector/issues/19>. Everything in the install guide works and was tested end to end, including on the Rabdi testnet. These are the parts that are not finished yet.
 
 | Limitation | Today | Plan | Issue |
 | :--- | :--- | :--- | :--- |

@@ -7,7 +7,6 @@ import { Home } from "./pages/Home";
 const Architecture = lazy(() => import("./pages/Architecture").then((m) => ({ default: m.Architecture })));
 const Build = lazy(() => import("./pages/Build").then((m) => ({ default: m.Build })));
 const Docs = lazy(() => import("./pages/Docs").then((m) => ({ default: m.Docs })));
-const Next = lazy(() => import("./pages/Next").then((m) => ({ default: m.Next })));
 import { Team } from "./pages/Team";
 import { NotFound } from "./pages/NotFound";
 import { setHead } from "./seo";
@@ -16,7 +15,6 @@ const TITLES: Record<Exclude<Route, `/docs${string}`>, string> = {
   "/": "Arkivector: vector search for Arkiv",
   "/architecture": "Architecture · Arkivector",
   "/build": "Build artifacts · Arkivector",
-  "/next": "What's next · Arkivector",
   "/team": "Team · Arkivector",
   "404": "Page not found · Arkivector",
 };
@@ -35,7 +33,6 @@ export function App() {
         {route.startsWith("/docs") && <Docs path={route} />}
         {route === "/architecture" && <Architecture />}
         {route === "/build" && <Build />}
-        {route === "/next" && <Next />}
         {route === "/team" && <Team />}
         {route === "404" && <NotFound />}
         </Suspense>

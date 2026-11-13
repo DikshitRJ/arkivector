@@ -8,13 +8,13 @@ import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent, type R
  * GitHub Pages.
  */
 
-export type StaticRoute = "/" | "/architecture" | "/build" | "/next" | "/team";
+export type StaticRoute = "/" | "/architecture" | "/build" | "/team";
 /** Docs pages are /docs and /docs/<folder>/<page> (resolved against docs/wiki by the Docs page). */
 export type Route = StaticRoute | "/docs" | `/docs/${string}` | "404";
-export const ROUTES: StaticRoute[] = ["/", "/architecture", "/build", "/next", "/team"];
+export const ROUTES: StaticRoute[] = ["/", "/architecture", "/build", "/team"];
 
-/** Old addresses kept working: the install page moved into the docs. */
-const MOVED: Record<string, string> = { "/install": "/docs/install" };
+/** Old addresses kept working: the install page moved into the docs; the roadmap page was retired. */
+const MOVED: Record<string, string> = { "/install": "/docs/install", "/next": "/" };
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, ""); // "" or "/arkivector"
 

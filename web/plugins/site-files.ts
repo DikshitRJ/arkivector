@@ -51,15 +51,6 @@ const STATIC: Omit<Page, "markdown">[] = [
     trail: [],
   },
   {
-    route: "/next",
-    title: "What's next · Arkivector",
-    description:
-      "The Arkivector roadmap: persistent HNSW graphs, user-wallet signing, dynamic gas fees, Qdrant writes, mainnet, macOS and Windows, more SDKs.",
-    file: "web/src/pages/Next.tsx",
-    type: "website",
-    trail: [],
-  },
-  {
     route: "/team",
     title: "Team · Arkivector",
     description: "Who built Arkivector, vector search for the Arkiv chain, at ETHGlobal Mumbai 2026.",
