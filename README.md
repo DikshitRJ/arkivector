@@ -109,7 +109,7 @@ The daemon now listens on `http://127.0.0.1:8080` and syncs from the Arkiv Rabdi
 Download the latest release and run it:
 
 ```bash
-VERSION=1.2.0
+VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/DikshitRJ/arkivector/releases/latest | sed 's|.*/tag/v||')   # latest release
 curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/arkivectord-${VERSION}-linux-x86_64.tar.gz
 tar xzf arkivectord-${VERSION}-linux-x86_64.tar.gz
 cd arkivectord-${VERSION}-linux-x86_64
@@ -392,7 +392,7 @@ This was built for a hackathon. Everything in the quick start works and was test
 | Linux only | macOS and Windows use the Docker image. | Port the few glibc-specific calls ([#17](https://github.com/DikshitRJ/arkivector/issues/17)). |
 | Two SDK languages | SDKs exist for Python and Node.js. | C, C++ and Rust SDKs ([#18](https://github.com/DikshitRJ/arkivector/issues/18)). |
 
-Fixed in v1.2.0:
+Fixed in v1.2.0 ([latest release](https://github.com/DikshitRJ/arkivector/releases/latest)):
 
 - **HNSW graphs survive restarts** ([#11](https://github.com/DikshitRJ/arkivector/issues/11)). Each collection's graphs are grouped by expiry band, saved under `<data_dir>/segments/<collection>/` and loaded at startup, so only what changed since the save is indexed. Rebuilds run on a background thread while sync continues, and a band whose entities have all expired is released whole. A corrupt or mismatched file is rejected with a warning and rebuilt. Settings: `[hnsw] persist`, `band_blocks`.
 - **Entity keys follow the wallet's on-chain nonce** ([#13](https://github.com/DikshitRJ/arkivector/issues/13)). Writes read `entityNonce` from the Arkiv contract before predicting keys and take the final keys from the `EntityCreated` receipt logs. `entities:prepare` uses the wallet's real nonces.

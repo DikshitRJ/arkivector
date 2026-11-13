@@ -3,7 +3,6 @@ import { ArchDiagram } from "../anim/ArchDiagram";
 import { Page, REPO } from "../components/Layout";
 import { CodeBlock, H2, Note } from "../components/ui";
 
-const V = "1.2.0";
 
 type Artifact = { n: number; what: string; where: { label: string; url: string }[]; cmd: string; lang: string; note: ReactNode };
 
@@ -12,7 +11,7 @@ const ARTIFACTS: Artifact[] = [
     n: 1,
     what: "Python SDK",
     where: [{ label: "pypi.org/project/arkivector", url: "https://pypi.org/project/arkivector/" }],
-    cmd: `pip install arkivector==${V}`,
+    cmd: `pip install arkivector`,
     lang: "shell",
     note: "Pure Python, no dependencies. Wheel and sdist are also attached to every GitHub release.",
   },
@@ -21,7 +20,7 @@ const ARTIFACTS: Artifact[] = [
     what: "Node.js SDK",
     where: [{ label: "GitHub Packages · @dikshitrj/arkivector", url: `${REPO}/pkgs/npm/arkivector` }],
     cmd: `echo "@dikshitrj:registry=https://npm.pkg.github.com" >> .npmrc
-npm install @dikshitrj/arkivector@${V}`,
+npm install @dikshitrj/arkivector`,
     lang: "shell",
     note: "ESM, TypeScript types, zero runtime dependencies. GitHub Packages asks for a token with read:packages.",
   },
@@ -29,21 +28,22 @@ npm install @dikshitrj/arkivector@${V}`,
     n: 3,
     what: "Daemon, container image",
     where: [{ label: "ghcr.io/dikshitrj/arkivectord", url: `${REPO}/pkgs/container/arkivectord` }],
-    cmd: `docker pull ghcr.io/dikshitrj/arkivectord:${V}   # also :1 and :latest
+    cmd: `docker pull ghcr.io/dikshitrj/arkivectord:latest   # also :1 and :<version>
 docker run -d -p 127.0.0.1:8080:8080 -v arkivector-data:/data \\
   -e ARKIVECTOR_ARKIV_ACCESS_KEY=... -e ARKIV_PRIVATE_KEY=... \\
-  ghcr.io/dikshitrj/arkivectord:${V}`,
+  ghcr.io/dikshitrj/arkivectord:latest`,
     lang: "shell",
     note: "18 MB Alpine image, linux/amd64, runs as a non-root user, index in the /data volume. ARKIV_PRIVATE_KEY is optional: leave it out when users sign with their own wallets, or use a keystore or remote signer.",
   },
   {
     n: 4,
     what: "Daemon, Linux binary",
-    where: [{ label: `GitHub Releases · v${V}`, url: `${REPO}/releases/tag/v${V}` }],
-    cmd: `curl -LO ${REPO}/releases/download/v${V}/arkivectord-${V}-linux-x86_64.tar.gz
-curl -LO ${REPO}/releases/download/v${V}/SHA256SUMS
+    where: [{ label: "GitHub Releases · latest", url: `${REPO}/releases/latest` }],
+    cmd: `VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' ${REPO}/releases/latest | sed 's|.*/tag/v||')
+curl -LO ${REPO}/releases/download/v\${VERSION}/arkivectord-\${VERSION}-linux-x86_64.tar.gz
+curl -LO ${REPO}/releases/download/v\${VERSION}/SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
-tar xzf arkivectord-${V}-linux-x86_64.tar.gz`,
+tar xzf arkivectord-\${VERSION}-linux-x86_64.tar.gz`,
     lang: "shell",
     note: "x86_64 glibc build with libcurl bundled; needs libuv and OpenSSL 3 from the OS.",
   },
@@ -64,7 +64,7 @@ tar xzf arkivectord-${V}-linux-x86_64.tar.gz`,
 ];
 
 const PIPE = [
-  { t: `git tag v${V}`, s: "push the tag" },
+  { t: "git tag vX.Y.Z", s: "push the tag" },
   { t: "release.yml", s: "GitHub Actions" },
   { t: "build", s: "binary · image · wheel · npm" },
   { t: "smoke test", s: "binary and image report the version" },

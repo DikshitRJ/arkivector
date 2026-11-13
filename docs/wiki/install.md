@@ -36,12 +36,12 @@ docker run -d --name arkivectord \
   ghcr.io/dikshitrj/arkivectord:latest
 ```
 
-The image is about 18 MB, runs as a non-root user, keeps its index in the `/data` volume and listens on `0.0.0.0:8080` inside the container. Tags: `:<version>` (e.g. `:1.2.0`), `:<major>`, `:latest`. The index survives restarts in the `arkivector-data` volume.
+The image is about 18 MB, runs as a non-root user, keeps its index in the `/data` volume and listens on `0.0.0.0:8080` inside the container. Tags: `:latest` (the [latest release](https://github.com/DikshitRJ/arkivector/releases/latest)), `:<major>`, `:<version>`. The index survives restarts in the `arkivector-data` volume.
 
 ### Linux x86_64 binary
 
 ```bash
-VERSION=1.2.0
+VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/DikshitRJ/arkivector/releases/latest | sed 's|.*/tag/v||')   # latest release
 curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/arkivectord-${VERSION}-linux-x86_64.tar.gz
 tar xzf arkivectord-${VERSION}-linux-x86_64.tar.gz
 cd arkivectord-${VERSION}-linux-x86_64
@@ -53,7 +53,7 @@ export ARKIVECTOR_STORAGE_DATA_DIR="$HOME/.local/share/arkivector"
 ./bin/arkivectord --config arkivector.example.toml
 ```
 
-libcurl is bundled. Install libuv and OpenSSL 3 from your distribution (`apt install libuv1 libssl3`, `dnf install libuv openssl`). Check the download against `SHA256SUMS` on the [release page](https://github.com/DikshitRJ/arkivector/releases). macOS and Windows: use Docker.
+libcurl is bundled. Install libuv and OpenSSL 3 from your distribution (`apt install libuv1 libssl3`, `dnf install libuv openssl`). Check the download against `SHA256SUMS` on the [latest release page](https://github.com/DikshitRJ/arkivector/releases/latest). macOS and Windows: use Docker.
 
 ### Build from source
 
@@ -90,7 +90,7 @@ echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc   # a refer
 npm install @dikshitrj/arkivector            # Node 18+
 ```
 
-GitHub Packages needs a token even for public packages. Without one, install the tarball attached to the release: `npm install https://github.com/DikshitRJ/arkivector/releases/download/v1.2.0/arkivector-node-1.2.0.tgz`.
+GitHub Packages needs a token even for public packages. Without one, install the tarball attached to the [latest release](https://github.com/DikshitRJ/arkivector/releases/latest): `npm install https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/arkivector-node-${VERSION}.tgz` (with `VERSION` set as in the binary install above).
 
 Both SDKs find the daemon through `ARKIVECTOR_URL` (default `http://127.0.0.1:8080`) and an optional `ARKIVECTOR_API_KEY`. Plain HTTP works too: see the [REST API](api/README.md).
 
