@@ -6,39 +6,46 @@ import { BLUE, ORANGE } from "../ink/colors";
 import { Arrow, Box, Stroke } from "../ink/Ink";
 import { line, loop } from "../ink/paths";
 
-const ITEMS: { title: string; today: string; plan: string }[] = [
+const ITEMS: { title: string; today: string; plan: string; issue: number }[] = [
   {
     title: "HNSW graphs live in memory",
+    issue: 11,
     today: "Since v1.1.0 every hnsw collection searches a real pgvector graph. The graph is rebuilt from the local store at startup, and rebuilds after many updates run on the sync thread.",
     plan: "Persist sealed graphs next to the vector segments, rebuild in the background, and add expiry-banded segments so whole graphs drop when their entities expire.",
   },
   {
     title: "The daemon signs with a key in an environment variable",
+    issue: 12,
     today: "The daemon holds a hot wallet (ARKIV_PRIVATE_KEY).",
     plan: "entities:prepare already returns unsigned transactions. Next, the SDKs hand them to the user's own wallet (MetaMask, WalletConnect, hardware wallets), plus encrypted keystores and remote signers for servers.",
   },
   {
     title: "Predicted keys ignore the wallet's on-chain nonce",
+    issue: 13,
     today: "Keys returned by a write can be wrong if the wallet created entities elsewhere. The entities themselves sync correctly.",
     plan: "Read entityNonce from the Arkiv contract before predicting keys.",
   },
   {
-    title: "Fixed gas limit",
-    today: "Each write reserves more gas than it uses (one create used about 135k on Rabdi).",
-    plan: "Use eth_estimateGas and fee history.",
+    title: "Fixed gas fees",
+    issue: 14,
+    today: "Gas limits come from eth_estimateGas, but fees are fixed (20 gwei max, 1.5 gwei tip) and the fallback reserves far more gas than a create uses (about 135k on Rabdi).",
+    plan: "Price fees from eth_feeHistory, tighten the fallback, and replace stuck transactions.",
   },
   {
     title: "Qdrant compatibility is search-only",
+    issue: 15,
     today: "Qdrant upserts and deletes return success without writing.",
     plan: "Route them through the same writer as the REST API.",
   },
   {
     title: "Tested on the Rabdi testnet only",
+    issue: 16,
     today: "Mainnet is configurable (rpc_urls, chain_id) but untried.",
     plan: "Run the sync and write suites against mainnet once its endpoints are published.",
   },
   {
     title: "Linux and Docker only, two SDK languages",
+    issue: 17,
     today: "macOS and Windows use the container. SDKs exist for Python and Node.js.",
     plan: "Port the few glibc-specific calls; the repository already has placeholders for C, C++ and Rust SDKs.",
   },
@@ -142,7 +149,7 @@ export function Next() {
           <span className="bg-paper">What's next</span>
         </h1>
         <p className="mt-3 max-w-[64ch] text-[16px] bg-paper">
-          Everything on the install page works and was tested end to end, including on the Rabdi testnet. These are the parts that
+          Everything in the install guide works and was tested end to end, including on the Rabdi testnet. These are the parts that
           are not finished yet, and how each one gets fixed.
         </p>
       </Page>
@@ -159,7 +166,12 @@ export function Next() {
               key={it.title}
               className={`grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.2fr)] ${i ? "border-t border-dashed border-ink" : ""}`}
             >
-              <div className="px-4 pt-3 md:py-3 font-semibold">{it.title}</div>
+              <div className="px-4 pt-3 md:py-3 font-semibold">
+                {it.title}
+                <a href={`${REPO}/issues/${it.issue}`} target="_blank" rel="noreferrer" className="ml-2 font-mono text-[12.5px] font-normal">
+                  #{it.issue}
+                </a>
+              </div>
               <div className="px-4 py-1 md:py-3 md:border-l border-dashed border-ink text-[13.5px]">
                 <span className="md:hidden font-semibold">Today: </span>
                 {it.today}
@@ -192,8 +204,8 @@ export function Next() {
         </p>
         <HnswSketch />
         <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Button href={`${REPO}/issues`} external>
-            Follow along on GitHub
+          <Button href={`${REPO}/issues/19`} external>
+            Follow the roadmap on GitHub
           </Button>
           <Note className="-rotate-1">pull requests welcome. so are bug reports.</Note>
         </div>
