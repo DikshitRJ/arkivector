@@ -24,6 +24,14 @@ map_size = 1073741824         # LMDB map size in bytes
 [sync]
 poll_interval_ms = 2000
 
+[write]                       # managed writes (need ARKIV_PRIVATE_KEY)
+# max_fee_cap_gwei = 50       # never pay more than this per gas
+# gas_margin_pct = 20         # margin over eth_estimateGas
+
+[hnsw]
+# persist = 1                 # save graphs under data_dir/segments and load them at start
+# band_blocks = 1296000       # expiry band width (30 days of 2 s blocks); 0 = one band
+
 [log]
 level = "info"                # debug | info | warn | error
 format = "text"               # text | json
@@ -57,6 +65,16 @@ Defaults are what the daemon uses when a key is absent (the example file sets so
 | `sync.bootstrap_parallelism` | `4` | Parallel key ranges during the initial snapshot |
 | `sync.reconcile_interval_s` | `60` | How often the local count is checked against the chain |
 | `sync.ring_size` | `128` | Recent block hashes kept for reorg detection |
+| `write.max_fee_cap_gwei` | `0` (no cap) | Upper bound for `maxFeePerGas` |
+| `write.priority_fee_percentile` | `50` | `eth_feeHistory` reward percentile used as the tip |
+| `write.fee_history_blocks` | `20` | Blocks of fee history |
+| `write.max_fee_gwei` / `priority_fee_gwei` | `20` / `1.5` | Static fees when the node has neither `eth_feeHistory` nor `eth_gasPrice` |
+| `write.gas_margin_pct` | `20` | Margin added to `eth_estimateGas` |
+| `write.fallback_gas_base` | `60000` | Gas when estimation fails: this plus 150,000 per operation |
+| `write.replace_after_blocks` | `10` | Resend a transaction not mined after this many blocks, with fees raised by at least 12.5% |
+| `write.max_replacements` | `3` | Resends per transaction (`0` = never) |
+| `hnsw.persist` | `1` | Save HNSW graphs under `<data_dir>/segments/` and load them at start (`0` = rebuild in the background at every start) |
+| `hnsw.band_blocks` | `1296000` | Expiry band width in blocks; a band is released when all its entities have expired. `0` = one band per collection |
 | `log.level` | `info` | `debug`, `info`, `warn`, `error` |
 | `log.format` | `text` | `text` or `json` |
 

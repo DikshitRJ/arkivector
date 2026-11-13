@@ -390,13 +390,17 @@ This was built for a hackathon. Everything in the quick start works and was test
 
 | Limitation | Effect today | Plan |
 | :--- | :--- | :--- |
-| HNSW graphs live in memory | Graphs are rebuilt from the local store when the daemon starts, and rebuilds after many updates run on the sync thread, so very large collections start slower and briefly pause sync while rebuilding. | Persist sealed graphs next to the vector segments, rebuild in the background, and add expiry-banded segments so whole graphs drop when their entities expire. |
-| Transactions are signed with a private key in an environment variable | The daemon holds a hot wallet. | The `entities:prepare` endpoint already returns unsigned transactions. Next is letting the SDK hand them to the user's own wallet (MetaMask, WalletConnect, a hardware wallet), plus encrypted keystore files and remote signers for servers. |
-| Predicted entity keys ignore the wallet's on-chain nonce | Keys returned by a write can be wrong if the wallet already created entities elsewhere. The entities themselves are fine and appear in search after sync. | Read `entityNonce` from the contract before predicting keys. |
-| Fixed gas limit | Each write reserves more gas than it uses (a single create used about 135k gas on Rabdi). | Use `eth_estimateGas` and fee history. |
-| Qdrant compatibility is search-only | Qdrant upserts and deletes return success without writing. | Route them through the same writer as the REST API. |
-| Tested on the Rabdi testnet only | Mainnet is configurable through `rpc_urls` and `chain_id` but has not been tried. | Run the sync and write tests against mainnet once its endpoints are published. |
-| Linux only | macOS and Windows use the Docker image. | Port the few glibc-specific calls. |
+| Transactions are signed with a private key in an environment variable | The daemon holds a hot wallet. | The `entities:prepare` endpoint already returns unsigned transactions, with nonces and keys taken from the wallet's on-chain state. Next is letting the SDK hand them to the user's own wallet (MetaMask, WalletConnect, a hardware wallet), plus encrypted keystore files and remote signers for servers ([#12](https://github.com/DikshitRJ/arkivector/issues/12)). |
+| Tested on the Rabdi testnet only | Mainnet is configurable through `rpc_urls` and `chain_id` but has not been tried. | Run the sync and write tests against mainnet once its endpoints are published, and check gas reservations against real usage there ([#16](https://github.com/DikshitRJ/arkivector/issues/16)). |
+| Linux only | macOS and Windows use the Docker image. | Port the few glibc-specific calls ([#17](https://github.com/DikshitRJ/arkivector/issues/17)). |
+| Two SDK languages | SDKs exist for Python and Node.js. | C, C++ and Rust SDKs ([#18](https://github.com/DikshitRJ/arkivector/issues/18)). |
+
+Fixed since v1.1.0:
+
+- **HNSW graphs survive restarts** ([#11](https://github.com/DikshitRJ/arkivector/issues/11)). Each collection's graphs are grouped by expiry band, saved under `<data_dir>/segments/<collection>/` and loaded at startup, so only what changed since the save is indexed. Rebuilds run on a background thread while sync continues, and a band whose entities have all expired is released whole. A corrupt or mismatched file is rejected with a warning and rebuilt. Settings: `[hnsw] persist`, `band_blocks`.
+- **Entity keys follow the wallet's on-chain nonce** ([#13](https://github.com/DikshitRJ/arkivector/issues/13)). Writes read `entityNonce` from the Arkiv contract before predicting keys and take the final keys from the `EntityCreated` receipt logs. `entities:prepare` uses the wallet's real nonces.
+- **Dynamic gas** ([#14](https://github.com/DikshitRJ/arkivector/issues/14)). Fees come from `eth_feeHistory`, then `eth_gasPrice`, then the config, capped by `write.max_fee_cap_gwei`. The gas limit is `eth_estimateGas` plus `write.gas_margin_pct`. A stuck transaction is resent with bumped fees.
+- **Qdrant writes are real** ([#15](https://github.com/DikshitRJ/arkivector/issues/15)). Upserts and deletes go through the REST writer, searches return payloads, and a daemon without a signer refuses writes.
 
 The open work is tracked task by task in `openspec/changes/integration-e2e-verify/tasks.md` and `openspec/changes/daemon-hnsw-ci-fix/tasks.md`.
 

@@ -39,6 +39,13 @@ With an `Idempotency-Key`, the request hash and the response are stored for 24 h
 
 `entities:prepare` runs steps 1–3 and returns the unsigned transactions; the client's own wallet signs and sends them ([Prepare](../api/entities-prepare.md)).
 
-## Known gaps
+## Entity keys
 
-Gas uses a fixed limit (no `eth_estimateGas` yet), and predicted keys ignore the wallet's on-chain entity nonce, so keys returned for `wait: "none"` can differ if the wallet created entities elsewhere. The entities themselves are always correct after sync.
+A create's key is `keccak256(chainId, contract, owner, entityNonce, salt)`. Before signing, the writer reads the wallet's `entityNonce` from the Arkiv contract (`eth_call` at `pending`) and keeps a local count of its own creates still in flight, so keys are right even when the same wallet also writes through another daemon, a script or the Arkiv SDK. Nonce reservation, signing and broadcast happen under one lock, so concurrent requests get keys in the order their transactions execute. With `wait: "receipt"` or `"indexed"` the response carries the keys from the `EntityCreated` logs of the receipts. With `wait: "none"` the keys are predictions; if `entityNonce` cannot be read the request fails with `arkiv_rpc_error` before anything is sent.
+
+## Fees and gas
+
+- **Fees:** `eth_feeHistory` over the last `write.fee_history_blocks` blocks: the tip is the median of the `write.priority_fee_percentile` reward, the max fee is twice the next base fee plus the tip. If the node has no fee history, `eth_gasPrice`; if that fails too, `write.max_fee_gwei` / `write.priority_fee_gwei`. Every quote is capped by `write.max_fee_cap_gwei`.
+- **Gas limit:** `eth_estimateGas` plus `write.gas_margin_pct` (default 20%). If estimation fails, `write.fallback_gas_base` + 150,000 per operation; this is logged and counted in `arkivector_write_gas_estimate_fallback_total`.
+- **Stuck transactions:** a transaction not mined after `write.replace_after_blocks` blocks is resent with the same nonce and both fees raised by at least 12.5%, up to `write.max_replacements` times. The response reports the hash that was mined.
+- **Observability:** `arkivector_write_gas_used_total`, `_gas_reserved_total`, `_effective_gas_price_wei`, `_fee_quotes_total{source}`, `_tx_replacements_total`, and one log line per transaction with gas used, gas reserved and the fee source.

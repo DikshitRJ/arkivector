@@ -134,13 +134,19 @@ Page: [{{SITE}}/next]({{SITE}}/next). Roadmap issue: <https://github.com/Dikshit
 
 | Limitation | Today | Plan | Issue |
 | :--- | :--- | :--- | :--- |
-| HNSW graphs live in memory | Every `hnsw` collection searches a real pgvector graph, rebuilt from the local store at startup; rebuilds after many updates run on the sync thread | Persist sealed graphs, rebuild in the background, expiry-banded segments | [#11](https://github.com/DikshitRJ/arkivector/issues/11) |
-| The daemon signs with a key in an environment variable | The daemon holds a hot wallet (`ARKIV_PRIVATE_KEY`) | `entities:prepare` already returns unsigned transactions; next the SDKs hand them to the user's wallet (MetaMask, WalletConnect, hardware), plus encrypted keystores and remote signers | [#12](https://github.com/DikshitRJ/arkivector/issues/12) |
-| Predicted keys ignore the wallet's on-chain nonce | Keys returned by a write can be wrong if the wallet created entities elsewhere; the entities sync correctly | Read `entityNonce` from the Arkiv contract | [#13](https://github.com/DikshitRJ/arkivector/issues/13) |
-| Fixed gas fees | Gas limits come from `eth_estimateGas`, but fees are fixed (20 gwei max, 1.5 gwei tip) | Price fees from `eth_feeHistory`, tighten the fallback, replace stuck transactions | [#14](https://github.com/DikshitRJ/arkivector/issues/14) |
-| Qdrant compatibility is search-only | Qdrant upserts and deletes return success without writing | Route them through the REST writer | [#15](https://github.com/DikshitRJ/arkivector/issues/15) |
-| Tested on the Rabdi testnet only | Mainnet is configurable but untried | Run the sync and write suites on mainnet | [#16](https://github.com/DikshitRJ/arkivector/issues/16) |
-| Linux and Docker only, two SDK languages | macOS and Windows use the container; SDKs for Python and Node.js | Port the glibc-specific calls; C, C++ and Rust SDKs | [#17](https://github.com/DikshitRJ/arkivector/issues/17), [#18](https://github.com/DikshitRJ/arkivector/issues/18) |
+| The daemon signs with a key in an environment variable | The daemon holds a hot wallet (`ARKIV_PRIVATE_KEY`) | `entities:prepare` already returns unsigned transactions keyed to the wallet's real nonces; next the SDKs hand them to the user's wallet (MetaMask, WalletConnect, hardware), plus encrypted keystores and remote signers | [#12](https://github.com/DikshitRJ/arkivector/issues/12) |
+| Tested on the Rabdi testnet only | Mainnet is configurable but untried | Run the sync and write suites on mainnet and measure gas reservations there | [#16](https://github.com/DikshitRJ/arkivector/issues/16) |
+| Linux and Docker only | macOS and Windows use the container | Port the glibc-specific calls | [#17](https://github.com/DikshitRJ/arkivector/issues/17) |
+| Two SDK languages | SDKs for Python and Node.js | C, C++ and Rust SDKs | [#18](https://github.com/DikshitRJ/arkivector/issues/18) |
+
+Done since v1.1.0:
+
+| Fixed | What changed | Issue |
+| :--- | :--- | :--- |
+| HNSW graphs survive restarts | Graphs are saved per expiry band under `data_dir/segments` and loaded at startup (only changes since the save are indexed); rebuilds run on a background thread while sync continues; expired bands are dropped whole; corrupt files are rejected and rebuilt | [#11](https://github.com/DikshitRJ/arkivector/issues/11) |
+| Entity keys follow the wallet's on-chain nonce | Writes read `entityNonce` before predicting keys and take final keys from the `EntityCreated` receipt logs; `entities:prepare` uses the wallet's real nonces | [#13](https://github.com/DikshitRJ/arkivector/issues/13) |
+| Dynamic gas fees | Fees from `eth_feeHistory` (then `eth_gasPrice`, then config) with a cap; gas limit = estimate + margin; stuck transactions are resent with bumped fees | [#14](https://github.com/DikshitRJ/arkivector/issues/14) |
+| Qdrant writes are real | Upserts and deletes go through the REST writer, searches return payloads, a daemon without a signer refuses writes | [#15](https://github.com/DikshitRJ/arkivector/issues/15) |
 
 ## Team
 

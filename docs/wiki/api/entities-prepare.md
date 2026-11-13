@@ -32,4 +32,4 @@ curl -s "$AV/v1/collections/notes/entities:prepare" -H 'content-type: applicatio
 1. Sign each transaction as EIP-1559 with your wallet (you choose the fees) and broadcast it to Arkiv.
 2. Read with `consistency.min_block` set to the receipt's block number ([Consistency](consistency.md)).
 
-Predicted keys are valid only if the transactions are mined in order, from `from`, with the given nonces.
+The `nonce` of the first transaction is the pending transaction count of `from`, and the keys are derived from its on-chain `entityNonce`, both read from the chain when you call prepare. Predicted keys are valid only if the transactions are mined in order, from `from`, with the given nonces, and nothing else creates entities from `from` in between. `gas_estimate` is `eth_estimateGas` plus the daemon's `write.gas_margin_pct`.

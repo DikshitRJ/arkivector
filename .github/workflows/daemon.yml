@@ -160,8 +160,8 @@ jobs:
     name: "Phase 2: fuzz smoke (libFuzzer, 60 s per target)"
     needs: [quality, provenance]
     runs-on: ubuntu-24.04
-    # 7 targets: nightly 7 x 300 s = 35 min (600 s each overran the old 60 min limit and was cancelled)
-    timeout-minutes: 50
+    # 9 targets: nightly 9 x 300 s = 45 min plus the build (600 s each overran the old 60 min limit)
+    timeout-minutes: 65
     env:
       FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '300' || '60' }}
     steps:

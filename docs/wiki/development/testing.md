@@ -18,9 +18,9 @@ pytest -q test/parity                                     # against real pgvecto
 | Suite | What it proves |
 | :--- | :--- |
 | Unit (`test/unit`) | Kernels, codecs, filters, planner, segments, HNSW, signer, REST handlers |
-| Integration (`test/integration`) | The daemon end to end against mock-arkiv: sync, reorgs, TTL, search, HNSW recall and distances, filters, writes, auth, MCP, Qdrant, the golden dataset |
+| Integration (`test/integration`) | The daemon end to end against mock-arkiv: sync, reorgs, TTL, search, HNSW recall and distances, filters, writes (entity keys, fee sources, stuck-transaction replacement), auth, MCP, Qdrant (with the official `qdrant-client`), HNSW persistence and background rebuilds, expiry bands, the golden dataset |
 | Parity (`test/parity`) | Distances, text I/O and error messages match real pgvector |
-| Fuzz (`test/fuzz`) | HTTP, JSON-RPC responses, filters, vector literals, VectorBytes, ABI |
+| Fuzz (`test/fuzz`) | HTTP, JSON-RPC responses (including `eth_feeHistory`), filters, vector literals, VectorBytes, ABI, Qdrant request bodies, HNSW graph files |
 
 ## SDKs
 

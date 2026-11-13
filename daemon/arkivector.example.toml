@@ -28,6 +28,23 @@ map_size = 1073741824         # LMDB map size in bytes (1 GiB)
 [sync]
 poll_interval_ms = 2000       # Rabdi produces a block every 2 s
 
+[write]                         # managed writes (needs ARKIV_PRIVATE_KEY)
+# Fees: eth_feeHistory (median of this reward percentile over fee_history_blocks), then
+# eth_gasPrice, then the static max_fee_gwei / priority_fee_gwei below.
+# max_fee_cap_gwei = 50         # never quote more than this per gas (0 = no cap)
+# priority_fee_percentile = 50
+# fee_history_blocks = 20
+# max_fee_gwei = 20
+# priority_fee_gwei = 1.5
+# gas_margin_pct = 20           # gas limit = eth_estimateGas + this margin
+# fallback_gas_base = 60000     # when estimation fails: this + 150000 per operation
+# replace_after_blocks = 10     # resend a stuck tx with fees +12.5% after this many blocks
+# max_replacements = 3          # 0 = never replace
+
+[hnsw]
+# persist = 1                   # save graphs under data_dir/segments and load them at startup
+# band_blocks = 1296000         # expiry band width (30 days of 2 s blocks); 0 = one band
+
 [log]
 level = "info"                # debug | info | warn | error
 format = "text"               # text | json
