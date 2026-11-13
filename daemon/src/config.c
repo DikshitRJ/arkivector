@@ -82,6 +82,10 @@ static const field k_fields[] = {
 
 static const char *const k_sections[] = {"server", "arkiv", "storage", "sync", "write", "hnsw", "log"};
 static const char *const k_reserved[] = {"signer"};
+/* [hnsw] keys from the ARCHITECTURE section 16.3 example, accepted (and ignored) since the section was
+ * reserved: they are per-search knobs today (ef_search, iterative_scan, max_scan_tuples on requests). */
+static const char *const k_hnsw_ignored[] = {"ef_search", "iterative_scan", "max_scan_tuples",
+                                             "scan_mem_multiplier"};
 
 static char *dup_s(const char *s)
 {
@@ -590,6 +594,14 @@ static av_status load_table(av_config *c, toml_table_t *root, const ctx *cx, av_
                 break;
             }
             const field *f = find_field(k_sections[s], key);
+            if (f == NULL && strcmp(k_sections[s], "hnsw") == 0 &&
+                in_list(key, k_hnsw_ignored, sizeof(k_hnsw_ignored) / sizeof(k_hnsw_ignored[0]))) {
+                av_log(AV_LOG_WARN, "config",
+                       "[hnsw] %s is ignored: set it per search request (ef_search, iterative_scan, "
+                       "max_scan_tuples)",
+                       key);
+                continue;
+            }
             if (f == NULL) {
                 cfg_err(e, cx, k_sections[s], key, "unknown key");
                 return AV_ERR;

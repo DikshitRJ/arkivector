@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "greatest.h"
 #include "index/hnsw_index.h"
 #include "index/segment.h"
@@ -384,6 +385,35 @@ TEST hnsw_index_background_and_persist(void)
     PASS();
 }
 
+/* [hnsw] became a real section: the ARCHITECTURE 16.3 example keys must keep loading. */
+TEST config_hnsw_and_write_sections(void)
+{
+    av_config c;
+    av_err e;
+    av_err_clear(&e);
+    ASSERT_EQ(AV_OK, av_config_defaults(&c, &e));
+    ASSERT_EQ(AV_OK,
+              av_config_load_string(&c,
+                                    "[hnsw]\nef_search = 40\niterative_scan = \"relaxed_order\"\n"
+                                    "max_scan_tuples = 20000\nscan_mem_multiplier = 1.0\nband_blocks = 500\n"
+                                    "[write]\ngas_margin_pct = 15\nmax_fee_cap_gwei = 3.5\n",
+                                    "unit", &e));
+    ASSERT_EQ(500, (int) c.hnsw.band_blocks);
+    ASSERT_EQ(1, (int) c.hnsw.persist);
+    ASSERT_EQ(15, (int) c.write.gas_margin_pct);
+    ASSERT(c.write.max_fee_cap_gwei > 3.4 && c.write.max_fee_cap_gwei < 3.6);
+    av_config_free(&c);
+    av_err_clear(&e);
+    ASSERT_EQ(AV_OK, av_config_defaults(&c, &e));
+    ASSERT_EQ(AV_ERR, av_config_load_string(&c, "[hnsw]\nno_such_key = 1\n", "unit", &e));
+    av_config_free(&c);
+    av_err_clear(&e);
+    ASSERT_EQ(AV_OK, av_config_defaults(&c, &e));
+    ASSERT_EQ(AV_ERR, av_config_load_string(&c, "[write]\ngas_margin_pct = 0\n", "unit", &e));
+    av_config_free(&c);
+    PASS();
+}
+
 SUITE(hnsw_file)
 {
     RUN_TEST(hnsw_file_round_trip);
@@ -391,4 +421,5 @@ SUITE(hnsw_file)
     RUN_TEST(hnsw_file_corruption_sweep);
     RUN_TEST(ttl_count_due);
     RUN_TEST(hnsw_index_background_and_persist);
+    RUN_TEST(config_hnsw_and_write_sections);
 }
