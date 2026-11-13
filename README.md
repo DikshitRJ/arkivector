@@ -22,7 +22,6 @@ That query runs against vectors that were written to a blockchain. Nobody can de
 ## Contents
 
 - [Documentation](#documentation)
-- [Use it from an AI agent (MCP)](#use-it-from-an-ai-agent-mcp)
 - [Why this exists](#why-this-exists)
 - [What you get](#what-you-get)
 - [Quick start](#quick-start)
