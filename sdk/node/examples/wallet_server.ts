@@ -162,7 +162,9 @@ async function main(): Promise<void> {
           send(404, { error: "not found" });
         }
       } catch (e) {
-        send(400, { error: e instanceof Error ? e.message : String(e) });
+        // Details go to the server log only; the page gets a generic message.
+        console.error(e);
+        send(400, { error: "request failed (see the server log)" });
       }
     })
     .listen(port, "127.0.0.1", () =>

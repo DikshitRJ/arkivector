@@ -112,7 +112,10 @@ export class Arkivector {
         ? process.env?.ARKIVECTOR_URL
         : undefined) ??
       "http://127.0.0.1:8080";
-    this.url = rawUrl.replace(/\/+$/, "");
+    // Strip trailing slashes without a regex (CodeQL js/polynomial-redos on /\/+$/).
+    let url = rawUrl;
+    while (url.endsWith("/")) url = url.slice(0, -1);
+    this.url = url;
 
     this.apiKey =
       options?.apiKey ??
