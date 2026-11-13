@@ -3,6 +3,7 @@
  */
 #include "write/writer.h"
 
+#include <ctype.h>
 #include <inttypes.h>
 #include <math.h>
 #include <pthread.h>
@@ -1633,6 +1634,15 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
     if (n_ops == 0)
         return AV_OK;
 
+    {
+        av_fee_config fc = fee_config(w);
+        av_fee_quote fee;
+        av_fee_quote_rpc(w->rpc, &fc, &fee);
+        out->max_fee_per_gas = fee.max_fee_per_gas;
+        out->max_priority_fee_per_gas = fee.max_priority_fee_per_gas;
+        out->fee_source = av_fee_source_name(fee.source);
+    }
+
     av_op_batch *batches = NULL;
     size_t n_batches = 0;
     if (av_batcher_pack(ops, n_ops, &w->cfg.batcher, arena, &batches, &n_batches, e) != AV_OK)
@@ -1667,5 +1677,266 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
 
     out->transactions = txs;
     out->n_transactions = n_batches;
+    return AV_OK;
+}
+
+/* ---- submit (transactions signed outside the daemon) ---- */
+
+static bool coldef_allows_sender(const av_coldef *def, const uint8_t sender[20])
+{
+    if (def->membership == AV_MEMBERSHIP_OPEN || def->n_writers == 0)
+        return true;
+    for (size_t i = 0; i < def->n_writers; i++)
+        if (memcmp(def->writers[i], sender, 20) == 0)
+            return true;
+    return false;
+}
+
+static bool is_tx_hash(const char *s)
+{
+    if (s == NULL || strlen(s) != 66 || s[0] != '0' || (s[1] != 'x' && s[1] != 'X'))
+        return false;
+    for (size_t i = 2; i < 66; i++) {
+        char c = s[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+            return false;
+    }
+    return true;
+}
+
+/* eth_sendRawTransaction; "already known" counts as accepted so a retried submit is harmless. */
+static av_status broadcast_raw(av_writer *w, const uint8_t *raw, size_t raw_len, size_t idx, av_arena *arena,
+                               av_err *e)
+{
+    if (w->rpc == NULL) {
+        av_err_set(e, "arkiv_rpc_error", "no Arkiv RPC configured to broadcast transactions");
+        return AV_ERR;
+    }
+    char *raw_hex = hex_alloc(arena, raw, raw_len);
+    size_t cap = raw_len * 2 + 16;
+    char *params = av_arena_alloc(arena, cap, 1);
+    if (raw_hex == NULL || params == NULL) {
+        av_err_set(e, "internal", "out of memory for raw transaction");
+        return AV_ERR;
+    }
+    snprintf(params, cap, "[\"%s\"]", raw_hex);
+    yyjson_doc *doc = NULL;
+    yyjson_val *res = NULL;
+    int code = 0;
+    av_status st = av_rpc_call(w->rpc, "eth_sendRawTransaction", params, &doc, &res, &code, e);
+    if (doc != NULL)
+        yyjson_doc_free(doc);
+    if (st == AV_OK) {
+        av_metric_inc(g_m_txs, NULL, 1);
+        return AV_OK;
+    }
+    if (code != 0) {
+        char msg[sizeof(e->msg)];
+        snprintf(msg, sizeof(msg), "%s", e->msg);
+        if (strstr(msg, "already known") != NULL || strstr(msg, "known transaction") != NULL) {
+            av_err_clear(e);
+            return AV_OK;
+        }
+        av_err_set(e, "tx_reverted", "signed_transactions[%zu] rejected by the node: %s", idx, msg);
+        av_err_field(e, "/signed_transactions");
+    }
+    return AV_ERR;
+}
+
+/* Poll one receipt until mined or the deadline. Fills block, appends EntityCreated keys. */
+static av_status poll_receipt(av_writer *w, const av_coldef *def, const char *hash, const struct timespec *t0,
+                              int max_wait, av_arena *arena, uint64_t *block, uint8_t (**keys)[32],
+                              size_t *n_keys, size_t *cap_keys, av_err *e)
+{
+    int sleep_ms = 50;
+    for (;;) {
+        char qparams[96];
+        snprintf(qparams, sizeof(qparams), "[\"%s\"]", hash);
+        yyjson_doc *doc = NULL;
+        yyjson_val *rc = NULL;
+        int code = 0;
+        av_err pe;
+        av_err_clear(&pe);
+        if (av_rpc_call(w->rpc, "eth_getTransactionReceipt", qparams, &doc, &rc, &code, &pe) == AV_OK &&
+            rc != NULL && !yyjson_is_null(rc)) {
+            const char *st_str = yyjson_get_str(yyjson_obj_get(rc, "status"));
+            const char *to_s = yyjson_get_str(yyjson_obj_get(rc, "to"));
+            const char *from_s = yyjson_get_str(yyjson_obj_get(rc, "from"));
+            uint8_t to[20], from[20];
+            av_status res = AV_OK;
+            if (to_s == NULL || !av_addr_from_hex(to_s, to) || memcmp(to, w->cfg.contract_addr, 20) != 0) {
+                av_err_set(e, "invalid_argument", "transaction %s is not a call to the Arkiv contract", hash);
+                av_err_field(e, "/tx_hashes");
+                res = AV_ERR;
+            } else if (from_s != NULL && av_addr_from_hex(from_s, from) && !coldef_allows_sender(def, from)) {
+                av_err_set(
+                    e, "forbidden",
+                    "transaction %s was sent by %s, which is not a writer of collection '%s'; it will not "
+                    "be indexed",
+                    hash, from_s, def->name);
+                res = AV_ERR;
+            } else if (st_str != NULL && strcmp(st_str, "0x0") == 0) {
+                av_err_set(e, "tx_reverted", "transaction %s reverted on-chain", hash);
+                res = AV_ERR;
+            } else {
+                const char *bn = yyjson_get_str(yyjson_obj_get(rc, "blockNumber"));
+                if (bn != NULL)
+                    (void) av_qty_parse(bn, block);
+                size_t n = receipt_created_keys(rc, w->cfg.contract_addr, NULL, 0);
+                if (n > 0) {
+                    if (*n_keys + n > *cap_keys) {
+                        size_t nc = (*cap_keys == 0 ? 16 : *cap_keys * 2);
+                        while (nc < *n_keys + n)
+                            nc *= 2;
+                        uint8_t (*nk)[32] = av_arena_alloc(arena, nc * 32, 1);
+                        if (nk == NULL) {
+                            yyjson_doc_free(doc);
+                            av_err_set(e, "internal", "out of memory collecting entity keys");
+                            return AV_ERR;
+                        }
+                        if (*n_keys > 0)
+                            memcpy(nk, *keys, *n_keys * 32);
+                        *keys = nk;
+                        *cap_keys = nc;
+                    }
+                    *n_keys += receipt_created_keys(rc, w->cfg.contract_addr, *keys + *n_keys, n);
+                }
+            }
+            yyjson_doc_free(doc);
+            return res;
+        }
+        if (doc != NULL)
+            yyjson_doc_free(doc);
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        long elapsed = (long) (now.tv_sec - t0->tv_sec) * 1000L + (now.tv_nsec - t0->tv_nsec) / 1000000L;
+        if (elapsed >= max_wait) {
+            av_err_set(e, "consistency_timeout", "timeout waiting for the receipt of transaction %s", hash);
+            return AV_ERR;
+        }
+        usleep((useconds_t) (sleep_ms * 1000));
+        if (sleep_ms < 250)
+            sleep_ms += 50;
+    }
+}
+
+av_status av_writer_submit(av_writer *w, av_collection *col, const char *const *raw_hex,
+                           const size_t *raw_hex_len, size_t n_raw, const char *const *hashes,
+                           size_t n_hashes, av_write_wait_mode wait_mode, int timeout_ms, av_arena *arena,
+                           av_submit_result *out, av_err *e)
+{
+    (void) pthread_once(&g_metrics_once, writer_metrics_init);
+    memset(out, 0, sizeof(*out));
+    if (w == NULL || col == NULL || (n_raw == 0) == (n_hashes == 0)) {
+        av_err_set(e, "invalid_argument", "give exactly one of signed_transactions or tx_hashes");
+        return AV_ERR;
+    }
+    const av_coldef *def = av_collection_def(col);
+    size_t n = n_raw > 0 ? n_raw : n_hashes;
+    char (*tx_hashes)[67] = av_arena_alloc(arena, n * sizeof(*tx_hashes), 1);
+    if (tx_hashes == NULL) {
+        av_err_set(e, "internal", "out of memory");
+        return AV_ERR;
+    }
+
+    if (n_raw > 0) {
+        /* Decode and check every transaction before broadcasting any of them. */
+        uint8_t **raws = av_arena_alloc(arena, n_raw * sizeof(*raws), _Alignof(uint8_t *));
+        size_t *lens = av_arena_alloc(arena, n_raw * sizeof(*lens), _Alignof(size_t));
+        if (raws == NULL || lens == NULL) {
+            av_err_set(e, "internal", "out of memory");
+            return AV_ERR;
+        }
+        const uint8_t *own = av_writer_get_address(w);
+        bool touches_own = false;
+        for (size_t i = 0; i < n_raw; i++) {
+            av_rawtx rt;
+            if (av_rawtx_decode_hex(raw_hex[i], raw_hex_len[i], arena, &raws[i], &lens[i], &rt, e) != AV_OK) {
+                char msg[sizeof(e->msg)];
+                snprintf(msg, sizeof(msg), "%s", e->msg);
+                av_err_set(e, "invalid_argument", "signed_transactions[%zu]: %s", i, msg);
+                av_err_field(e, "/signed_transactions");
+                return AV_ERR;
+            }
+            const char *why = NULL;
+            if (rt.chain_id != w->cfg.chain_id)
+                why = "chain id does not match the daemon's Arkiv chain";
+            else if (!rt.has_to || memcmp(rt.to, w->cfg.contract_addr, 20) != 0)
+                why = "'to' is not the Arkiv contract";
+            else if (!rt.value_zero)
+                why = "'value' must be 0";
+            else if (rt.data_len < 4 || rt.data[0] != 0x49 || rt.data[1] != 0x65 || rt.data[2] != 0x00 ||
+                     rt.data[3] != 0x44)
+                why = "calldata is not an Arkiv execute(...) call";
+            if (why != NULL) {
+                av_err_set(e, "invalid_argument", "signed_transactions[%zu]: %s", i, why);
+                av_err_field(e, "/signed_transactions");
+                return AV_ERR;
+            }
+            if (!coldef_allows_sender(def, rt.sender)) {
+                char sh[43];
+                av_addr_to_hex(rt.sender, sh);
+                av_err_set(
+                    e, "forbidden",
+                    "signed_transactions[%zu] is signed by %s, which is not a writer of collection '%s'", i,
+                    sh, def->name);
+                return AV_ERR;
+            }
+            if (own != NULL && memcmp(own, rt.sender, 20) == 0)
+                touches_own = true;
+            av_key_to_hex(rt.hash, tx_hashes[i]);
+        }
+        /* Transactions from the daemon's own signer address move its nonces: re-read them next time. */
+        if (touches_own)
+            invalidate_nonces(w);
+        for (size_t i = 0; i < n_raw; i++) {
+            if (broadcast_raw(w, raws[i], lens[i], i, arena, e) != AV_OK)
+                return AV_ERR;
+            av_log(AV_LOG_INFO, "writer", "relayed client-signed tx %s (%zu bytes)", tx_hashes[i], lens[i]);
+        }
+    } else {
+        for (size_t i = 0; i < n_hashes; i++) {
+            if (!is_tx_hash(hashes[i])) {
+                av_err_set(e, "invalid_argument", "tx_hashes[%zu] is not a 32-byte hex transaction hash", i);
+                av_err_field(e, "/tx_hashes");
+                return AV_ERR;
+            }
+            for (size_t c = 0; c < 66; c++)
+                tx_hashes[i][c] = (char) tolower((unsigned char) hashes[i][c]);
+            tx_hashes[i][66] = '\0';
+        }
+    }
+    out->tx_hashes = tx_hashes;
+    out->n_tx_hashes = n;
+    if (wait_mode == AV_WAIT_NONE)
+        return AV_OK;
+    if (w->rpc == NULL) {
+        av_err_set(e, "arkiv_rpc_error", "no Arkiv RPC configured to read receipts");
+        return AV_ERR;
+    }
+
+    struct timespec t0;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    int max_wait = timeout_ms > 0 ? timeout_ms : 60000;
+    uint64_t highest = 0;
+    size_t cap_keys = 0;
+    for (size_t i = 0; i < n; i++) {
+        uint64_t block = 0;
+        if (poll_receipt(w, def, tx_hashes[i], &t0, max_wait, arena, &block, &out->created_keys,
+                         &out->n_created_keys, &cap_keys, e) != AV_OK)
+            return AV_ERR;
+        if (block > highest)
+            highest = block;
+    }
+    out->block_number = highest;
+    out->has_block_number = highest > 0;
+    if (wait_mode == AV_WAIT_INDEXED && highest > 0) {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        long elapsed = (long) (now.tv_sec - t0.tv_sec) * 1000L + (now.tv_nsec - t0.tv_nsec) / 1000000L;
+        int left = max_wait - (int) (elapsed < max_wait ? elapsed : max_wait);
+        if (av_collection_wait_block(col, highest, left > 0 ? left : 1, e) != AV_OK)
+            return AV_ERR;
+    }
     return AV_OK;
 }

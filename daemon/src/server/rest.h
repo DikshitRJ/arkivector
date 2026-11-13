@@ -56,6 +56,9 @@ void av_rest_set_sync_provider(av_sync_provider_fn fn, void *ctx);
 
 /* chain_id and writes_enabled for GET /v1/version. */
 void av_rest_set_info(int64_t chain_id, bool writes_enabled);
+/* Signer kind ("env", "keystore", "remote") and its public address, reported by GET /v1/version.
+ * Never key material. NULL kind = no signer (version reports "signer": null). */
+void av_rest_set_signer(const char *kind, const char *address_hex);
 
 /* Capability list for GET /v1/version: "ops.version", "ops.sync", "ops.metrics" plus anything added. */
 av_status av_rest_add_capability(const char *capability, av_err *e);

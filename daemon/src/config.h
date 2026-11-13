@@ -6,8 +6,9 @@
  * command-line flags applied by main.c. Unknown sections and keys are errors. Errors name the
  * file, the line (when the key is found in the text), the section and the key.
  *
- * Sections: [server] [arkiv] [storage] [sync] [write] [hnsw] [log] and [[collections]]. [signer] is
- * accepted and ignored (reserved for a later phase; a warning is logged).
+ * Sections: [server] [arkiv] [storage] [sync] [write] [write.signer] [hnsw] [log] and [[collections]].
+ * A top-level [signer] table is accepted as an alias of [write.signer] (ARCHITECTURE section 16.3);
+ * giving both is an error. Environment names for [write.signer] keys are ARKIVECTOR_WRITE_SIGNER_<KEY>.
  * [[collections]] tables are converted to JSON text, one string per table, and handed to the
  * registry unchanged (Lane C parses them with av_coldef_from_json).
  *
@@ -67,6 +68,18 @@ typedef struct av_config {
         int64_t replace_after_blocks; /* resend a stuck tx with bumped fees after N blocks (default 10) */
         int64_t max_replacements;     /* resends per tx, 0 = never replace (default 3) */
     } write;
+    struct {                   /* [write.signer] (GitHub issue #12); never holds key material */
+        char *kind;            /* auto (default) | none | env | keystore | remote */
+        char *env_var;         /* kind env/auto: variable holding the hex key (ARKIV_PRIVATE_KEY) */
+        char *keystore_path;   /* kind keystore: Web3 Secret Storage v3 JSON file */
+        char *passphrase_file; /* kind keystore: file whose first line is the passphrase */
+        char *
+            passphrase_credential; /* kind keystore: systemd credential name ($CREDENTIALS_DIRECTORY/<name>) */
+        char *remote_url;          /* kind remote: Web3Signer / Clef JSON-RPC endpoint */
+        char *remote_address;      /* kind remote: signing address; "" = ask the signer (must have one) */
+        char *remote_method;       /* kind remote: eth_signTransaction (default) | account_signTransaction */
+        int64_t remote_timeout_ms; /* kind remote: per signing call (default 10000) */
+    } signer;
     struct {
         int64_t persist;     /* 1 = save graphs under data_dir/segments and load them at startup */
         int64_t band_blocks; /* expiry band width in blocks; 0 = one band per collection */
