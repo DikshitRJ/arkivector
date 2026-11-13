@@ -1,5 +1,7 @@
 # Collections
 
+Create, list, follow and delete collections from Node.js. A collection is a vector column, an index and the wallets whose entities it indexes.
+
 ```ts
 const col = await client.createCollection({
   name: "notes",

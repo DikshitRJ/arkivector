@@ -1,5 +1,7 @@
 # Client
 
+`Arkivector` is the Node.js client: one instance per daemon, with retries, timeouts, idempotent writes and optional read-your-writes consistency.
+
 ```ts
 import { Arkivector } from "@dikshitrj/arkivector";
 
