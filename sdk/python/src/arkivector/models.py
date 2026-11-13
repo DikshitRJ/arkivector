@@ -218,6 +218,21 @@ class Ttl:
 
 
 @dataclass
+class SignerInfo:
+    """The daemon's managed signer: ``kind`` is env, keystore or remote. Never key material."""
+
+    kind: str
+    address: str
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "SignerInfo":
+        return cls(kind=str(d.get("kind", "")), address=str(d.get("address", "")))
+
+    def to_json(self) -> Dict[str, Any]:
+        return {"kind": self.kind, "address": self.address}
+
+
+@dataclass
 class VersionInfo:
     """Daemon and contract version info along with advertised capabilities."""
 
@@ -228,6 +243,7 @@ class VersionInfo:
     chain_id: int
     writes_enabled: bool
     capabilities: List[str]
+    signer: Optional["SignerInfo"] = None
 
     @classmethod
     def from_json(cls, d: Dict[str, Any]) -> "VersionInfo":
@@ -239,10 +255,12 @@ class VersionInfo:
             chain_id=int(d.get("chain_id", 0)),
             writes_enabled=bool(d.get("writes_enabled", False)),
             capabilities=[str(c) for c in d.get("capabilities", [])],
+            signer=SignerInfo.from_json(d["signer"]) if isinstance(d.get("signer"), dict) else None,
         )
 
     def to_json(self) -> Dict[str, Any]:
         return {
+            "signer": self.signer.to_json() if self.signer is not None else None,
             "daemon_version": self.daemon_version,
             "api_version": self.api_version,
             "pgvector_version": self.pgvector_version,
@@ -985,29 +1003,57 @@ class UpsertResult:
         return d
 
 
+def _hex_qty(v: Optional[str]) -> Optional[int]:
+    if v is None:
+        return None
+    return int(str(v), 16) if str(v).lower().startswith("0x") else int(v)
+
+
 @dataclass
 class PreparedTransaction:
-    """Unsigned transaction built for client-side signing."""
+    """Unsigned EIP-1559 transaction built by ``entities:prepare`` for client-side signing.
+
+    Since contract 1.1.0 it carries everything needed to sign it as is: ``type`` (2),
+    ``chain_id``, ``from_address``, ``gas`` and a fee suggestion (wei). Change the fees before
+    signing if you like.
+    Convert it with :meth:`to_eth_account` (``eth_account.Account.sign_transaction``, web3.py) or
+    :meth:`to_rpc` (JSON-RPC ``eth_sendTransaction`` / ``eth_signTransaction``, EIP-1193 wallets).
+    """
 
     to: str
     data: str
     value: str
     nonce: int
     gas_estimate: Optional[int] = None
+    type: int = 2
+    chain_id: Optional[int] = None
+    from_address: Optional[str] = None
+    gas: Optional[int] = None
+    max_fee_per_gas: Optional[int] = None
+    max_priority_fee_per_gas: Optional[int] = None
 
     @classmethod
     def from_json(cls, d: Dict[str, Any]) -> "PreparedTransaction":
         ge = d.get("gas_estimate")
+        gas = d.get("gas")
+        cid = d.get("chain_id")
         return cls(
             to=str(d.get("to", "")),
             data=str(d.get("data", "")),
             value=str(d.get("value", "0x0")),
             nonce=int(d.get("nonce", 0)),
             gas_estimate=int(ge) if ge is not None else None,
+            type=int(d.get("type", 2)),
+            chain_id=int(cid) if cid is not None else None,
+            from_address=str(d["from"]) if d.get("from") is not None else None,
+            gas=int(gas) if gas is not None else (int(ge) if ge is not None else None),
+            max_fee_per_gas=_hex_qty(d.get("max_fee_per_gas")),
+            max_priority_fee_per_gas=_hex_qty(d.get("max_priority_fee_per_gas")),
         )
 
     def to_json(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
+            "type": self.type,
             "to": self.to,
             "data": self.data,
             "value": self.value,
@@ -1015,7 +1061,115 @@ class PreparedTransaction:
         }
         if self.gas_estimate is not None:
             d["gas_estimate"] = self.gas_estimate
+        if self.chain_id is not None:
+            d["chain_id"] = self.chain_id
+        if self.from_address is not None:
+            d["from"] = self.from_address
+        if self.gas is not None:
+            d["gas"] = self.gas
+        if self.max_fee_per_gas is not None:
+            d["max_fee_per_gas"] = hex(self.max_fee_per_gas)
+        if self.max_priority_fee_per_gas is not None:
+            d["max_priority_fee_per_gas"] = hex(self.max_priority_fee_per_gas)
         return d
+
+    def _require(self) -> None:
+        missing = [
+            n
+            for n in ("chain_id", "gas", "max_fee_per_gas", "max_priority_fee_per_gas")
+            if getattr(self, n) is None
+        ]
+        if missing:
+            raise ValueError(
+                "transaction lacks " + ", ".join(missing) + " (daemon older than contract 1.1.0); "
+                "set them before signing"
+            )
+
+    def to_eth_account(self) -> Dict[str, Any]:
+        """Dict for ``eth_account.Account.sign_transaction`` / web3.py (camelCase, integers)."""
+        self._require()
+        return {
+            "type": self.type,
+            "chainId": self.chain_id,
+            "nonce": self.nonce,
+            "to": self.to,
+            "value": int(self.value, 16),
+            "data": self.data,
+            "gas": self.gas,
+            "maxFeePerGas": self.max_fee_per_gas,
+            "maxPriorityFeePerGas": self.max_priority_fee_per_gas,
+        }
+
+    def to_rpc(self) -> Dict[str, Any]:
+        """Dict for JSON-RPC ``eth_sendTransaction`` / ``eth_signTransaction`` (hex quantities).
+
+        This is what a browser wallet (EIP-1193 ``provider.request``) expects; send it to a frontend
+        as JSON and have MetaMask sign and broadcast it, then pass the hash to ``Client.submit``.
+        """
+        self._require()
+        out: Dict[str, Any] = {
+            "type": "0x2",
+            "chainId": hex(self.chain_id or 0),
+            "nonce": hex(self.nonce),
+            "to": self.to,
+            "value": self.value,
+            "data": self.data,
+            "gas": hex(self.gas or 0),
+            "maxFeePerGas": hex(self.max_fee_per_gas or 0),
+            "maxPriorityFeePerGas": hex(self.max_priority_fee_per_gas or 0),
+        }
+        if self.from_address is not None:
+            out["from"] = self.from_address
+        return out
+
+
+@dataclass
+class FeeSuggestion:
+    """Fee suggestion returned by ``entities:prepare`` (wei)."""
+
+    max_fee_per_gas: int
+    max_priority_fee_per_gas: int
+    source: str
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "FeeSuggestion":
+        return cls(
+            max_fee_per_gas=_hex_qty(d.get("max_fee_per_gas")) or 0,
+            max_priority_fee_per_gas=_hex_qty(d.get("max_priority_fee_per_gas")) or 0,
+            source=str(d.get("source", "")),
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "max_fee_per_gas": hex(self.max_fee_per_gas),
+            "max_priority_fee_per_gas": hex(self.max_priority_fee_per_gas),
+            "source": self.source,
+        }
+
+
+@dataclass
+class SubmitResult:
+    """``entities:submit`` response: tx hashes, highest receipt block, keys of created entities."""
+
+    tx_hashes: List[str]
+    block_number: Optional[int] = None
+    created_keys: List[str] = field(default_factory=list)
+
+    @classmethod
+    def from_json(cls, d: Dict[str, Any]) -> "SubmitResult":
+        blk = d.get("block_number")
+        return cls(
+            tx_hashes=[str(t) for t in d.get("tx_hashes", []) or []],
+            block_number=int(blk) if blk is not None else None,
+            created_keys=[str(k) for k in d.get("created_keys", []) or []],
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "tx_hashes": list(self.tx_hashes),
+            "block_number": self.block_number,
+            "created_keys": list(self.created_keys),
+        }
 
 
 @dataclass
@@ -1025,6 +1179,8 @@ class PrepareResult:
     chain_id: int
     transactions: List[PreparedTransaction]
     results: List[UpsertItemResult]
+    from_address: Optional[str] = None
+    fees: Optional[FeeSuggestion] = None
 
     @classmethod
     def from_json(cls, d: Dict[str, Any]) -> "PrepareResult":
@@ -1038,18 +1194,26 @@ class PrepareResult:
             r if isinstance(r, UpsertItemResult) else UpsertItemResult.from_json(r)
             for r in (raw_results or [])
         ]
+        fees = d.get("fees")
         return cls(
             chain_id=int(d.get("chain_id", 0)),
             transactions=txs,
             results=results,
+            from_address=str(d["from"]) if d.get("from") is not None else None,
+            fees=FeeSuggestion.from_json(fees) if isinstance(fees, dict) else None,
         )
 
     def to_json(self) -> Dict[str, Any]:
-        return {
+        d: Dict[str, Any] = {
             "chain_id": self.chain_id,
             "transactions": [t.to_json() for t in self.transactions],
             "results": [r.to_json() for r in self.results],
         }
+        if self.from_address is not None:
+            d["from"] = self.from_address
+        if self.fees is not None:
+            d["fees"] = self.fees.to_json()
+        return d
 
 
 @dataclass

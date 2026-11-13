@@ -26,13 +26,16 @@ from arkivector.models import (
     Readiness,
     ScrollPage,
     SearchResult,
+    SubmitResult,
     SyncStatus,
     Ttl,
     TxResult,
     TypedValue,
+    UpsertItemResult,
     UpsertResult,
     VersionInfo,
 )
+from arkivector.signing import SendFn, SignFn, normalize_hash, normalize_raw
 from arkivector.types import Bit, HalfVector, SparseVector, Vector
 from arkivector.vectorbytes import encode_halfvec, encode_vector
 
@@ -765,6 +768,102 @@ class Client:
         )
         data = resp.json() or {}
         return PrepareResult.from_json(data)
+
+    def submit(
+        self,
+        collection: str,
+        signed_transactions: Optional[Sequence[Any]] = None,
+        tx_hashes: Optional[Sequence[Any]] = None,
+        wait: str = "receipt",
+        timeout_ms: int = 60000,
+        idempotency_key: Optional[str] = None,
+    ) -> SubmitResult:
+        """Hand transactions signed outside the daemon back to it (contract 1.1.0).
+
+        Give exactly one of ``signed_transactions`` (raw signed EIP-1559 transactions: bytes,
+        hex, or eth_account results; the daemon broadcasts them in order) or ``tx_hashes`` (a
+        wallet already broadcast them, e.g. MetaMask ``eth_sendTransaction``).
+        ``wait``: none | receipt | indexed.
+
+        Endpoint: POST /v1/collections/{name}/entities:submit
+        """
+        self.check_capability("entities.submit")
+        if (signed_transactions is None) == (tx_hashes is None):
+            raise ValueError("give exactly one of signed_transactions or tx_hashes")
+        body: Dict[str, Any] = {"wait": str(wait), "timeout_ms": int(timeout_ms)}
+        if signed_transactions is not None:
+            if not signed_transactions:
+                raise ValueError("signed_transactions cannot be empty")
+            body["signed_transactions"] = [normalize_raw(t) for t in signed_transactions]
+        else:
+            assert tx_hashes is not None
+            if not tx_hashes:
+                raise ValueError("tx_hashes cannot be empty")
+            body["tx_hashes"] = [normalize_hash(h) for h in tx_hashes]
+        if idempotency_key is None and self.idempotency:
+            idempotency_key = str(uuid.uuid4())
+        http_timeout = max(self.timeout, (float(timeout_ms) / 1000.0) + 5.0)
+        encoded_col = urllib.parse.quote(collection, safe="")
+        resp = self._http.request(
+            "POST",
+            f"/v1/collections/{encoded_col}/entities:submit",
+            body=body,
+            idempotency_key=idempotency_key,
+            timeout=http_timeout,
+        )
+        res = SubmitResult.from_json(resp.json() or {})
+        if res.block_number is not None:
+            self.last_write_block = max(self.last_write_block or 0, res.block_number)
+        return res
+
+    def upsert_signed(
+        self,
+        collection: str,
+        entities: Sequence[Union[EntityInput, Dict[str, Any]]],
+        from_address: str,
+        sign: Optional[SignFn] = None,
+        send: Optional[SendFn] = None,
+        wait: str = "indexed",
+        timeout_ms: int = 60000,
+        idempotency_key: Optional[str] = None,
+    ) -> UpsertResult:
+        """Upsert with the caller's own wallet: prepare → sign/send → submit (contract 1.1.0).
+
+        ``sign(tx)`` returns the raw signed transaction (see :mod:`arkivector.signing`, e.g.
+        ``eth_account_signer(acct)``) and the daemon broadcasts it; or ``send(tx)`` broadcasts it
+        itself and returns the hash. The daemon needs no key. With ``wait`` receipt/indexed the
+        returned keys are the mined ones (from the receipts), not predictions.
+        """
+        if (sign is None) == (send is None):
+            raise ValueError("give exactly one of sign or send")
+        prepared = self.prepare(collection, entities, from_address)
+        if not prepared.transactions:
+            return UpsertResult(results=prepared.results, tx_hashes=[], block_number=None)
+        if sign is not None:
+            raws = [normalize_raw(sign(tx)) for tx in prepared.transactions]
+            sub = self.submit(
+                collection,
+                signed_transactions=raws,
+                wait=wait,
+                timeout_ms=timeout_ms,
+                idempotency_key=idempotency_key,
+            )
+        else:
+            assert send is not None
+            hashes = [normalize_hash(send(tx)) for tx in prepared.transactions]
+            sub = self.submit(
+                collection,
+                tx_hashes=hashes,
+                wait=wait,
+                timeout_ms=timeout_ms,
+                idempotency_key=idempotency_key,
+            )
+        results = list(prepared.results)
+        creates = [i for i, r in enumerate(results) if r.op == "create"]
+        if len(sub.created_keys) == len(creates):
+            for i, key in zip(creates, sub.created_keys):
+                results[i] = UpsertItemResult(id=results[i].id, key=key, op=results[i].op)
+        return UpsertResult(results=results, tx_hashes=sub.tx_hashes, block_number=sub.block_number)
 
     def delete(
         self,

@@ -24,6 +24,7 @@ from arkivector.models import (
     DirectAttribute,
     Entity,
     EntityInput,
+    FeeSuggestion,
     IndexDef,
     PreparedTransaction,
     PrepareResult,
@@ -31,6 +32,8 @@ from arkivector.models import (
     ScrollPage,
     SearchHit,
     SearchResult,
+    SignerInfo,
+    SubmitResult,
     SyncStatus,
     T,
     Ttl,
@@ -40,6 +43,7 @@ from arkivector.models import (
     UpsertResult,
     VersionInfo,
 )
+from arkivector.signing import eth_account_signer, web3_sender
 from arkivector.types import (
     AnyVector,
     Bit,
@@ -76,6 +80,11 @@ __all__ = [
     "NotFoundError",
     "NotImplementedByDaemon",
     "PrepareResult",
+    "FeeSuggestion",
+    "SignerInfo",
+    "SubmitResult",
+    "eth_account_signer",
+    "web3_sender",
     "PreparedTransaction",
     "Readiness",
     "ScrollPage",
