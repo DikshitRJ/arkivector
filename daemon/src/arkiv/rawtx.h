@@ -5,6 +5,7 @@
  * by the remote signer (arkiv/tx.c checks that what the signer returned is what was asked for).
  * Both inputs are untrusted: every length is checked against the input before it is read, RLP must
  * be canonical (no leading zeros, shortest length form), integers that must fit uint64 are bounded,
+ * access-list entries must have the EIP-2930 shape [address, [storageKey, ...]],
  * the signature must have a low s (EIP-2), and the input must be exactly one transaction with no
  * trailing bytes. Fuzz target: test/fuzz/fuzz_rawtx.c.
  *

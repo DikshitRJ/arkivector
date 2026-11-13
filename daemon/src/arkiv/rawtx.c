@@ -101,6 +101,26 @@ static bool item_u256(const uint8_t *b, const rlp_item *it, uint8_t out[32])
     return true;
 }
 
+/* One EIP-2930 access-list entry at pos: [address (20 bytes), [storageKey (32 bytes), ...]]. */
+static bool access_entry_ok(const uint8_t *b, size_t lim, size_t pos, size_t *next)
+{
+    rlp_item entry, addr, keys;
+    if (!rlp_next(b, lim, pos, &entry) || !entry.list)
+        return false;
+    if (!rlp_next(b, entry.end, entry.start, &addr) || addr.list || addr.len != 20)
+        return false;
+    if (!rlp_next(b, entry.end, addr.end, &keys) || !keys.list || keys.end != entry.end)
+        return false;
+    for (size_t k = keys.start; k < keys.end;) {
+        rlp_item key;
+        if (!rlp_next(b, keys.end, k, &key) || key.list || key.len != 32)
+            return false;
+        k = key.end;
+    }
+    *next = entry.end;
+    return true;
+}
+
 static bool is_zero32(const uint8_t v[32])
 {
     for (size_t i = 0; i < 32; i++)
@@ -177,11 +197,9 @@ av_status av_rawtx_decode(const uint8_t *raw, size_t len, av_rawtx *out, av_err 
     if (!f[8].list)
         return bad(e, "'accessList' must be a list");
     for (size_t p = f[8].start; p < f[8].end;) {
-        rlp_item entry;
-        if (!rlp_next(raw, f[8].end, p, &entry) || !entry.list)
-            return bad(e, "malformed access list");
+        if (!access_entry_ok(raw, f[8].end, p, &p))
+            return bad(e, "malformed access list (EIP-2930: [address, [storageKey, ...]])");
         out->n_access_list++;
-        p = entry.end;
     }
     uint64_t parity = 0;
     if (!item_u64(raw, &f[9], &parity) || parity > 1)

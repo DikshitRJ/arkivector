@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "arkiv/rawtx.h"
+#include "arkiv/rlp.h"
 #include "arkiv/signer.h"
 #include "arkiv/tx.h"
 #include "core/arena.h"
@@ -195,6 +196,117 @@ TEST test_rawtx_noncanonical_integer(void)
     PASS();
 }
 
+/* 0x02 || rlp([chainId..data, accessList, 1, 1, 1]) with a caller-built access list. Signature
+ * values are dummies: structural checks run before signature recovery. */
+static size_t build_with_access_list(uint8_t *out, size_t cap, void (*al)(av_rlp *))
+{
+    av_rlp r;
+    av_rlp_init(&r);
+    av_rlp_list_begin(&r);
+    for (int i = 0; i < 5; i++)
+        av_rlp_u64(&r, 1);
+    av_rlp_bytes(&r, k_contract, 20);
+    av_rlp_u64(&r, 0);
+    av_rlp_bytes(&r, k_data, sizeof(k_data));
+    al(&r);
+    av_rlp_u64(&r, 1);
+    av_rlp_u64(&r, 1);
+    av_rlp_u64(&r, 1);
+    av_rlp_list_end(&r);
+    const uint8_t *p = NULL;
+    size_t n = 0;
+    av_err e;
+    if (av_rlp_finish(&r, &p, &n, &e) != AV_OK || n + 1 > cap) {
+        av_rlp_free(&r);
+        return 0;
+    }
+    out[0] = 0x02;
+    memcpy(out + 1, p, n);
+    av_rlp_free(&r);
+    return n + 1;
+}
+
+static const uint8_t k_key32[32] = {1};
+
+static void al_good(av_rlp *r)
+{
+    av_rlp_list_begin(r);
+    av_rlp_list_begin(r);
+    av_rlp_bytes(r, k_contract, 20);
+    av_rlp_list_begin(r);
+    av_rlp_bytes(r, k_key32, 32);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+}
+static void al_short_address(av_rlp *r)
+{
+    av_rlp_list_begin(r);
+    av_rlp_list_begin(r);
+    av_rlp_bytes(r, k_contract, 19);
+    av_rlp_list_begin(r);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+}
+static void al_short_key(av_rlp *r)
+{
+    av_rlp_list_begin(r);
+    av_rlp_list_begin(r);
+    av_rlp_bytes(r, k_contract, 20);
+    av_rlp_list_begin(r);
+    av_rlp_bytes(r, k_key32, 31);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+}
+static void al_extra_item(av_rlp *r)
+{
+    av_rlp_list_begin(r);
+    av_rlp_list_begin(r);
+    av_rlp_bytes(r, k_contract, 20);
+    av_rlp_list_begin(r);
+    av_rlp_list_end(r);
+    av_rlp_u64(r, 7);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+}
+static void al_keys_not_list(av_rlp *r)
+{
+    av_rlp_list_begin(r);
+    av_rlp_list_begin(r);
+    av_rlp_bytes(r, k_contract, 20);
+    av_rlp_bytes(r, k_key32, 32);
+    av_rlp_list_end(r);
+    av_rlp_list_end(r);
+}
+
+TEST test_rawtx_access_list_shape(void)
+{
+    uint8_t buf[512];
+    av_rawtx rt;
+    av_err e;
+    void (*bad_lists[])(av_rlp *) = {al_short_address, al_short_key, al_extra_item, al_keys_not_list};
+    for (size_t i = 0; i < sizeof(bad_lists) / sizeof(bad_lists[0]); i++) {
+        size_t n = build_with_access_list(buf, sizeof(buf), bad_lists[i]);
+        ASSERT(n > 0);
+        av_err_clear(&e);
+        ASSERT_EQ(AV_ERR, av_rawtx_decode(buf, n, &rt, &e));
+        ASSERT(strstr(e.msg, "access list") != NULL);
+    }
+    /* A well-formed access list passes the structural checks. (r = 1 is a valid x coordinate, so the
+     * dummy signature even recovers some key and the whole decode succeeds.) */
+    size_t n = build_with_access_list(buf, sizeof(buf), al_good);
+    ASSERT(n > 0);
+    av_err_clear(&e);
+    av_status st = av_rawtx_decode(buf, n, &rt, &e);
+    if (st == AV_OK)
+        ASSERT_EQ(1u, rt.n_access_list);
+    else
+        ASSERT(strstr(e.msg, "access list") == NULL);
+    PASS();
+}
+
 TEST test_keystore_v3_pbkdf2_vector(void)
 {
     /* Web3 Secret Storage Definition test vector (pbkdf2-sha256, c = 262144). */
@@ -264,6 +376,7 @@ SUITE(rawtx)
     RUN_TEST(test_rawtx_roundtrip);
     RUN_TEST(test_rawtx_rejects_malformed);
     RUN_TEST(test_rawtx_noncanonical_integer);
+    RUN_TEST(test_rawtx_access_list_shape);
     RUN_TEST(test_keystore_v3_pbkdf2_vector);
     RUN_TEST(test_remote_signer_config_errors);
 }
