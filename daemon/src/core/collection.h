@@ -34,6 +34,7 @@
 #include "core/coldef.h"
 #include "index/attr_index.h"
 #include "index/docid.h"
+#include "index/hnsw_index.h"
 #include "index/segment.h"
 #include "log.h"
 #include "store/lmdb_store.h"
@@ -110,13 +111,18 @@ const av_attr_index *av_collection_attr_index(const av_collection *c);
 const av_segment *av_collection_segment(const av_collection *c); /* the flat segment (raw vectors) */
 
 /*
- * HNSW index (collections whose index method is hnsw). The graph indexes the docids of the flat
- * segment; docids it could not take (graph full, zero-norm cosine vectors) form an exact "tail".
- * The applier rebuilds the graph after publish when the tail or the dead share grows large.
+ * HNSW index (collections whose index method is hnsw): per-expiry-band pgvector graphs over the
+ * docids of the flat segment, persisted under <data_dir>/segments/<name>/ and rebuilt on a
+ * background thread (index/hnsw_index.h). Docids a graph could not take form an exact "tail".
  */
 bool av_collection_has_hnsw(const av_collection *c);
-/* Applier thread only: rebuild the graph from the published live docids now. */
+/* [hnsw] persist / band_blocks for collections created afterwards (main, at startup). */
+void av_collection_set_hnsw_config(bool persist, uint64_t band_blocks);
+/* Ask for a background rebuild of every band (any thread; scheduled at the next publish). */
 av_status av_collection_rebuild_hnsw(av_collection *c, av_err *e);
+/* Band rows and counters of the HNSW index (debug route). Any thread. */
+size_t av_collection_hnsw_describe(av_collection *c, av_hnsw_band_info *out, size_t max,
+                                   av_hnsw_index_stats *st);
 /*
  * Approximate search under the read lock: graph search (pgvector GetScanItems/ResumeScanItems with
  * ef_search >= limit) over cand (NULL = live) plus an exact scan of the tail. Distances are

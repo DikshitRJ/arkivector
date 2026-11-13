@@ -173,6 +173,7 @@ set(AV_CORE_SOURCES
     src/index/live.c
     src/index/attr_index.c
     src/index/segment.c
+    src/index/hnsw_index.c
     src/core/coldef.c
     src/core/collection.c
     src/core/registry.c

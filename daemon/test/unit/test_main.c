@@ -21,6 +21,7 @@ extern SUITE(abi);
 extern SUITE(signer);
 extern SUITE(segment_suite);
 extern SUITE(fees);
+extern SUITE(hnsw_file);
 #ifdef AV_HAVE_HNSW_TEST
 extern SUITE(hnsw);
 #endif
@@ -48,6 +49,7 @@ int main(int argc, char **argv)
     RUN_SUITE(signer);
     RUN_SUITE(segment_suite);
     RUN_SUITE(fees);
+    RUN_SUITE(hnsw_file);
 #ifdef AV_HAVE_HNSW_TEST
     RUN_SUITE(hnsw);
 #endif

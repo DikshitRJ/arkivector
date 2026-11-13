@@ -123,6 +123,7 @@ static av_status services_start(const av_config *cfg, av_err *e)
         return AV_ERR;
 
     /* 2. Load registry */
+    av_collection_set_hnsw_config(cfg->hnsw.persist != 0, (uint64_t) cfg->hnsw.band_blocks);
     g_registry = av_registry_create(g_store, cfg->storage.data_dir, e);
     if (g_registry == NULL)
         return AV_ERR;

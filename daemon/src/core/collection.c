@@ -68,18 +68,13 @@ struct av_collection {
     av_ttl *ttl;
 
     /*
-     * HNSW side index (def.method == AV_INDEX_HNSW). The flat segment stays the source of truth
-     * (raw vectors, exact scans, distance recomputation); the graph indexes the same docids.
-     * hnsw_lock guards hnsw, hnsw_tail and hnsw_full: the applier takes it exclusively per graph
-     * insert and for the swap after a rebuild, readers take it shared for one search. Lock order:
-     * collection read lock, then hnsw_lock. hnsw_tail holds docids stored in the flat segment but
-     * not in the graph (graph full, zero-norm cosine vectors, insert errors): searches scan it exactly.
+     * HNSW side index (def.method == AV_INDEX_HNSW): per-expiry-band graphs with background builds
+     * and persistence (index/hnsw_index.h, which documents its own lock). The flat segment stays the
+     * source of truth (raw vectors, exact scans, distance recomputation). Lock order: collection
+     * read lock, then the index lock.
      */
-    pthread_rwlock_t hnsw_lock;
     bool hnsw_enabled; /* set once in create, never changes: lock-free "has a graph" for readers */
-    av_segment *hnsw;  /* read by query threads only under hnsw_lock; written by the applier under it */
-    roaring_bitmap_t *hnsw_tail;
-    bool hnsw_full;
+    av_hnsw_index *hnsw;
 
     /* applier-private */
     uint32_t next_docid;
@@ -242,125 +237,21 @@ static void *fatal_oom(void)
 
 /* ------------------------------------------------------------ HNSW index */
 
-av_status av_collection_rebuild_hnsw(av_collection *c, av_err *e);
+/* Process-wide HNSW settings ([hnsw] config), set once by main before collections are created. */
+static bool g_hnsw_persist = true;
+static uint64_t g_hnsw_band_blocks = 1296000;
 
-#define AV_HNSW_MIN_CAPACITY ((size_t) 65536)
-
-/* Graph capacity for a (re)build over n vectors: room to double before the tail grows. */
-static size_t hnsw_capacity(size_t n)
+void av_collection_set_hnsw_config(bool persist, uint64_t band_blocks)
 {
-    size_t cap = 2 * n;
-    return cap > AV_HNSW_MIN_CAPACITY ? cap : AV_HNSW_MIN_CAPACITY;
+    g_hnsw_persist = persist;
+    g_hnsw_band_blocks = band_blocks;
 }
 
-typedef struct {
-    av_collection *c;
-    av_segment *seg;
-    roaring_bitmap_t *tail;
-    bool full;
-} hnsw_build_ctx;
-
-static void hnsw_put(av_segment *g, roaring_bitmap_t *tail, bool *full, av_docid id, const void *pg,
-                     const char *coll)
+static uint64_t docid_expiry(void *ctx, av_docid id)
 {
-    av_err he;
-    av_err_clear(&he);
-    av_status st = *full ? AV_SEAL_NEEDED : av_segment_insert(g, id, pg, &he);
-    if (st == AV_SEAL_NEEDED && !*full) {
-        *full = true;
-        av_log(AV_LOG_WARN, "collection",
-               "%s: hnsw graph full at %zu vectors; new vectors are scanned exactly "
-               "until the next rebuild",
-               coll, av_segment_count(g));
-    }
-    if (st == AV_ERR)
-        av_log(AV_LOG_WARN, "collection", "%s: docid %u not added to the hnsw graph (%s); scanned exactly",
-               coll, id, he.msg);
-    if (st != AV_OK)
-        roaring_bitmap_add(tail, id);
-}
-
-static bool hnsw_build_cb(uint32_t id, void *p)
-{
-    hnsw_build_ctx *b = p;
-    const void *v = av_segment_get(b->c->seg, (av_docid) id);
-    if (v != NULL)
-        hnsw_put(b->seg, b->tail, &b->full, (av_docid) id, v, b->c->def.name);
-    return true;
-}
-
-/* Build a fresh graph over ids (vectors read from the flat segment). Applier thread only. */
-static av_status hnsw_build(av_collection *c, const roaring_bitmap_t *ids, av_segment **seg_out,
-                            roaring_bitmap_t **tail_out, bool *full_out, av_err *e)
-{
-    size_t n = ids != NULL ? (size_t) roaring_bitmap_get_cardinality(ids) : 0;
-    int m = c->def.m > 0 ? c->def.m : 16;
-    int efc = c->def.ef_construction > 0 ? c->def.ef_construction : 64;
-    size_t reserve = av_segment_hnsw_reserve(c->def.vtype, (int) c->def.dimensions, m, hnsw_capacity(n));
-    av_segment *g = NULL;
-    if (av_segment_create_hnsw(NULL, c->def.vtype, (int) c->def.dimensions, c->def.opclass, m, efc, reserve,
-                               &g, e) != AV_OK)
-        return AV_ERR;
-    roaring_bitmap_t *tail = roaring_bitmap_create();
-    if (tail == NULL) {
-        av_segment_destroy(g);
-        return oom(e);
-    }
-    hnsw_build_ctx b = {c, g, tail, false};
-    if (ids != NULL)
-        roaring_iterate(ids, hnsw_build_cb, &b);
-    *seg_out = g;
-    *tail_out = tail;
-    *full_out = b.full;
-    return AV_OK;
-}
-
-/* Applier: index a docid that was just stored in the flat segment. Never fails the batch. */
-static void hnsw_add(av_collection *c, av_docid id, const void *pg)
-{
-    if (!c->hnsw_enabled)
-        return;
-    (void) pthread_rwlock_wrlock(&c->hnsw_lock);
-    hnsw_put(c->hnsw, c->hnsw_tail, &c->hnsw_full, id, pg, c->def.name);
-    (void) pthread_rwlock_unlock(&c->hnsw_lock);
-}
-
-/*
- * Applier, after publish: rebuild the graph from the live docids when the exact tail or the dead
- * share got large (updates and deletes leave dead elements in the graph). Searches keep using the
- * old graph during the build; the swap takes hnsw_lock exclusively for a pointer exchange.
- */
-static void hnsw_maybe_rebuild(av_collection *c)
-{
-    if (!c->hnsw_enabled)
-        return;
-    size_t graph_n = av_segment_count(c->hnsw);
-    size_t tail_n = (size_t) roaring_bitmap_get_cardinality(c->hnsw_tail);
-    size_t live_n = atomic_load_explicit(&c->pub_count, memory_order_acquire);
-    /* the tail also holds dead docids (deleted, discarded batches): count only its live part */
-    size_t tail_live = (size_t) roaring_bitmap_and_cardinality(c->hnsw_tail, av_live_current(c->live));
-    size_t live_in_graph = live_n > tail_live ? live_n - tail_live : 0;
-    size_t dead_n = graph_n > live_in_graph ? graph_n - live_in_graph : 0;
-    size_t tail_limit = graph_n / 10 > 1024 ? graph_n / 10 : 1024;
-    bool tail_big = c->hnsw_full && tail_n > tail_limit;
-    bool dead_big = graph_n >= 1024 && (double) dead_n > 0.30 * (double) graph_n;
-    if (!tail_big && !dead_big)
-        return;
-
-    struct timespec t0, t1;
-    clock_gettime(CLOCK_MONOTONIC, &t0);
-    av_err e;
-    av_err_clear(&e);
-    if (av_collection_rebuild_hnsw(c, &e) != AV_OK) {
-        av_log(AV_LOG_WARN, "collection", "%s: hnsw rebuild failed: %s", c->def.name, e.msg);
-        return;
-    }
-    clock_gettime(CLOCK_MONOTONIC, &t1);
-    double ms = (double) (t1.tv_sec - t0.tv_sec) * 1e3 + (double) (t1.tv_nsec - t0.tv_nsec) / 1e6;
-    av_log(AV_LOG_INFO, "collection",
-           "%s: hnsw graph rebuilt over %zu live vectors in %.0f ms (was %zu, "
-           "%zu dead, %zu exact tail)",
-           c->def.name, live_n, ms, graph_n, dead_n, tail_n);
+    const av_collection *c = ctx;
+    uint64_t up = 0, exp = 0;
+    return av_docmap_meta(c->docmap, id, &up, &exp) ? exp : 0;
 }
 
 static void apply_ops(av_collection *c)
@@ -466,14 +357,6 @@ av_collection *av_collection_create_opts(const av_coldef *def, av_store *store, 
         return NULL;
     }
     (void) pthread_rwlock_init(&c->lock, NULL);
-    /* Writer-preferring: a steady search load must not starve the applier's graph inserts. */
-    pthread_rwlockattr_t hla;
-    (void) pthread_rwlockattr_init(&hla);
-#ifdef __GLIBC__ /* musl (Alpine image) has no rwlock kinds */
-    (void) pthread_rwlockattr_setkind_np(&hla, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
-#endif
-    (void) pthread_rwlock_init(&c->hnsw_lock, &hla);
-    (void) pthread_rwlockattr_destroy(&hla);
     (void) pthread_mutex_init(&c->wait_mu, NULL);
     pthread_condattr_t ca;
     (void) pthread_condattr_init(&ca);
@@ -518,15 +401,35 @@ av_collection *av_collection_create_opts(const av_coldef *def, av_store *store, 
         goto fail;
     av_live_publish(c->live);
     atomic_store(&c->pub_count, (size_t) roaring_bitmap_get_cardinality(av_live_current(c->live)));
-    if (c->def.method == AV_INDEX_HNSW && c->def.opclass != NULL &&
-        hnsw_build(c, av_live_current(c->live), &c->hnsw, &c->hnsw_tail, &c->hnsw_full, e) != AV_OK)
-        goto fail;
-    c->hnsw_enabled = c->hnsw != NULL; /* before the collection is shared with any other thread */
     c->next_docid = ls.any ? ls.max_docid + 1 : 0;
     if (meta.has_next_docid && meta.next_docid > c->next_docid)
         c->next_docid = meta.next_docid;
     if (meta.has_cursor)
         atomic_store(&c->as_of, meta.cursor.block);
+    if (c->def.method == AV_INDEX_HNSW && c->def.opclass != NULL) {
+        char hdir[600];
+        bool persist = g_hnsw_persist && data_dir != NULL;
+        if (persist) {
+            int hn = snprintf(hdir, sizeof hdir, "%s/segments/%s", data_dir, c->def.name);
+            persist = hn > 0 && (size_t) hn < sizeof hdir;
+        }
+        av_hnsw_index_config hc = {
+            .coll_name = c->def.name,
+            .vtype = c->def.vtype,
+            .dim = (int) c->def.dimensions,
+            .oc = c->def.opclass,
+            .m = c->def.m,
+            .ef_construction = c->def.ef_construction,
+            .flat = c->seg,
+            .dir = persist ? hdir : NULL,
+            .band_blocks = g_hnsw_band_blocks,
+        };
+        c->hnsw = av_hnsw_index_create(&hc, e);
+        if (c->hnsw == NULL || av_hnsw_index_open(c->hnsw, av_live_current(c->live), docid_expiry, c,
+                                                  c->next_docid, atomic_load(&c->as_of), e) != AV_OK)
+            goto fail;
+    }
+    c->hnsw_enabled = c->hnsw != NULL; /* before the collection is shared with any other thread */
     av_arena_reset(c->scratch);
     return c;
 fail:
@@ -550,9 +453,9 @@ void av_collection_release(av_collection *c)
         return;
     if (atomic_fetch_sub_explicit(&c->refs, 1, memory_order_acq_rel) != 1)
         return;
+    /* before the flat segment goes: the index's worker reads vectors from it */
+    av_hnsw_index_close(c->hnsw, !c->dropped, c->dropped, c->next_docid, atomic_load(&c->as_of));
     av_segment_destroy(c->seg);
-    av_segment_destroy(c->hnsw);
-    roaring_bitmap_free(c->hnsw_tail);
     if (c->dropped && c->has_seg_path)
         (void) unlink(c->seg_path);
     av_docmap_destroy(c->docmap);
@@ -566,7 +469,6 @@ void av_collection_release(av_collection *c)
     (void) pthread_cond_destroy(&c->wait_cv);
     (void) pthread_mutex_destroy(&c->wait_mu);
     (void) pthread_rwlock_destroy(&c->lock);
-    (void) pthread_rwlock_destroy(&c->hnsw_lock);
     free(c);
 }
 
@@ -657,15 +559,18 @@ void av_collection_publish(av_collection *c, uint64_t block)
     (void) pthread_rwlock_wrlock(&c->lock);
     apply_ops(c);
     av_live_publish(c->live);
-    atomic_store_explicit(&c->pub_count, (size_t) roaring_bitmap_get_cardinality(av_live_current(c->live)),
-                          memory_order_release);
+    /* live_entities never counts expired rows, even while reclamation runs behind (TTL budget) */
+    size_t live_n = (size_t) roaring_bitmap_get_cardinality(av_live_current(c->live));
+    size_t due = c->ttl != NULL ? av_ttl_count_due(c->ttl, block, av_live_current(c->live)) : 0;
+    atomic_store_explicit(&c->pub_count, live_n > due ? live_n - due : 0, memory_order_release);
     atomic_store_explicit(&c->as_of, block, memory_order_release);
     (void) pthread_rwlock_unlock(&c->lock);
     stage_reset(c);
     (void) pthread_mutex_lock(&c->wait_mu);
     (void) pthread_cond_broadcast(&c->wait_cv);
     (void) pthread_mutex_unlock(&c->wait_mu);
-    hnsw_maybe_rebuild(c);
+    /* applier thread: the published live bitmap is stable here (only this thread publishes) */
+    av_hnsw_index_after_publish(c->hnsw, av_live_current(c->live), block, c->next_docid);
 }
 
 void av_collection_discard(av_collection *c)
@@ -708,23 +613,22 @@ bool av_collection_has_hnsw(const av_collection *c)
 
 av_status av_collection_rebuild_hnsw(av_collection *c, av_err *e)
 {
+    (void) e;
     if (c == NULL || !c->hnsw_enabled)
         return AV_OK;
-    av_segment *g = NULL;
-    roaring_bitmap_t *tail = NULL;
-    bool full = false;
-    if (hnsw_build(c, av_live_current(c->live), &g, &tail, &full, e) != AV_OK)
-        return AV_ERR;
-    (void) pthread_rwlock_wrlock(&c->hnsw_lock);
-    av_segment *old_g = c->hnsw;
-    roaring_bitmap_t *old_tail = c->hnsw_tail;
-    c->hnsw = g;
-    c->hnsw_tail = tail;
-    c->hnsw_full = full;
-    (void) pthread_rwlock_unlock(&c->hnsw_lock);
-    av_segment_destroy(old_g);
-    roaring_bitmap_free(old_tail);
+    av_hnsw_index_request_rebuild(c->hnsw);
     return AV_OK;
+}
+
+size_t av_collection_hnsw_describe(av_collection *c, av_hnsw_band_info *out, size_t max,
+                                   av_hnsw_index_stats *st)
+{
+    if (c == NULL || !c->hnsw_enabled) {
+        if (st != NULL)
+            memset(st, 0, sizeof *st);
+        return 0;
+    }
+    return av_hnsw_index_describe(c->hnsw, out, max, st);
 }
 
 typedef struct {
@@ -748,16 +652,10 @@ static bool hit_vec_push(hit_vec *v, av_docid id)
     return true;
 }
 
-typedef struct {
-    hit_vec *v;
-    bool ok;
-} hit_push_ctx;
-
-static bool hit_push_cb(uint32_t id, void *p)
+static int docid_cmp(const void *a, const void *b)
 {
-    hit_push_ctx *pc = p;
-    pc->ok = hit_vec_push(pc->v, (av_docid) id);
-    return pc->ok;
+    av_docid x = *(const av_docid *) a, y = *(const av_docid *) b;
+    return (x > y) - (x < y);
 }
 
 typedef struct {
@@ -801,46 +699,30 @@ av_status av_collection_search_hnsw(av_collection *c, const void *query, const a
         ef_search = limit > 1000 ? 1000 : (int) limit; /* pgvector caps hnsw.ef_search at 1000 */
 
     hit_vec v = {NULL, 0, 0};
-    av_status st = AV_OK;
-    (void) pthread_rwlock_rdlock(&c->hnsw_lock);
-    av_hit *graph_hits = malloc(limit * sizeof *graph_hits);
-    roaring_bitmap_t *tail = NULL;
-    if (graph_hits == NULL) {
-        st = oom(e);
-        goto out;
-    }
-    size_t ng = 0;
-    st = av_segment_search_hnsw(c->hnsw, query, ef_search, iterative_mode, max_scan_tuples, cand, 0, limit,
-                                graph_hits, &ng, e);
-    if (st != AV_OK)
-        goto out;
-    for (size_t i = 0; i < ng; i++)
-        if (!hit_vec_push(&v, graph_hits[i].id)) {
-            st = oom(e);
-            goto out;
-        }
-    /* Vectors that are not in the graph: score them exactly. */
-    if (!roaring_bitmap_is_empty(c->hnsw_tail)) {
-        tail = roaring_bitmap_and(c->hnsw_tail, cand);
-        if (tail == NULL) {
-            st = oom(e);
-            goto out;
-        }
-        hit_push_ctx pc = {&v, true};
-        roaring_iterate(tail, hit_push_cb, &pc);
-        if (!pc.ok) {
-            st = oom(e);
-            goto out;
-        }
-    }
-out:
-    (void) pthread_rwlock_unlock(&c->hnsw_lock);
-    free(graph_hits);
-    roaring_bitmap_free(tail);
+    av_docid *ids = NULL;
+    size_t n_ids = 0, cap_ids = 0;
+    av_status st = av_hnsw_index_search(c->hnsw, query, cand, ef_search, iterative_mode, max_scan_tuples,
+                                        limit, &ids, &n_ids, &cap_ids, e);
     if (st != AV_OK) {
-        free(v.items);
+        free(ids);
         return st;
     }
+    /* bands can return the same docid (an extended entity's old element): keep one */
+    if (n_ids > 1) {
+        qsort(ids, n_ids, sizeof *ids, docid_cmp);
+        size_t w = 1;
+        for (size_t i = 1; i < n_ids; i++)
+            if (ids[i] != ids[w - 1])
+                ids[w++] = ids[i];
+        n_ids = w;
+    }
+    for (size_t i = 0; i < n_ids; i++)
+        if (!hit_vec_push(&v, ids[i])) {
+            free(ids);
+            free(v.items);
+            return oom(e);
+        }
+    free(ids);
 
     /* Report the operator's distance on the stored raw vector, not the index distance
      * (l2 squared, negative ip, normalized cosine). */
@@ -895,7 +777,7 @@ void av_collection_get_stats(av_collection *c, av_collection_stats *out)
     av_collection_read_lock(c);
     out->live = av_collection_live_count(c);
     out->tombstones = av_docmap_high(c->docmap) > out->live ? av_docmap_high(c->docmap) - out->live : 0;
-    out->segments = c->hnsw_enabled ? 2 : 1;
+    out->segments = 1 + (c->hnsw_enabled ? av_hnsw_index_band_count(c->hnsw) : 0);
     av_collection_read_unlock(c);
     size_t q = 0;
     av_err e;
@@ -1167,6 +1049,8 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
             else
                 av_ttl_remove(c->ttl, old.docid);
         }
+        if (old.expires_at != ent->expires_at)
+            av_hnsw_index_expiry_changed(c->hnsw, old.docid, old.expires_at, ent->expires_at);
         *outcome = AV_UP_ATTRS_ONLY;
         return AV_OK;
     }
@@ -1179,7 +1063,8 @@ av_status av_collection_upsert_ex(av_collection *c, av_txn *t, const av_entity *
     av_docid id = c->next_docid++;
     if (av_segment_insert(c->seg, id, pg, e) != AV_OK)
         return AV_ERR;
-    hnsw_add(c, id, pg); /* invisible to readers until publish adds id to the live bitmap */
+    /* invisible to readers until publish adds id to the live bitmap */
+    av_hnsw_index_add(c->hnsw, id, pg, ent->expires_at);
     roaring_bitmap_t *w = av_live_working(c->live);
     if (w == NULL)
         return oom(e);
@@ -1274,6 +1159,8 @@ av_status av_collection_extend(av_collection *c, av_txn *t, const uint8_t key[32
         else
             av_ttl_remove(c->ttl, row.docid);
     }
+    if (old_expires != expires_at)
+        av_hnsw_index_expiry_changed(c->hnsw, row.docid, old_expires, expires_at);
     return stage_push(c, &op, e);
 }
 

@@ -629,13 +629,11 @@ static void qdrant_search(const av_http_req *req, const char *const *params, av_
     av_store *store = av_rest_get_store();
     av_collection_read_lock(c);
     av_status st = AV_OK;
-    roaring_bitmap_t *cand = NULL;
-    if (ast != NULL) {
-        cand = av_filter_eval(ast, av_collection_attr_index(c), av_collection_docmap(c),
-                              av_collection_live(c), av_collection_as_of(c), &e);
-        if (cand == NULL && ast->kind != AV_F_TRUE)
-            st = AV_ERR;
-    }
+    /* always (filter AND live AND not expired), like /v1 search: expired rows never come back */
+    roaring_bitmap_t *cand = av_filter_eval(ast, av_collection_attr_index(c), av_collection_docmap(c),
+                                            av_collection_live(c), av_collection_as_of(c), &e);
+    if (cand == NULL)
+        st = AV_ERR;
     if (st == AV_OK)
         st = av_execute_search(c, store, &sp, cand, &res, &e);
     av_collection_read_unlock(c);

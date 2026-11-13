@@ -1680,6 +1680,79 @@ static void h_debug_keys(const av_http_req *req, const char *const *params, size
     av_collection_release(c);
 }
 
+/* GET /_debug/collections/{name}/hnsw: expiry bands, graph sizes, background builds, persistence. */
+static void h_debug_hnsw(const av_http_req *req, const char *const *params, size_t n_params,
+                         av_http_resp *resp, void *ctx)
+{
+    (void) n_params;
+    (void) ctx;
+    av_registry *reg = av_rest_get_registry();
+    av_collection *c = reg != NULL ? av_registry_get(reg, params[0]) : NULL;
+    if (c == NULL) {
+        av_err e;
+        av_err_set(&e, "collection_not_found", "collection '%s' does not exist", params[0]);
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+    enum { MAX_BANDS = 256 };
+    av_hnsw_band_info *bands = av_arena_alloc(req->arena, MAX_BANDS * sizeof *bands, 8);
+    av_hnsw_index_stats st;
+    size_t n = bands != NULL ? av_collection_hnsw_describe(c, bands, MAX_BANDS, &st) : 0;
+    bool has = av_collection_has_hnsw(c);
+    av_collection_release(c);
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
+    yyjson_mut_val *root = yyjson_mut_obj(doc);
+    yyjson_mut_doc_set_root(doc, root);
+    yyjson_mut_obj_add_bool(doc, root, "hnsw", has);
+    yyjson_mut_val *arr = yyjson_mut_arr(doc);
+    for (size_t i = 0; i < n && i < MAX_BANDS; i++) {
+        yyjson_mut_val *b = yyjson_mut_obj(doc);
+        if (bands[i].band == AV_HNSW_BAND_NONE)
+            yyjson_mut_obj_add_null(doc, b, "band");
+        else
+            yyjson_mut_obj_add_uint(doc, b, "band", bands[i].band);
+        yyjson_mut_obj_add_uint(doc, b, "graph", bands[i].graph_count);
+        yyjson_mut_obj_add_uint(doc, b, "tail", bands[i].tail_count);
+        yyjson_mut_obj_add_str(doc, b, "source", bands[i].source);
+        yyjson_mut_obj_add_bool(doc, b, "building", bands[i].building);
+        yyjson_mut_arr_add_val(arr, b);
+    }
+    yyjson_mut_obj_add_val(doc, root, "bands", arr);
+    if (has) {
+        yyjson_mut_obj_add_uint(doc, root, "loads", st.loads);
+        yyjson_mut_obj_add_uint(doc, root, "load_failures", st.load_failures);
+        yyjson_mut_obj_add_uint(doc, root, "builds", st.builds);
+        yyjson_mut_obj_add_uint(doc, root, "builds_running", st.builds_running);
+        yyjson_mut_obj_add_uint(doc, root, "bands_dropped", st.bands_dropped);
+        yyjson_mut_obj_add_uint(doc, root, "saves", st.saves);
+    }
+    (void) av_resp_json(resp, 200, doc);
+}
+
+/* POST /_debug/collections/{name}/hnsw/rebuild: request a background rebuild of every band. */
+static void h_debug_hnsw_rebuild(const av_http_req *req, const char *const *params, size_t n_params,
+                                 av_http_resp *resp, void *ctx)
+{
+    (void) n_params;
+    (void) ctx;
+    av_registry *reg = av_rest_get_registry();
+    av_collection *c = reg != NULL ? av_registry_get(reg, params[0]) : NULL;
+    av_err e;
+    av_err_clear(&e);
+    if (c == NULL) {
+        av_err_set(&e, "collection_not_found", "collection '%s' does not exist", params[0]);
+        av_problem_from_err(&e, resp, req->path);
+        return;
+    }
+    (void) av_collection_rebuild_hnsw(c, &e);
+    av_collection_release(c);
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
+    yyjson_mut_val *root = yyjson_mut_obj(doc);
+    yyjson_mut_doc_set_root(doc, root);
+    yyjson_mut_obj_add_bool(doc, root, "requested", true);
+    (void) av_resp_json(resp, 202, doc);
+}
+
 static void h_debug_entity(const av_http_req *req, const char *const *params, size_t n_params,
                            av_http_resp *resp, void *ctx)
 {
@@ -1794,5 +1867,8 @@ void av_rest_register_search(av_router *r, bool debug_routes, void *ctx)
     if (debug_routes) {
         (void) av_router_add(r, "GET", "/_debug/collections/{name}/keys", h_debug_keys, NULL, &e);
         (void) av_router_add(r, "GET", "/_debug/collections/{name}/entities/{key}", h_debug_entity, NULL, &e);
+        (void) av_router_add(r, "GET", "/_debug/collections/{name}/hnsw", h_debug_hnsw, NULL, &e);
+        (void) av_router_add(r, "POST", "/_debug/collections/{name}/hnsw/rebuild", h_debug_hnsw_rebuild, NULL,
+                             &e);
     }
 }
