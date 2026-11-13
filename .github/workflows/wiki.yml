@@ -39,16 +39,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check out the wiki
+        id: clone
         env:
           GH_TOKEN: ${{ secrets.WIKI_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          if ! git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
-            echo "::error::Cannot clone the wiki. Enable it (Settings -> Features -> Wikis) and create one page in the web UI first; if it exists, set a WIKI_TOKEN secret."
-            exit 1
+          if git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            # GitHub creates the wiki repository only after a first page is saved in the web UI.
+            msg="Wiki not published: enable Wikis (Settings -> Features) and create any first page, or set a WIKI_TOKEN secret. The next push to main publishes docs/wiki."
+            echo "::warning::$msg"
+            echo "### Wiki not published" >> "$GITHUB_STEP_SUMMARY"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Render pages
+        if: steps.clone.outputs.ok == 'true'
         run: python3 -I docs/tools/wiki_sync.py wiki
       - name: Push
+        if: steps.clone.outputs.ok == 'true'
         working-directory: wiki
         run: |
           git config user.name "github-actions[bot]"
