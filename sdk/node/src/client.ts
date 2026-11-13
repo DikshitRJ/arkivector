@@ -5,7 +5,7 @@
 
 import * as crypto from "node:crypto";
 import { ApiError, NotImplementedByDaemonError } from "./errors.js";
-import { HttpTransport } from "./http.js";
+import { HttpTransport, trimTrailingSlashes } from "./http.js";
 import {
   ClientOptions,
   VersionInfo,
@@ -112,10 +112,7 @@ export class Arkivector {
         ? process.env?.ARKIVECTOR_URL
         : undefined) ??
       "http://127.0.0.1:8080";
-    // Strip trailing slashes without a regex (CodeQL js/polynomial-redos on /\/+$/).
-    let url = rawUrl;
-    while (url.endsWith("/")) url = url.slice(0, -1);
-    this.url = url;
+    this.url = trimTrailingSlashes(rawUrl);
 
     this.apiKey =
       options?.apiKey ??
