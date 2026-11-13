@@ -13,11 +13,11 @@ This file is the whole website ({{SITE}}) as Markdown, written for AI agents and
 
 - **What it is.** `arkivectord` is a daemon written in C11 that contains pgvector 0.8.7's own code. It syncs entities from the Arkiv chain into a local index (LMDB rows, mmap vector segments, roaring-bitmap filters, HNSW graphs) and serves REST on port 8080. It writes by building, signing and sending Arkiv transactions.
 - **Clients.** A Python SDK (`pip install arkivector`), a Node.js SDK (`@dikshitrj/arkivector` on GitHub Packages), plain HTTP (`curl`), and an MCP server at `/mcp` for AI agents (Claude Code: `claude mcp add --transport http arkivector http://127.0.0.1:8080/mcp`).
-- **Run it.** `docker run -d -p 127.0.0.1:8080:8080 -v arkivector-data:/data -e ARKIVECTOR_ARKIV_ACCESS_KEY=... -e ARKIV_PRIVATE_KEY ghcr.io/dikshitrj/arkivectord:latest`. Without `ARKIV_PRIVATE_KEY` the daemon is read-only.
+- **Run it.** `docker run -d -p 127.0.0.1:8080:8080 -v arkivector-data:/data -e ARKIVECTOR_ARKIV_ACCESS_KEY=... -e ARKIV_PRIVATE_KEY ghcr.io/dikshitrj/arkivectord:latest`. Without `ARKIV_PRIVATE_KEY` (or an encrypted keystore or remote signer, `[write.signer]`) the daemon can't sign, but it still relays writes signed by your users' own wallets.
 - **Vector types** (same as pgvector): `vector`, `halfvec`, `sparsevec`, `bit`.
 - **Distance operators:** `<->` L2, `<#>` negative inner product, `<=>` cosine, `<+>` L1, `<~>` Hamming, `<%>` Jaccard.
 - **Indexes:** `hnsw` (pgvector's graph) or `none` (exact scan). The planner picks HNSW for large candidate sets and an exact scan for small or very selective ones. Every hit is rescored with the real operator. `"exact": true` forces a full scan.
-- **Collections need `writers`.** A collection only indexes entities created by the wallets in its `writers` list. Put the daemon's own wallet address there, or your writes land on chain but never show up in search.
+- **Collections need `writers`.** A collection only indexes entities created by the wallets in its `writers` list. Put the daemon's own wallet address there (and your users' addresses if they sign with their own wallets), or your writes land on chain but never show up in search.
 - **Chain:** Arkiv Rabdi testnet, chain id 7794095, 2 s blocks, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network`.
 
 ## Home
@@ -134,7 +134,6 @@ Tracked on GitHub: <https://github.com/DikshitRJ/arkivector/issues/19>. Everythi
 
 | Limitation | Today | Plan | Issue |
 | :--- | :--- | :--- | :--- |
-| The daemon signs with a key in an environment variable | The daemon holds a hot wallet (`ARKIV_PRIVATE_KEY`) | `entities:prepare` already returns unsigned transactions keyed to the wallet's real nonces; next the SDKs hand them to the user's wallet (MetaMask, WalletConnect, hardware), plus encrypted keystores and remote signers | [#12](https://github.com/DikshitRJ/arkivector/issues/12) |
 | Tested on the Rabdi testnet only | Mainnet is configurable but untried | Run the sync and write suites on mainnet and measure gas reservations there | [#16](https://github.com/DikshitRJ/arkivector/issues/16) |
 | Linux and Docker only | macOS and Windows use the container | Port the glibc-specific calls | [#17](https://github.com/DikshitRJ/arkivector/issues/17) |
 | Two SDK languages | SDKs for Python and Node.js | C, C++ and Rust SDKs | [#18](https://github.com/DikshitRJ/arkivector/issues/18) |
@@ -147,6 +146,7 @@ Done since v1.1.0:
 | Entity keys follow the wallet's on-chain nonce | Writes read `entityNonce` before predicting keys and take final keys from the `EntityCreated` receipt logs; `entities:prepare` uses the wallet's real nonces | [#13](https://github.com/DikshitRJ/arkivector/issues/13) |
 | Dynamic gas fees | Fees from `eth_feeHistory` (then `eth_gasPrice`, then config) with a cap; gas limit = estimate + margin; stuck transactions are resent with bumped fees | [#14](https://github.com/DikshitRJ/arkivector/issues/14) |
 | Qdrant writes are real | Upserts and deletes go through the REST writer, searches return payloads, a daemon without a signer refuses writes | [#15](https://github.com/DikshitRJ/arkivector/issues/15) |
+| Sign with your own wallet, keystores and remote signers | `entities:prepare` returns transactions ready to sign; the new `entities:submit` broadcasts what the user's wallet signed (or waits for what it broadcast) and returns the mined keys; the SDKs do prepare → sign → submit with MetaMask, viem, ethers or `eth_account`; the daemon's own signer can be an encrypted keystore or a Web3Signer/Clef remote signer; `/v1/version` reports the signer kind | [#12](https://github.com/DikshitRJ/arkivector/issues/12) |
 
 ## Team
 

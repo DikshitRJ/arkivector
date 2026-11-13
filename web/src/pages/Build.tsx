@@ -34,7 +34,7 @@ docker run -d -p 127.0.0.1:8080:8080 -v arkivector-data:/data \\
   -e ARKIVECTOR_ARKIV_ACCESS_KEY=... -e ARKIV_PRIVATE_KEY=... \\
   ghcr.io/dikshitrj/arkivectord:${V}`,
     lang: "shell",
-    note: "18 MB Alpine image, linux/amd64, runs as a non-root user, index in the /data volume.",
+    note: "18 MB Alpine image, linux/amd64, runs as a non-root user, index in the /data volume. ARKIV_PRIVATE_KEY is optional: leave it out when users sign with their own wallets, or use a keystore or remote signer.",
   },
   {
     n: 4,
