@@ -3,6 +3,7 @@ import { marked, type Token, type Tokens } from "marked";
 import { Page, REPO } from "../components/Layout";
 import { CodeBlock } from "../components/ui";
 import { Link, navigate } from "../router";
+import { setHead } from "../seo";
 
 /*
  * /docs renders docs/wiki/ (the same Markdown files are published to the GitHub wiki), so the
@@ -234,7 +235,7 @@ export function Docs({ path }: { path: string }) {
   const trail = idx >= 0 ? ORDER[idx].trail : [];
 
   useEffect(() => {
-    document.title = rel ? `${docTitle(rel)} · Docs · Arkivector` : "Page not found · Docs · Arkivector";
+    setHead(rel ? `${docTitle(rel)} · Docs · Arkivector` : "Page not found · Docs · Arkivector", rel ? routeOf(rel) : window.location.pathname, { notFound: !rel });
     setMenu(false);
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (id) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());

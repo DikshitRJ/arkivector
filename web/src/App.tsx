@@ -10,6 +10,7 @@ const Docs = lazy(() => import("./pages/Docs").then((m) => ({ default: m.Docs })
 const Next = lazy(() => import("./pages/Next").then((m) => ({ default: m.Next })));
 import { Team } from "./pages/Team";
 import { NotFound } from "./pages/NotFound";
+import { setHead } from "./seo";
 
 const TITLES: Record<Exclude<Route, `/docs${string}`>, string> = {
   "/": "Arkivector: vector search for Arkiv",
@@ -23,7 +24,8 @@ const TITLES: Record<Exclude<Route, `/docs${string}`>, string> = {
 export function App() {
   const route = useRoute();
   useEffect(() => {
-    if (!route.startsWith("/docs")) document.title = TITLES[route as keyof typeof TITLES]; // docs pages set their own
+    // docs pages set their own head
+    if (!route.startsWith("/docs")) setHead(TITLES[route as keyof typeof TITLES], route === "404" ? window.location.pathname : route, { notFound: route === "404" });
   }, [route]);
   return (
     <SoundProvider>
