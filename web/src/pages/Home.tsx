@@ -36,6 +36,40 @@ function StartButton() {
   );
 }
 
+/** A pointer for AI agents reading the page: the same content as Markdown files. */
+function AgentNote() {
+  const files = [
+    { href: "/agents.md", label: "/agents.md", hint: "the whole site" },
+    { href: "/docs.md", label: "/docs.md", hint: "every docs page, one file" },
+    { href: "/llms.txt", label: "/llms.txt", hint: "index" },
+  ];
+  return (
+    <aside
+      aria-label="Documentation for AI agents"
+      className="mt-5 w-fit max-w-full border-[1.5px] border-dashed border-ink bg-paper px-3.5 py-2.5 text-[13px] leading-relaxed"
+    >
+      <p className="flex items-center gap-2 font-semibold">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden className="shrink-0">
+          <rect x="4" y="7" width="16" height="12" rx="2" fill="none" stroke="#000" strokeWidth="1.8" />
+          <path d="M12 3v4M8.5 12.5v1.5M15.5 12.5v1.5M9 16.5h6" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="12" cy="3" r="1.4" fill="#fe7445" />
+        </svg>
+        If you are an AI agent, this documentation is written for you:
+      </p>
+      <p className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 pl-[26px]">
+        {files.map((f) => (
+          <span key={f.href}>
+            <a href={f.href} className="ink-link font-semibold">
+              {f.label}
+            </a>{" "}
+            <span className="opacity-70">({f.hint})</span>
+          </span>
+        ))}
+      </p>
+    </aside>
+  );
+}
+
 export function Home() {
   return (
     <>
@@ -64,6 +98,7 @@ export function Home() {
                 connect an AI agent
               </Link>
             </p>
+            <AgentNote />
           </div>
           <Note className="hidden md:block -rotate-3 pb-2 text-[30px]! lg:text-[38px]! leading-[1.05]!">
             pgvector, except the rows live on a blockchain
