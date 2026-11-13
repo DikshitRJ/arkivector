@@ -49,8 +49,12 @@ from eth_account import Account  # any signer works; the SDK itself has no depen
 from arkivector import eth_account_signer
 
 acct = Account.from_key(user_key)
-client.upsert_signed("notes", [EntityInput(id="fish", vector=[0, 1, 0, 0])],
-                     from_address=acct.address, sign=eth_account_signer(acct))
+client.upsert_signed(
+    "notes",
+    [EntityInput(id="fish", vector=[0, 1, 0, 0])],
+    from_address=acct.address,
+    sign=eth_account_signer(acct),
+)
 ```
 
 Or step by step (`client.prepare`, sign `tx.to_eth_account()` or hand `tx.to_rpc()` to MetaMask, `client.submit`). Guide: [Signing writes](https://arkivector.dikshitrj.in/docs/getting-started/signing).
