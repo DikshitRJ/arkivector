@@ -17,7 +17,15 @@ The collection is still bootstrapping. `/v1/sync` shows progress; large collecti
 
 ## `403 write_disabled`
 
-The daemon has no signer. Set `ARKIV_PRIVATE_KEY` and restart.
+The daemon has no signer (`/v1/version` shows `"signer": null`): set `ARKIV_PRIVATE_KEY`, or configure a keystore or remote signer, and restart ([Signing writes](../getting-started/signing.md)). Or sign with your own wallet through prepare + submit, which needs no daemon signer. With a remote signer, the message says why it failed: unreachable, refused by the signer's policy, or it returned a transaction that differs from the request.
+
+## The daemon won't start: `keystore password incorrect` / `remote signer`
+
+An explicit `[write.signer]` kind that can't be set up stops startup on purpose. Check the passphrase file or systemd credential, or that the remote signer is reachable and `eth_accounts` returns exactly one address (or set `remote_address`).
+
+## `403 forbidden` from `entities:submit`
+
+The transaction is signed by an address that isn't in the collection's `writers`, so the daemon would never index it. Add the address, or sign with a writer.
 
 ## `422 invalid_filter` on a `where` string
 

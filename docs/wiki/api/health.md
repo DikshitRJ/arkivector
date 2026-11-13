@@ -37,15 +37,16 @@ curl -s $AV/v1/version
 ```json
 {
   "daemon_version": "1.1.0",
-  "api_version": "1.0.0",
+  "api_version": "1.1.0",
   "pgvector_version": "0.8.7",
   "kernel_tier": "x86-64-v4",
   "chain_id": 7794095,
   "writes_enabled": true,
+  "signer": { "kind": "keystore", "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" },
   "capabilities": ["ops.version", "ops.sync", "ops.metrics", "collections.read", "collections.write",
                    "collections.follow", "entities.read", "search.exact", "search.hnsw", "search.filter.json",
                    "search.filter.where", "search.batch", "search.explain", "scroll", "count",
-                   "consistency.min_block", "collections.manifest", "entities.write", "entities.prepare",
+                   "consistency.min_block", "collections.manifest", "entities.write", "entities.prepare", "entities.submit",
                    "entities.verify", "idempotency", "auth.api_keys", "qdrant", "mcp"]
 }
 ```
@@ -54,7 +55,8 @@ curl -s $AV/v1/version
 | :--- | :--- |
 | `api_version` | REST contract version. Clients check that the major version matches |
 | `kernel_tier` | Distance kernels picked for this CPU: `x86-64`, `x86-64-v3` (AVX2/FMA), `x86-64-v4` (AVX-512), `aarch64` |
-| `writes_enabled` | `true` when a signer is configured |
+| `writes_enabled` | `true` when the daemon has its own signer (managed writes). Writes signed by your wallet work either way |
+| `signer` | `null`, or the signer's `kind` (`env`, `keystore`, `remote`) and public `address`. Never the key. API 1.1 |
 | `capabilities` | Features this build supports |
 
 ## `GET /v1/sync`

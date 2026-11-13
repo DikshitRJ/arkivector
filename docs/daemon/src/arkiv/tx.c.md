@@ -8,6 +8,8 @@ Implements EIP-1559 transaction serialization and hashing routines declared in `
 
 Part of the Phase D5 write stack. Coordinates with `rlp.c` to produce canonical Ethereum wire encodings, with `signer.c` to obtain valid ECDSA signatures, and provides transaction data to `rpc.c` for broadcast.
 
+For a remote signer (GitHub issue #12), `av_tx_sign_and_encode` does not compute a signature. It sends the transaction object (`from`, `to`, `gas`, fees, `nonce`, `chainId`, `type`, `data`) with `eth_signTransaction` or `account_signTransaction`, accepts the raw transaction as a string or as `{raw, tx}`, decodes it with `rawtx.c`, and accepts it only if `av_tx_matches` is true and the recovered sender is the configured address. Otherwise it returns `write_disabled` and nothing is broadcast.
+
 ## Key Types and Functions
 
 | Function / Helper | Role |

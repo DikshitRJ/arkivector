@@ -26,7 +26,7 @@ with Client() as client:
 | :--- | :--- |
 | `client.health()` | `True` when `/healthz` answers |
 | `client.ready()` | `Readiness(ready, collections={name: state})` |
-| `client.version()` | `VersionInfo(daemon_version, api_version, pgvector_version, kernel_tier, chain_id, writes_enabled, capabilities)` (cached) |
+| `client.version()` | `VersionInfo(daemon_version, api_version, pgvector_version, kernel_tier, chain_id, writes_enabled, capabilities, signer)` (cached; `signer` is `SignerInfo(kind, address)` or `None`) |
 | `client.has_capability("search.hnsw")` | Whether the daemon supports a feature |
 | `client.sync_status()` | `[SyncStatus]` per collection (state, lag, last error) |
 

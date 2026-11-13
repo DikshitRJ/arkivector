@@ -49,7 +49,7 @@ for (const hit of res.hits) console.log(hit.id, hit.distance.toFixed(4), hit.doc
 | :--- | :--- |
 | [Client](client.md) | Options, health, version, capabilities |
 | [Collections](collections.md) | Create, list, get, follow, delete |
-| [Writing](writing.md) | Upsert, extend, delete, prepare |
+| [Writing](writing.md) | Upsert, extend, delete, signing with your own wallet (prepare, submit, upsertSigned) |
 | [Searching](searching.md) | Search options, HNSW knobs, batch search |
 | [Reading](reading.md) | Get, count, scroll |
 | [Filters](filters.md) | The `F` builder and `where` strings |

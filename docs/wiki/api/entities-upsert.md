@@ -1,6 +1,6 @@
 # Upsert entities
 
-`POST /v1/collections/{name}/entities` writes entities to the Arkiv chain through the daemon's wallet. Needs a signer (`writes_enabled: true`, otherwise `403 write_disabled`) and the `write` scope when auth is on.
+`POST /v1/collections/{name}/entities` writes entities to the Arkiv chain through the daemon's wallet. Needs a signer (`writes_enabled: true`, otherwise `403 write_disabled`) and the `write` scope when auth is on. To have each user sign with their own wallet instead, use [prepare](entities-prepare.md) + [submit](entities-submit.md) ([Signing writes](../getting-started/signing.md)).
 
 ```bash
 curl -s $AV/v1/collections/notes/entities -H 'content-type: application/json' -d '{

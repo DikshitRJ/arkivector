@@ -13,7 +13,7 @@ services:
       - ./api_keys.toml:/etc/arkivector/api_keys.toml:ro
     environment:
       ARKIVECTOR_ARKIV_ACCESS_KEY: ${ARKIV_ACCESS_KEY}
-      ARKIV_PRIVATE_KEY: ${ARKIV_PRIVATE_KEY}          # omit for a read-only daemon
+      ARKIV_PRIVATE_KEY: ${ARKIV_PRIVATE_KEY}          # omit if users sign with their own wallets
       ARKIVECTOR_ARKIV_CONFIRMATIONS: "2"
       ARKIVECTOR_SERVER_API_KEYS_FILE: /etc/arkivector/api_keys.toml
     healthcheck:
@@ -48,6 +48,18 @@ WantedBy=multi-user.target
 ```
 
 Keep `secrets.env` readable only by the service user (`chmod 600`).
+
+To keep the private key out of the environment, use an encrypted keystore with a systemd encrypted credential for its passphrase:
+
+```ini
+[Service]
+LoadCredentialEncrypted=keystore-pass:/etc/credstore.encrypted/keystore-pass
+Environment=ARKIVECTOR_WRITE_SIGNER_KIND=keystore
+Environment=ARKIVECTOR_WRITE_SIGNER_KEYSTORE_PATH=/etc/arkivector/signer.json
+Environment=ARKIVECTOR_WRITE_SIGNER_PASSPHRASE_CREDENTIAL=keystore-pass
+```
+
+or a remote signer (Web3Signer, Clef) so the daemon never holds the key. See [Signing writes](../getting-started/signing.md#the-daemons-signer).
 
 ## Behind a reverse proxy
 

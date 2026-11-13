@@ -25,7 +25,7 @@ const client = new Arkivector({
 | :--- | :--- |
 | `await client.health()` | `true` when `/healthz` answers |
 | `await client.ready()` | `{ ready, collections: { name: state } }` |
-| `await client.version()` | `{ daemonVersion, apiVersion, pgvectorVersion, kernelTier, chainId, writesEnabled, capabilities }` (cached) |
+| `await client.version()` | `{ daemonVersion, apiVersion, pgvectorVersion, kernelTier, chainId, writesEnabled, capabilities, signer }` (cached; `signer` is `{ kind, address }` or `null`) |
 | `await client.hasCapability("search.hnsw")` | Whether the daemon supports a feature |
 | `await client.syncStatus()` | Per-collection sync state and lag |
 

@@ -43,7 +43,7 @@ for hit in res.hits:
 | :--- | :--- |
 | [Client](client.md) | Constructor options, health, version, capabilities |
 | [Collections](collections.md) | Create, list, get, follow, delete |
-| [Writing](writing.md) | Upsert, extend, delete, prepare |
+| [Writing](writing.md) | Upsert, extend, delete, signing with your own wallet (prepare, submit, upsert_signed) |
 | [Searching](searching.md) | Search options, HNSW knobs, batch search |
 | [Reading](reading.md) | Get, count, scroll |
 | [Filters](filters.md) | The `F` builder and `where` strings |

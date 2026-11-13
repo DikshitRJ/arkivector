@@ -6,16 +6,16 @@ Arkivector has two parts: the daemon `arkivectord`, which does the work, and opt
 
 ## 1. Get Arkiv access
 
-Reading works without a wallet. Writing sends Arkiv transactions, which need a signer and a little gas.
+Reading works without a wallet. Writing sends Arkiv transactions, which need a signer and a little gas. The signer can be the daemon (steps below), or each user's own wallet, in which case the daemon needs no key at all ([Signing writes](getting-started/signing.md)).
 
 1. Create a **fresh** EVM wallet for the daemon (MetaMask, Rabby, or anything that can export a private key). Don't reuse a wallet that holds real funds.
 2. Get free test GLM from the faucet: <https://hub.arkiv.network/faucet>.
 3. Create an access key at <https://hub.arkiv.network/access-keys> (sign in with the wallet, pick **Rabdi**). Without one the daemon shares Arkiv's heavily throttled public pool.
-4. Export the wallet's private key (hex). The daemon only needs it for writes; without it, it runs read-only.
+4. Export the wallet's private key (hex). The daemon only needs it for managed writes; without it, it can still search and relay writes signed by your users' wallets. In production prefer an encrypted keystore or a remote signer ([Signing writes](getting-started/signing.md#the-daemons-signer)).
 
 | Variable | Required | What it does |
 | :--- | :--- | :--- |
-| `ARKIV_PRIVATE_KEY` | For writes | Hex private key that signs transactions (`0x` optional). Without it the daemon is read-only. Keep it out of config files and shell history |
+| `ARKIV_PRIVATE_KEY` | For managed writes | Hex private key that signs transactions (`0x` optional). Without it (and without a keystore or remote signer) the daemon can't sign; writes signed by your own wallet still work. Keep it out of config files and shell history |
 | `ARKIVECTOR_ARKIV_ACCESS_KEY` | Recommended | Your Arkiv Hub access key, so you are not on the throttled public pool |
 | `ARKIVECTOR_STORAGE_DATA_DIR` | Binary only | Where the local index lives. The Docker image uses `/data` |
 | `ARKIVECTOR_URL` | SDKs | Where the SDKs find the daemon. Defaults to `http://127.0.0.1:8080` |
@@ -73,7 +73,7 @@ curl -s http://127.0.0.1:8080/healthz          # {"status":"ok"}
 curl -s http://127.0.0.1:8080/v1/version       # versions, "writes_enabled": true when the key was picked up
 ```
 
-`writes_enabled: false` means the daemon did not see `ARKIV_PRIVATE_KEY`: it can still search, but not write.
+`writes_enabled: false` means the daemon has no signer (it did not see `ARKIV_PRIVATE_KEY`, and no keystore or remote signer is configured): it can still search, and accept writes signed by your own wallet, but it can't sign. `signer.kind` says which signer is in use.
 
 > **Find your wallet address** (you need it in the next step): it is the address of the wallet whose key you exported. Put it in each collection's `writers` list. A collection only indexes entities created by its writers; without it your writes land on chain but never show up in search.
 

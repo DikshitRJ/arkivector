@@ -27,7 +27,7 @@ sequenceDiagram
 1. **Validate.** Vector type and dimension, attribute names and types, the 128 KiB bytes budget, TTL range.
 2. **Upsert by id.** For each entity, look up a live entity with the same `id`. Owned by the signer: build a `PATCH` with only the changed attributes, or skip (`noop`). Absent: `CREATE`. Owned by someone else: fail with `not_owner` before sending anything.
 3. **Encode.** Attributes become Arkiv wire values (`arkiv.schema`, `av.id`, `av.vec` as [VectorBytes](vectorbytes.md), `av.doc`, user attributes). Ops are packed into as few `execute((uint8,bytes)[])` calls as the transaction size limit allows.
-4. **Sign.** EIP-1559 transaction with secp256k1 (libsecp256k1) over Keccak-256, chain id from config, nonce tracked per account.
+4. **Sign.** EIP-1559 transaction, chain id from config, nonce tracked per account. Env and keystore signers sign the Keccak-256 sighash with libsecp256k1; a remote signer receives the whole transaction (`eth_signTransaction`) and the daemon decodes its answer and checks every field and the recovered address before using it.
 5. **Send and wait.** `eth_sendRawTransaction`, then receipts. A reverted transaction is reported as `tx_reverted` with the Solidity error name.
 6. **Index.** The sync engine sees the contract's logs for block N like any other change and applies them. With `wait: "indexed"` the request returns only after that.
 
@@ -37,7 +37,7 @@ With an `Idempotency-Key`, the request hash and the response are stored for 24 h
 
 ## Without a hot wallet
 
-`entities:prepare` runs steps 1–3 and returns the unsigned transactions; the client's own wallet signs and sends them ([Prepare](../api/entities-prepare.md)).
+`entities:prepare` runs steps 1–3 for the user's address and returns unsigned transactions with nonce, gas limit and a fee suggestion. The user's wallet signs them (step 4 happens outside the daemon). [`entities:submit`](../api/entities-submit.md) then takes the raw signed transactions, decodes each one (canonical RLP, low-s signature, chain id, Arkiv contract, `execute` calldata), recovers the sender and checks it against the collection's `writers`, and only then broadcasts them in order (step 5). A wallet that broadcasts itself (MetaMask) passes the hashes instead. Receipts give the real keys, and `wait: "indexed"` waits for step 6. The daemon does not replace stuck client transactions, since it cannot re-sign them. See [Signing writes](../getting-started/signing.md).
 
 ## Entity keys
 

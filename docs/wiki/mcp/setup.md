@@ -102,5 +102,5 @@ To use a daemon on another machine, put it behind HTTPS (a reverse proxy, see [D
 | `401` | The daemon has API keys: add the `Authorization` header |
 | `403 forbidden` on a tool | The key lacks the scope (writes need `write`) |
 | `403` before any tool runs | A browser-based client sent a non-localhost `Origin`: enable API keys or run the client locally |
-| `arkivector_upsert` missing | The daemon has no `ARKIV_PRIVATE_KEY` |
+| `arkivector_upsert` missing | The daemon has no signer (`ARKIV_PRIVATE_KEY`, keystore or remote signer) |
 | Search returns `dimension_mismatch` | The query vector must have the collection's dimension (see `arkivector_list_collections`) |

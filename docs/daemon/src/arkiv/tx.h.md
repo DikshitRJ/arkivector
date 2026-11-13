@@ -6,7 +6,7 @@ Declares the EIP-1559 (Type-2) transaction construction, signing-hash (sighash) 
 
 ## Role in Architecture
 
-Operates between high-level operation batching (`batcher.c`) and low-level cryptographic signing (`signer.c`) and broadcasting (`rpc.c`). It encapsulates Ethereum transaction envelope details, invokes `rlp.c` for recursive-length-prefix encoding, and formats raw byte payloads suitable for submission via `eth_sendRawTransaction`.
+Operates between high-level operation batching (`batcher.c`) and low-level cryptographic signing (`signer.c`) and broadcasting (`rpc.c`). It also declares `av_tx_matches` (a decoded signed transaction carries exactly the fields of a descriptor). It encapsulates Ethereum transaction envelope details, invokes `rlp.c` for recursive-length-prefix encoding, and formats raw byte payloads suitable for submission via `eth_sendRawTransaction`.
 
 ## Key Types and Functions
 

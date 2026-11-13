@@ -60,7 +60,7 @@ arkivector/
 │   │   ├── conventions.md         ✅ Transport, versioning, auth, headers, JSON rules, limits, retries
 │   │   ├── vectors.md             ✅ Vector JSON/text forms, VectorBytes v1, operators
 │   │   ├── collections.md         ✅ Collection definition and endpoints, on-chain entity layout
-│   │   ├── entities.md            ✅ Get, managed upsert, prepare, delete, extend, idempotency, TTL
+│   │   ├── entities.md            ✅ Get, managed upsert, prepare + submit (client-side signing), delete, extend, idempotency, TTL
 │   │   ├── search.md              ✅ Search, batch, scroll, count, guarantees, plans
 │   │   ├── filters.md             ✅ JSON AST, where grammar, typing and comparison semantics
 │   │   ├── consistency.md         ✅ as_of_block, min_block, sync states
@@ -140,7 +140,8 @@ arkivector/
 │   │   │   ├── abi.c/.h           ⬜ D5 execute(ops) ABI encode/decode (D5 also calldata discovery)
 │   │   │   ├── rlp.c/.h           ⬜ D5 RLP encoding
 │   │   │   ├── tx.c/.h            ⬜ D5 EIP-1559 tx build + sighash
-│   │   │   └── signer.c/.h        ⬜ D5 Keystore/env/remote signer (libsecp256k1)
+│   │   │   ├── rawtx.c/.h         ✅ Strict signed EIP-1559 decoder + sender recovery (entities:submit, remote signer; fuzz_rawtx)
+│   │   │   └── signer.c/.h        ✅ Keystore/env/remote signer (libsecp256k1; remote = eth_signTransaction / Clef)
 │   │   ├── store/
 │   │   │   ├── schema.h           ⬜ D2 LMDB DB names, key/value layouts, versioning
 │   │   │   ├── lmdb_store.c/.h    ⬜ D2 Entity rows, cursor, hash ring, collection defs, idempotency (D5)
@@ -184,7 +185,7 @@ arkivector/
 │   │       ├── problem.c/.h       ⬜ D2 RFC 9457 responses from av_err
 │   │       ├── rest_ops.c         ⬜ D2 healthz, readyz, version, sync, metrics (+ debug routes)
 │   │       ├── rest_collections.c ⬜ D3 Collections endpoints
-│   │       ├── rest_entities.c    ⬜ D3 get; D5 writes/prepare/delete/extend
+│   │       ├── rest_entities.c    ✅ get; writes/prepare/submit/delete/extend
 │   │       ├── rest_search.c      ⬜ D3 search, scroll, count; D4 batch
 │   │       ├── rest.h             ⬜ D2 Shared handler declarations
 │   │       ├── auth.c/.h          ⬜ D6 API keys + scopes
