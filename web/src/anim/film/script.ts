@@ -17,7 +17,7 @@ export const CHAPTERS: Chapter[] = [
   { title: "A search", start: 41, end: 56, still: 52, summary: "Filter bitmap, AND live bitmap, score survivors, keep the best k." },
   { title: "The arithmetic", start: 56, end: 74, still: 72, summary: "Cosine distance worked out by hand for cat and dog." },
   { title: "16 bits per number", start: 74, end: 86, still: 85, summary: "How halfvec stores 0.1 as IEEE binary16." },
-  { title: "Exact scan and HNSW", start: 86, end: 100, still: 99, summary: "Today: exact scan with a top-k heap. Next: pgvector's HNSW graph." },
+  { title: "Exact scan and HNSW", start: 86, end: 100, still: 99, summary: "Small searches scan exactly with a top-k heap; large ones walk pgvector's HNSW graph." },
   { title: "Expiry", start: 100, end: 108, still: 106.5, summary: "When the chain passes an entity's expiry block, it leaves the index." },
   { title: "A reorg", start: 108, end: 118, still: 116, summary: "Mismatched block hash, roll back, replay the new branch." },
   { title: "On chain, and the math", start: 118, end: 132, still: 131, summary: "A plain Arkiv entity, and pgvector's six operators." },
@@ -62,10 +62,10 @@ export const LINES: Line[] = [
   { t: 77.4, text: "0.1 becomes sign 0, exponent 01011, mantissa 1001100110: exactly 0.0999755859375.", say: "Zero point one becomes a sign bit, five exponent bits and ten mantissa bits, which is exactly zero point zero nine nine nine seven five five eight five nine three seven five." },
   { t: 81.6, text: "The conversion rounds half to even with pgvector's own code, so the stored bytes match Postgres." },
 
-  { t: 86, text: "Today every search is an exact scan: score each candidate, keep the best k in a heap." },
+  { t: 86, text: "Small or very selective searches are an exact scan: score each candidate, keep the best k in a heap." },
   { t: 89.4, text: "That is one distance per candidate, O(n log k) in total, and it never misses a neighbour.", say: "That is one distance per candidate, n log k in total, and it never misses a neighbour." },
-  { t: 93, text: "pgvector's HNSW graph is compiled in for large collections: layers of neighbour links, searched greedily from the top.", say: "pgvector's H N S W graph is compiled in for large collections: layers of neighbour links, searched greedily from the top." },
-  { t: 96.8, text: "Each node gets level ⌊−ln U · m_L⌋ with m_L = 1/ln 16. It is not switched on yet.", say: "Each node gets a random level from an exponential distribution. The graph is not switched on yet." },
+  { t: 93, text: "Larger ones walk pgvector's HNSW graph: layers of neighbour links, searched greedily from the top.", say: "Larger ones walk pgvector's H N S W graph: layers of neighbour links, searched greedily from the top." },
+  { t: 96.8, text: "Each node gets level ⌊−ln U · m_L⌋ with m_L = 1/ln 16. Every hit is rescored exactly.", say: "Each node gets a random level from an exponential distribution, and every hit is rescored exactly." },
 
   { t: 100, text: "Every Arkiv entity has an expiry block, and the daemon tracks it." },
   { t: 102.6, text: `fish expires at block ${N + 4}. The chain keeps moving.`, say: "Fish expires four blocks later. The chain keeps moving." },

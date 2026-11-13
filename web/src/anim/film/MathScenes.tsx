@@ -240,7 +240,7 @@ function ScanVsGraph({ s, L }: { s: number; L: Layout }) {
       {/* exact scan */}
       <Box x={A.x} y={A.y} w={A.w} h={A.h} seed={1301} p={seg(s, 0, 0.6)} />
       <T x={A.x + 16} y={A.y + 30 * fs} s={16 * fs} w={700} disp>
-        exact scan (today)
+        exact scan (small sets)
       </T>
       {CANDS.map((c, i) => {
         const y = A.y + 66 * fs + i * rowH;
@@ -291,7 +291,7 @@ function ScanVsGraph({ s, L }: { s: number; L: Layout }) {
       {s >= 7.6 && (
         <>
           <T x={B.x + 16} y={B.y + 30 * fs} s={16 * fs} w={700} disp>
-            HNSW (compiled in, next)
+            HNSW (large sets)
           </T>
           {layerY.map((ly, li) => (
             <g key={li}>
