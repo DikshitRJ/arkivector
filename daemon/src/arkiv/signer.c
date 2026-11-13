@@ -16,7 +16,9 @@
 #include "secp256k1.h"
 #include "secp256k1_recovery.h"
 
+#include "arkiv/entity.h"
 #include "arkiv/keccak.h"
+#include "arkiv/rpc.h"
 #include "core/fileio.h"
 #include "codec/hex.h"
 #include "yyjson.h"
@@ -29,6 +31,8 @@ struct av_signer {
     secp256k1_context *secp;
     uint8_t privkey[32];
     char *remote_url;
+    av_rpc *remote_rpc;     /* JSON-RPC client for the remote signer (owned) */
+    char remote_method[32]; /* eth_signTransaction | account_signTransaction */
 };
 
 static bool hex_val(char c, uint8_t *out)
@@ -307,9 +311,50 @@ av_status av_signer_create_keystore(const char *path, const char *password, av_s
 
 av_status av_signer_create_remote(const char *endpoint, av_signer **out, av_err *e)
 {
+    av_signer_remote_config rc;
+    memset(&rc, 0, sizeof(rc));
+    rc.url = endpoint;
+    return av_signer_create_remote_ex(&rc, out, e);
+}
+
+/* Ask the signer for its accounts; exactly one is required when no address is configured. */
+static av_status remote_resolve_address(av_signer *s, av_err *e)
+{
+    const char *method =
+        strcmp(s->remote_method, "account_signTransaction") == 0 ? "account_list" : "eth_accounts";
+    yyjson_doc *doc = NULL;
+    yyjson_val *res = NULL;
+    if (av_signer_remote_call(s, method, "[]", &doc, &res, e) != AV_OK)
+        return AV_ERR;
+    bool ok = yyjson_is_arr(res) && yyjson_arr_size(res) == 1 &&
+              av_addr_from_hex(yyjson_get_str(yyjson_arr_get_first(res)), s->address);
+    size_t n = yyjson_is_arr(res) ? yyjson_arr_size(res) : 0;
+    yyjson_doc_free(doc);
+    if (!ok) {
+        av_err_set(e, "invalid_argument",
+                   "remote signer: %s returned %zu accounts; set write.signer.remote_address to choose one",
+                   method, n);
+        return AV_ERR;
+    }
+    return AV_OK;
+}
+
+av_status av_signer_create_remote_ex(const av_signer_remote_config *cfg, av_signer **out, av_err *e)
+{
     *out = NULL;
-    if (endpoint == NULL || endpoint[0] == '\0') {
-        av_err_set(e, "invalid_argument", "remote endpoint required");
+    if (cfg == NULL || cfg->url == NULL || cfg->url[0] == '\0') {
+        av_err_set(e, "invalid_argument", "remote signer: url required");
+        return AV_ERR;
+    }
+    if (strncmp(cfg->url, "http://", 7) != 0 && strncmp(cfg->url, "https://", 8) != 0) {
+        av_err_set(e, "invalid_argument", "remote signer: url must start with http:// or https://");
+        return AV_ERR;
+    }
+    const char *method = cfg->method != NULL && cfg->method[0] != '\0' ? cfg->method : "eth_signTransaction";
+    if (strcmp(method, "eth_signTransaction") != 0 && strcmp(method, "account_signTransaction") != 0) {
+        av_err_set(e, "invalid_argument",
+                   "remote signer: method must be eth_signTransaction (Web3Signer, geth) or "
+                   "account_signTransaction (Clef)");
         return AV_ERR;
     }
 
@@ -319,8 +364,78 @@ av_status av_signer_create_remote(const char *endpoint, av_signer **out, av_err 
         return AV_ERR;
     }
     s->backend = SIGNER_BACKEND_REMOTE;
-    s->remote_url = strdup(endpoint);
+    s->remote_url = strdup(cfg->url);
+    snprintf(s->remote_method, sizeof(s->remote_method), "%s", method);
+    const char *urls[1] = {cfg->url};
+    av_rpc_config rc;
+    memset(&rc, 0, sizeof(rc));
+    rc.urls = urls;
+    rc.n_urls = 1;
+    rc.timeout_ms = cfg->timeout_ms > 0 ? cfg->timeout_ms : 10000;
+    rc.max_retries = 2; /* signing the same transaction twice yields the same nonce: safe to retry */
+    rc.chain_id = cfg->chain_id;
+    s->remote_rpc = s->remote_url != NULL ? av_rpc_create(&rc, e) : NULL;
+    if (s->remote_rpc == NULL) {
+        if (s->remote_url == NULL)
+            av_err_set(e, "internal", "out of memory");
+        av_signer_destroy(s);
+        return AV_ERR;
+    }
+    if (cfg->address != NULL && cfg->address[0] != '\0') {
+        if (!av_addr_from_hex(cfg->address, s->address)) {
+            av_signer_destroy(s);
+            av_err_set(e, "invalid_argument", "remote signer: remote_address is not a 20-byte hex address");
+            return AV_ERR;
+        }
+    } else if (remote_resolve_address(s, e) != AV_OK) {
+        av_signer_destroy(s);
+        return AV_ERR;
+    }
     *out = s;
+    return AV_OK;
+}
+
+av_signer_kind av_signer_get_kind(const av_signer *s)
+{
+    if (s == NULL || s->backend == SIGNER_BACKEND_ENV)
+        return AV_SIGNER_ENV;
+    return s->backend == SIGNER_BACKEND_KEYSTORE ? AV_SIGNER_KEYSTORE : AV_SIGNER_REMOTE;
+}
+
+const char *av_signer_kind_name(const av_signer *s)
+{
+    switch (av_signer_get_kind(s)) {
+    case AV_SIGNER_KEYSTORE:
+        return "keystore";
+    case AV_SIGNER_REMOTE:
+        return "remote";
+    case AV_SIGNER_ENV:
+    default:
+        return "env";
+    }
+}
+
+const char *av_signer_remote_method(const av_signer *s)
+{
+    return (s != NULL && s->backend == SIGNER_BACKEND_REMOTE) ? s->remote_method : NULL;
+}
+
+av_status av_signer_remote_call(const av_signer *s, const char *method, const char *params_json,
+                                yyjson_doc **doc, yyjson_val **result, av_err *e)
+{
+    *doc = NULL;
+    *result = NULL;
+    if (s == NULL || s->backend != SIGNER_BACKEND_REMOTE || s->remote_rpc == NULL) {
+        av_err_set(e, "invalid_argument", "not a remote signer");
+        return AV_ERR;
+    }
+    int code = 0;
+    if (av_rpc_call(s->remote_rpc, method, params_json, doc, result, &code, e) != AV_OK) {
+        char msg[sizeof(e->msg)];
+        snprintf(msg, sizeof(msg), "%s", e->msg);
+        av_err_set(e, "write_disabled", "remote signer %s failed: %s", method, msg);
+        return AV_ERR;
+    }
     return AV_OK;
 }
 
@@ -390,7 +505,7 @@ av_status av_signer_sign(const av_signer *s, const uint8_t hash32[32], uint8_t r
     }
 
     if (s->backend == SIGNER_BACKEND_REMOTE) {
-        av_err_set(e, "internal", "remote signing not yet connected over HTTP");
+        av_err_set(e, "internal", "a remote signer signs whole transactions, not hashes");
         return AV_ERR;
     }
 
@@ -420,6 +535,8 @@ void av_signer_destroy(av_signer *s)
         secp256k1_context_destroy(s->secp);
         s->secp = NULL;
     }
+    if (s->remote_rpc != NULL)
+        av_rpc_destroy(s->remote_rpc);
     free(s->remote_url);
     free(s);
 }

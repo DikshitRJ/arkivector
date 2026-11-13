@@ -19,6 +19,7 @@ extern SUITE(planner);
 extern SUITE(rest_suite);
 extern SUITE(abi);
 extern SUITE(signer);
+extern SUITE(rawtx);
 extern SUITE(segment_suite);
 extern SUITE(fees);
 extern SUITE(hnsw_file);
@@ -47,6 +48,7 @@ int main(int argc, char **argv)
     RUN_SUITE(rest_suite);
     RUN_SUITE(abi);
     RUN_SUITE(signer);
+    RUN_SUITE(rawtx);
     RUN_SUITE(segment_suite);
     RUN_SUITE(fees);
     RUN_SUITE(hnsw_file);
