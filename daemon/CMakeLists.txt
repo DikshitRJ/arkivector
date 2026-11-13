@@ -205,6 +205,7 @@ set(AV_CORE_SOURCES
     src/arkiv/tx.c
     src/arkiv/signer.c
     src/write/nonce.c
+    src/write/fees.c
     src/write/batcher.c
     src/write/writer.c
     src/server/idempotency.c

@@ -17,8 +17,9 @@ set(AV_UNIT_SOURCES
     unit/test_rest.c
     unit/test_abi.c
     unit/test_signer.c
-    unit/test_segment.c)
-set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp keccak arkiv_parse arkiv_rpc value filter_parser filter_eval planner rest abi signer segment)
+    unit/test_segment.c
+    unit/test_fees.c)
+set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp keccak arkiv_parse arkiv_rpc value filter_parser filter_eval planner rest abi signer segment fees)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)

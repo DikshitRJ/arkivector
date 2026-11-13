@@ -6,8 +6,8 @@
  * command-line flags applied by main.c. Unknown sections and keys are errors. Errors name the
  * file, the line (when the key is found in the text), the section and the key.
  *
- * Sections: [server] [arkiv] [storage] [sync] [log] and [[collections]]. [hnsw] and [signer] are
- * accepted and ignored (reserved for later phases; a warning is logged).
+ * Sections: [server] [arkiv] [storage] [sync] [write] [hnsw] [log] and [[collections]]. [signer] is
+ * accepted and ignored (reserved for a later phase; a warning is logged).
  * [[collections]] tables are converted to JSON text, one string per table, and handed to the
  * registry unchanged (Lane C parses them with av_coldef_from_json).
  *
@@ -56,6 +56,21 @@ typedef struct av_config {
         int64_t reconcile_interval_s;
         int64_t ring_size; /* reorg ring depth in blocks */
     } sync;
+    struct {
+        double max_fee_cap_gwei;        /* 0 = no cap on maxFeePerGas */
+        double priority_fee_percentile; /* eth_feeHistory reward percentile (default 50) */
+        int64_t fee_history_blocks;     /* blocks of fee history (default 20) */
+        double max_fee_gwei;            /* static fallback maxFeePerGas (default 20) */
+        double priority_fee_gwei;       /* static fallback maxPriorityFeePerGas (default 1.5) */
+        int64_t gas_margin_pct;         /* margin over eth_estimateGas (default 20) */
+        int64_t fallback_gas_base; /* gas when eth_estimateGas fails: base + ops x per-op (default 60000) */
+        int64_t replace_after_blocks; /* resend a stuck tx with bumped fees after N blocks (default 10) */
+        int64_t max_replacements;     /* resends per tx, 0 = never replace (default 3) */
+    } write;
+    struct {
+        int64_t persist;     /* 1 = save graphs under data_dir/segments and load them at startup */
+        int64_t band_blocks; /* expiry band width in blocks; 0 = one band per collection */
+    } hnsw;
     struct {
         char *level;  /* debug|info|warn|error */
         char *format; /* text|json */

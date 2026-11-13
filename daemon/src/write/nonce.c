@@ -114,3 +114,12 @@ uint64_t av_nonce_tracker_current(const av_nonce_tracker *nt)
     pthread_mutex_unlock(&mut_nt->mu);
     return n;
 }
+
+void av_nonce_tracker_invalidate(av_nonce_tracker *nt)
+{
+    if (nt == NULL)
+        return;
+    pthread_mutex_lock(&nt->mu);
+    nt->initialized = false;
+    pthread_mutex_unlock(&nt->mu);
+}

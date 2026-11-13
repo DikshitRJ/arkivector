@@ -61,14 +61,27 @@ static const field k_fields[] = {
     F("sync", "reconcile_interval_s", K_INT, sync.reconcile_interval_s, 1, 86400),
     F("sync", "ring_size", K_INT, sync.ring_size, 1, 100000),
 
+    F("write", "max_fee_cap_gwei", K_DBL, write.max_fee_cap_gwei, 0, 1e9),
+    F("write", "priority_fee_percentile", K_DBL, write.priority_fee_percentile, 1, 100),
+    F("write", "fee_history_blocks", K_INT, write.fee_history_blocks, 1, 1024),
+    F("write", "max_fee_gwei", K_DBL, write.max_fee_gwei, 0.000001, 1e9),
+    F("write", "priority_fee_gwei", K_DBL, write.priority_fee_gwei, 0, 1e9),
+    F("write", "gas_margin_pct", K_INT, write.gas_margin_pct, 1, 400),
+    F("write", "fallback_gas_base", K_INT, write.fallback_gas_base, 21000, 30000000),
+    F("write", "replace_after_blocks", K_INT, write.replace_after_blocks, 1, 10000),
+    F("write", "max_replacements", K_INT, write.max_replacements, 0, 8),
+
+    F("hnsw", "persist", K_INT, hnsw.persist, 0, 1),
+    F("hnsw", "band_blocks", K_INT, hnsw.band_blocks, 0, 100000000),
+
     F("log", "level", K_STR, log.level, 0, 0),
     F("log", "format", K_STR, log.format, 0, 0),
 };
 /* clang-format on */
 #define N_FIELDS (sizeof(k_fields) / sizeof(k_fields[0]))
 
-static const char *const k_sections[] = {"server", "arkiv", "storage", "sync", "log"};
-static const char *const k_reserved[] = {"hnsw", "signer"};
+static const char *const k_sections[] = {"server", "arkiv", "storage", "sync", "write", "hnsw", "log"};
+static const char *const k_reserved[] = {"signer"};
 
 static char *dup_s(const char *s)
 {
@@ -156,6 +169,17 @@ av_status av_config_defaults(av_config *c, av_err *e)
     c->sync.poll_interval_ms = 1000;
     c->sync.reconcile_interval_s = 60;
     c->sync.ring_size = 128;
+    c->write.max_fee_cap_gwei = 0;
+    c->write.priority_fee_percentile = 50;
+    c->write.fee_history_blocks = 20;
+    c->write.max_fee_gwei = 20;
+    c->write.priority_fee_gwei = 1.5;
+    c->write.gas_margin_pct = 20;
+    c->write.fallback_gas_base = 60000;
+    c->write.replace_after_blocks = 10;
+    c->write.max_replacements = 3;
+    c->hnsw.persist = 1;
+    c->hnsw.band_blocks = 1296000; /* 30 days of 2 s blocks */
     static const char *const urls[] = {"https://rpc.rabdi.db-chain.testnet.arkiv.network"};
     if (av_config_set_string(&c->server.listen, "127.0.0.1:8080", e) != AV_OK ||
         av_config_set_string(&c->server.api_keys_file, "", e) != AV_OK ||
@@ -825,5 +849,14 @@ void av_config_log_summary(const av_config *c)
            c->arkiv.n_rpc_urls, c->arkiv.ws_url[0] != '\0' ? c->arkiv.ws_url : "(none)",
            (long long) c->arkiv.chain_id, c->arkiv.access_key[0] != '\0' ? "configured" : "none",
            (long long) c->arkiv.confirmations);
+    av_log(AV_LOG_INFO, "config",
+           "write fee_history=%lld blocks p%.0f cap=%.3f gwei static=%.3f/%.3f gwei gas_margin=%lld%% "
+           "replace_after=%lld blocks x%lld",
+           (long long) c->write.fee_history_blocks, c->write.priority_fee_percentile,
+           c->write.max_fee_cap_gwei, c->write.max_fee_gwei, c->write.priority_fee_gwei,
+           (long long) c->write.gas_margin_pct, (long long) c->write.replace_after_blocks,
+           (long long) c->write.max_replacements);
+    av_log(AV_LOG_INFO, "config", "hnsw persist=%lld band_blocks=%lld", (long long) c->hnsw.persist,
+           (long long) c->hnsw.band_blocks);
     av_log(AV_LOG_INFO, "config", "collections=%zu", c->n_collections);
 }
