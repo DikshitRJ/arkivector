@@ -6,7 +6,8 @@ ESM, zero runtime dependencies, Node 18+. Includes a LangChain.js vector store (
 
 ```bash
 echo "@dikshitrj:registry=https://npm.pkg.github.com" >> .npmrc
-echo "//npm.pkg.github.com/:_authToken=<GITHUB_TOKEN with read:packages>" >> .npmrc
+read -rs NODE_AUTH_TOKEN && export NODE_AUTH_TOKEN   # GitHub token with read:packages
+echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc   # a reference, not the token
 npm install @dikshitrj/arkivector
 ```
 
@@ -34,6 +35,6 @@ const res = await client.search("notes", { vector: [1, 0.05, 0, 0], k: 1, filter
 console.log(res.hits[0].id, res.hits[0].distance); // cat 0.0012...
 ```
 
-**Documentation:** [Node.js SDK guide](https://github.com/DikshitRJ/arkivector/blob/main/docs/guide/node.md) · [REST API](https://github.com/DikshitRJ/arkivector/blob/main/docs/guide/api.md) · [wiki](https://github.com/DikshitRJ/arkivector/wiki)
+**Documentation:** [Node.js SDK](https://arkivector.dikshitrj.in/docs/node) · [REST API](https://arkivector.dikshitrj.in/docs/api) · [MCP server](https://arkivector.dikshitrj.in/docs/mcp) · [website](https://arkivector.dikshitrj.in) · [wiki](https://github.com/DikshitRJ/arkivector/wiki)
 
 MIT licensed.

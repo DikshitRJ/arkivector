@@ -11,8 +11,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g. 0.1.0); publishes packages but creates no Release'
+        description: 'Version to build (e.g. 1.1.0); publishes the packages'
         required: true
+      create_release:
+        description: 'Also create the tag v<version> on this commit and the GitHub Release'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -201,8 +205,8 @@ jobs:
 
   release:
     name: GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [daemon, docker, sdk-python, sdk-node]
+    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
+    needs: [version, daemon, docker, sdk-python, sdk-node]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -227,7 +231,9 @@ jobs:
         run: sha256sum * > SHA256SUMS
       - name: Render release notes
         run: |
-          export TAG="$GITHUB_REF_NAME" REPO="$GITHUB_REPOSITORY" OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then TAG="$GITHUB_REF_NAME"; else TAG="v${{ needs.version.outputs.v }}"; fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          export TAG REPO="$GITHUB_REPOSITORY" OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           export VERSION="${TAG#daemon-}"; VERSION="${VERSION#v}"; export MAJOR="${VERSION%%.*}"
           envsubst '${TAG} ${REPO} ${OWNER} ${VERSION} ${MAJOR}' < .github/release-notes.md > notes.md
       - name: Create GitHub Release
@@ -243,5 +249,7 @@ jobs:
               *) args+=("$f") ;;
             esac
           done
-          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "Arkivector $GITHUB_REF_NAME" \
-            --notes-file ../notes.md --verify-tag "${args[@]}"
+          # A tag push releases that tag; a dispatch with create_release creates the tag on this commit.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then target=(--verify-tag); else target=(--target "$GITHUB_SHA"); fi
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "Arkivector $TAG" \
+            --notes-file ../notes.md "${target[@]}" "${args[@]}"

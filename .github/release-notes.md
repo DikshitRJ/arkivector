@@ -2,7 +2,7 @@
 
 ## What's new
 
-See [CHANGELOG.md](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) for the changes in ${TAG}. Guides: [REST API](https://github.com/${REPO}/blob/${TAG}/docs/guide/api.md) · [Python SDK](https://github.com/${REPO}/blob/${TAG}/docs/guide/python.md) · [Node.js SDK](https://github.com/${REPO}/blob/${TAG}/docs/guide/node.md) · [wiki](https://github.com/${REPO}/wiki).
+See [CHANGELOG.md](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) for the changes in ${TAG}. Documentation: [arkivector.dikshitrj.in/docs](https://arkivector.dikshitrj.in/docs) (also in the [wiki](https://github.com/${REPO}/wiki)): [installation](https://arkivector.dikshitrj.in/docs/getting-started/installation), [REST API](https://arkivector.dikshitrj.in/docs/api), [Python SDK](https://arkivector.dikshitrj.in/docs/python), [Node.js SDK](https://arkivector.dikshitrj.in/docs/node), [MCP server](https://arkivector.dikshitrj.in/docs/mcp).
 
 ## Assets
 
@@ -31,7 +31,7 @@ tar xzf arkivectord-${VERSION}-linux-x86_64.tar.gz
 cd arkivectord-${VERSION}-linux-x86_64
 
 export ARKIVECTOR_ARKIV_ACCESS_KEY="<your Arkiv Hub access key>"
-export ARKIV_PRIVATE_KEY="<wallet private key, hex>"     # optional: enables writes
+read -rs ARKIV_PRIVATE_KEY && export ARKIV_PRIVATE_KEY   # paste the wallet key: not echoed, not saved in shell history
 export ARKIVECTOR_STORAGE_DATA_DIR="$HOME/.local/share/arkivector"
 
 ./bin/arkivectord --config arkivector.example.toml
@@ -39,9 +39,10 @@ export ARKIVECTOR_STORAGE_DATA_DIR="$HOME/.local/share/arkivector"
 
 **Docker**
 ```bash
+read -rs ARKIV_PRIVATE_KEY && export ARKIV_PRIVATE_KEY   # paste the wallet key: not echoed, not saved in shell history
 docker run -d --name arkivectord -p 127.0.0.1:8080:8080 -v arkivector-data:/data \
   -e ARKIVECTOR_ARKIV_ACCESS_KEY="<access key>" \
-  -e ARKIV_PRIVATE_KEY="<wallet private key>" \
+  -e ARKIV_PRIVATE_KEY \
   ghcr.io/${OWNER}/arkivectord:${VERSION}
 curl http://127.0.0.1:8080/healthz
 ```
@@ -95,7 +96,8 @@ print(c.search("my.docs", vector=[1, 0.1, 0, 0], k=3, filter=F.eq("topic", "pets
 **Node.js** (GitHub Packages needs a GitHub token with `read:packages`, even for public packages)
 ```bash
 echo "@${OWNER}:registry=https://npm.pkg.github.com" >> .npmrc
-echo "//npm.pkg.github.com/:_authToken=<GITHUB_TOKEN>" >> .npmrc
+read -rs NODE_AUTH_TOKEN && export NODE_AUTH_TOKEN   # GitHub token with read:packages
+echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc   # a reference, not the token
 npm install @${OWNER}/arkivector@${VERSION}
 # or, without a token: npm install https://github.com/${REPO}/releases/download/${TAG}/arkivector-node-${VERSION}.tgz
 ```

@@ -405,6 +405,7 @@ int main(int argc, char **argv)
         av_log(AV_LOG_ERROR, "main", "cannot create the HTTP server: %s", e.msg);
         goto out;
     }
+    av_rest_set_auth(av_http_auth(app.http));
     uv_signal_init(loop, &app.sigterm);
     uv_signal_init(loop, &app.sigint);
     app.sigterm.data = &app;
@@ -428,6 +429,7 @@ out:
     if (services_up) {
         services_stop();
     }
+    av_rest_set_auth(NULL);
     av_http_destroy(app.http);
     av_router_destroy(router);
     uv_loop_close(loop);

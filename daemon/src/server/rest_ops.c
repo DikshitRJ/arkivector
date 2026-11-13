@@ -140,6 +140,31 @@ void av_rest_set_sync_provider(av_sync_provider_fn fn, void *ctx)
     pthread_mutex_unlock(&g_mu);
 }
 
+static const struct av_auth *g_auth_svc = NULL;
+
+void av_rest_set_auth(const struct av_auth *auth)
+{
+    pthread_mutex_lock(&g_mu);
+    g_auth_svc = auth;
+    pthread_mutex_unlock(&g_mu);
+}
+
+const struct av_auth *av_rest_get_auth(void)
+{
+    pthread_mutex_lock(&g_mu);
+    const struct av_auth *a = g_auth_svc;
+    pthread_mutex_unlock(&g_mu);
+    return a;
+}
+
+bool av_rest_writes_enabled(void)
+{
+    pthread_mutex_lock(&g_mu);
+    bool w = g_writes_enabled;
+    pthread_mutex_unlock(&g_mu);
+    return w;
+}
+
 void av_rest_set_info(int64_t chain_id, bool writes_enabled)
 {
     pthread_mutex_lock(&g_mu);

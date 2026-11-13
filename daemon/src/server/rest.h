@@ -78,6 +78,14 @@ struct av_store *av_rest_get_store(void);
 struct av_rpc *av_rest_get_rpc(void);
 struct av_sync *av_rest_get_sync(void);
 
+struct av_auth;
+/* API-key context of the HTTP server (NULL = auth disabled). /mcp checks each tool's inner /v1 call
+ * against it, so a read-only key cannot write through MCP. */
+void av_rest_set_auth(const struct av_auth *auth);
+const struct av_auth *av_rest_get_auth(void);
+/* True when the daemon has a signer (the value GET /v1/version reports). */
+bool av_rest_writes_enabled(void);
+
 void av_rest_set_writer(struct av_writer *writer, struct av_idempotency_store *idem);
 struct av_writer *av_rest_get_writer(void);
 struct av_idempotency_store *av_rest_get_idempotency(void);

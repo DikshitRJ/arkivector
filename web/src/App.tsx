@@ -12,13 +12,9 @@ const Next = lazy(() => import("./pages/Next").then((m) => ({ default: m.Next })
 import { Team } from "./pages/Team";
 import { NotFound } from "./pages/NotFound";
 
-const TITLES: Record<Route, string> = {
+const TITLES: Record<Exclude<Route, `/docs${string}`>, string> = {
   "/": "Arkivector: vector search for Arkiv",
   "/install": "Install · Arkivector",
-  "/docs": "Docs · Arkivector",
-  "/docs/api": "REST API (curl) · Docs · Arkivector",
-  "/docs/python": "Python SDK · Docs · Arkivector",
-  "/docs/node": "Node.js SDK · Docs · Arkivector",
   "/architecture": "Architecture · Arkivector",
   "/build": "Build artifacts · Arkivector",
   "/next": "What's next · Arkivector",
@@ -29,7 +25,7 @@ const TITLES: Record<Route, string> = {
 export function App() {
   const route = useRoute();
   useEffect(() => {
-    document.title = TITLES[route];
+    if (!route.startsWith("/docs")) document.title = TITLES[route as keyof typeof TITLES]; // docs pages set their own
   }, [route]);
   return (
     <SoundProvider>
@@ -37,7 +33,7 @@ export function App() {
         <Suspense fallback={<p className="mx-auto max-w-5xl px-6 py-16">loading…</p>}>
         {route === "/" && <Home />}
         {route === "/install" && <Install />}
-        {route.startsWith("/docs") && <Docs route={route as "/docs"} />}
+        {route.startsWith("/docs") && <Docs path={route} />}
         {route === "/architecture" && <Architecture />}
         {route === "/build" && <Build />}
         {route === "/next" && <Next />}

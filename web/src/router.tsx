@@ -8,30 +8,10 @@ import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent, type R
  * GitHub Pages.
  */
 
-export type Route =
-  | "/"
-  | "/install"
-  | "/docs"
-  | "/docs/api"
-  | "/docs/python"
-  | "/docs/node"
-  | "/architecture"
-  | "/build"
-  | "/next"
-  | "/team"
-  | "404";
-export const ROUTES: Exclude<Route, "404">[] = [
-  "/",
-  "/install",
-  "/docs",
-  "/docs/api",
-  "/docs/python",
-  "/docs/node",
-  "/architecture",
-  "/build",
-  "/next",
-  "/team",
-];
+export type StaticRoute = "/" | "/install" | "/architecture" | "/build" | "/next" | "/team";
+/** Docs pages are /docs and /docs/<folder>/<page> (resolved against docs/wiki by the Docs page). */
+export type Route = StaticRoute | "/docs" | `/docs/${string}` | "404";
+export const ROUTES: StaticRoute[] = ["/", "/install", "/architecture", "/build", "/next", "/team"];
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, ""); // "" or "/arkivector"
 
@@ -39,6 +19,7 @@ function current(): Route {
   let p = window.location.pathname;
   if (BASE && p.startsWith(BASE)) p = p.slice(BASE.length);
   p = p.replace(/\/+$/, "") || "/";
+  if (p === "/docs" || p.startsWith("/docs/")) return p as Route;
   return (ROUTES as string[]).includes(p) ? (p as Route) : "404";
 }
 

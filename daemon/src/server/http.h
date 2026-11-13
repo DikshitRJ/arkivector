@@ -38,6 +38,7 @@ typedef struct av_http_req {
     const char *authorization;   /* NULL when absent */
     const char *idempotency_key; /* NULL when absent */
     av_arena *arena;             /* request arena; reset after the response is sent */
+    const char *origin;          /* Origin header, NULL when absent (MCP DNS-rebinding check) */
 } av_http_req;
 
 typedef struct av_http_resp {
@@ -112,6 +113,9 @@ av_http_server *av_http_create(uv_loop_t *loop, const av_http_config *cfg, av_er
 av_status av_http_listen(av_http_server *s, av_err *e);
 /* Bound TCP port (after av_http_listen), 0 if not listening. */
 int av_http_port(const av_http_server *s);
+struct av_auth;
+/* The API-key context (NULL when auth is disabled). Owned by the server; valid until av_http_destroy. */
+const struct av_auth *av_http_auth(const av_http_server *s);
 
 /*
  * Graceful shutdown on the loop thread: stop accepting, close idle connections, let in-flight

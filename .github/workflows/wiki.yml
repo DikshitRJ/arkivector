@@ -1,42 +1,68 @@
 name: wiki
 
-# Publishes docs/guide/*.md to the GitHub wiki (docs/tools/wiki_sync.py renames pages and rewrites
-# links). The wiki must exist: enable it in Settings -> Features and create any first page once.
+# docs/wiki/ is the single source of the documentation: the website renders it under /docs and
+# this workflow publishes it to the GitHub wiki (docs/tools/wiki_sync.py renames pages and rewrites
+# links). Every push and pull request checks links, anchors and SUMMARY.md; pushes to main publish.
+# The wiki must exist: enable it in Settings -> Features and create any first page once.
+# Pushes use GITHUB_TOKEN (contents: write covers the repository's wiki). If an organisation policy
+# blocks that, add a fine-grained token with Contents read/write as the WIKI_TOKEN secret.
 on:
   push:
-    branches: [main]
-    paths: ['docs/guide/**', 'docs/tools/wiki_sync.py', '.github/workflows/wiki.yml']
+    branches: ['**']
+    paths: ['docs/wiki/**', 'docs/tools/**', '.github/workflows/wiki.yml']
+  pull_request:
+    paths: ['docs/wiki/**', 'docs/tools/**', '.github/workflows/wiki.yml']
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: wiki
+  group: wiki-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  check:
+    name: Docs links, anchors and SUMMARY.md
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -I docs/tools/check_docs.py
+
   publish:
+    name: Publish to the GitHub wiki
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Check out the wiki
+        id: clone
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WIKI_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          if ! git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
-            echo "::error::Cannot clone the wiki. Enable it (Settings -> Features -> Wikis) and create one page in the web UI first."
-            exit 1
+          if git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            # GitHub creates the wiki repository only after a first page is saved in the web UI.
+            msg="Wiki not published: enable Wikis (Settings -> Features) and create any first page, or set a WIKI_TOKEN secret. The next push to main publishes docs/wiki."
+            echo "::warning::$msg"
+            echo "### Wiki not published" >> "$GITHUB_STEP_SUMMARY"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Render pages
+        if: steps.clone.outputs.ok == 'true'
         run: python3 -I docs/tools/wiki_sync.py wiki
       - name: Push
+        if: steps.clone.outputs.ok == 'true'
         working-directory: wiki
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then echo "wiki already up to date"; exit 0; fi
-          git commit -m "Sync from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7} (docs/guide)"
+          git commit -m "Sync from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7} (docs/wiki)"
           git push

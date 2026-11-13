@@ -7,6 +7,6 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   base: process.env.VITE_BASE ?? "/",
   plugins: [react(), tailwindcss()],
-  // /docs imports the Markdown guides from ../docs/guide (shared with the repository and the wiki)
+  // /docs renders the Markdown in ../docs/wiki (the same files are published to the GitHub wiki)
   server: { fs: { allow: [".."] } },
 });
