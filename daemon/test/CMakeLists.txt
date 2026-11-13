@@ -17,8 +17,10 @@ set(AV_UNIT_SOURCES
     unit/test_rest.c
     unit/test_abi.c
     unit/test_signer.c
-    unit/test_segment.c)
-set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp keccak arkiv_parse arkiv_rpc value filter_parser filter_eval planner rest abi signer segment)
+    unit/test_segment.c
+    unit/test_fees.c
+    unit/test_hnsw_file.c)
+set(AV_UNIT_SUITES pgcompat kernels vectorbytes text_io ttl rlp keccak arkiv_parse arkiv_rpc value filter_parser filter_eval planner rest abi signer segment fees hnsw_file)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c)
   file(SIZE ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_hnsw.c _hnsw_sz)
@@ -55,7 +57,7 @@ if(AV_FUZZ)
   target_link_libraries(fuzz_rpc_response PRIVATE av_core av3p_yyjson)
   target_compile_options(fuzz_rpc_response PRIVATE -fsanitize=fuzzer-no-link)
   target_link_options(fuzz_rpc_response PRIVATE -fsanitize=fuzzer)
-  foreach(_fz fuzz_filter_parser fuzz_json_filter fuzz_abi fuzz_http)
+  foreach(_fz fuzz_filter_parser fuzz_json_filter fuzz_abi fuzz_http fuzz_qdrant fuzz_hnsw_file)
     add_executable(${_fz} fuzz/${_fz}.c)
     target_link_libraries(${_fz} PRIVATE av_core av3p_yyjson)
     target_compile_options(${_fz} PRIVATE -fsanitize=fuzzer-no-link)

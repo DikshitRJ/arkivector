@@ -303,3 +303,113 @@ format = "text"
     finally:
         client.stop()
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+# --------------------------------------------------------------------------- daemon factory
+# Dev signer (well-known Hardhat account #0; never holds real funds).
+DEV_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+DEV_ADDR = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+
+
+class DaemonFactory:
+    """Start (and restart) daemons with a signer, extra TOML and a reusable data dir."""
+
+    def __init__(self, mock: MockArkiv) -> None:
+        self.mock = mock
+        self.started: list[DaemonClient] = []
+        self.dirs: list[Path] = []
+
+    def new_dir(self) -> Path:
+        d = Path(tempfile.mkdtemp(prefix="arkivectord-f-"))
+        self.dirs.append(d)
+        (d / "data").mkdir()
+        return d
+
+    def start(
+        self,
+        workdir: Path | None = None,
+        extra_toml: str = "",
+        signer: bool = True,
+        env: dict[str, str] | None = None,
+        log_path: Path | None = None,
+    ) -> DaemonClient:
+        if not DAEMON_BIN.exists():
+            if os.environ.get("AV_REQUIRE_DAEMON") == "1":
+                pytest.fail(f"daemon binary missing: {DAEMON_BIN} (AV_REQUIRE_DAEMON=1)")
+            pytest.skip(f"daemon binary missing: {DAEMON_BIN}")
+        wd = workdir if workdir is not None else self.new_dir()
+        port = _free_port()
+        (wd / "config.toml").write_text(
+            f"""
+[server]
+listen = "127.0.0.1:{port}"
+
+[arkiv]
+rpc_urls = ["{self.mock.url}"]
+ws_url = "{self.mock.ws_url}"
+chain_id = 7794095
+confirmations = 0
+rpc_budget_per_sec = 1000  # local mock: the 20/s default (public Rabdi pool) cannot follow 10 blocks/s
+
+[storage]
+data_dir = "{wd / 'data'}"
+map_size = 104857600
+
+[sync]
+poll_interval_ms = 50
+
+[log]
+level = "debug"
+format = "text"
+{extra_toml}
+"""
+        )
+        full_env = {**os.environ, **(env or {})}
+        full_env.pop("ARKIV_PRIVATE_KEY", None)
+        full_env.pop("ARKIVECTOR_SIGNER_KEY", None)
+        if signer:
+            full_env["ARKIV_PRIVATE_KEY"] = DEV_KEY
+        logf = open(log_path if log_path is not None else wd / "daemon.log", "a")
+        proc = subprocess.Popen(
+            [str(DAEMON_BIN), "--config", str(wd / "config.toml"), "--debug-routes"],
+            stdout=logf,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=full_env,
+        )
+        logf.close()
+        client = DaemonClient(proc, port, wd / "data")
+        client.workdir = wd  # type: ignore[attr-defined]
+        deadline = time.time() + 30.0
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                raise RuntimeError(f"arkivectord exited with {proc.returncode}:\n{(wd / 'daemon.log').read_text()[-4000:]}")
+            try:
+                if client.get("/readyz")[0] == 200:
+                    break
+            except Exception:
+                pass
+            time.sleep(0.05)
+        else:
+            client.stop()
+            raise RuntimeError("Timed out waiting for arkivectord /readyz")
+        self.started.append(client)
+        return client
+
+    def log(self, client: DaemonClient) -> str:
+        return (client.workdir / "daemon.log").read_text(errors="replace")  # type: ignore[attr-defined]
+
+    def close(self) -> None:
+        for c in self.started:
+            c.stop()
+        for d in self.dirs:
+            shutil.rmtree(d, ignore_errors=True)
+
+
+@pytest.fixture
+def daemon_factory(mock_arkiv: MockArkiv) -> Iterator[DaemonFactory]:
+    f = DaemonFactory(mock_arkiv)
+    try:
+        yield f
+    finally:
+        f.close()

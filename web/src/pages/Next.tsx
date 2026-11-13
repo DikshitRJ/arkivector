@@ -8,46 +8,52 @@ import { line, loop } from "../ink/paths";
 
 const ITEMS: { title: string; today: string; plan: string; issue: number }[] = [
   {
-    title: "HNSW graphs live in memory",
-    issue: 11,
-    today: "Since v1.1.0 every hnsw collection searches a real pgvector graph. The graph is rebuilt from the local store at startup, and rebuilds after many updates run on the sync thread.",
-    plan: "Persist sealed graphs next to the vector segments, rebuild in the background, and add expiry-banded segments so whole graphs drop when their entities expire.",
-  },
-  {
     title: "The daemon signs with a key in an environment variable",
     issue: 12,
     today: "The daemon holds a hot wallet (ARKIV_PRIVATE_KEY).",
-    plan: "entities:prepare already returns unsigned transactions. Next, the SDKs hand them to the user's own wallet (MetaMask, WalletConnect, hardware wallets), plus encrypted keystores and remote signers for servers.",
-  },
-  {
-    title: "Predicted keys ignore the wallet's on-chain nonce",
-    issue: 13,
-    today: "Keys returned by a write can be wrong if the wallet created entities elsewhere. The entities themselves sync correctly.",
-    plan: "Read entityNonce from the Arkiv contract before predicting keys.",
-  },
-  {
-    title: "Fixed gas fees",
-    issue: 14,
-    today: "Gas limits come from eth_estimateGas, but fees are fixed (20 gwei max, 1.5 gwei tip) and the fallback reserves far more gas than a create uses (about 135k on Rabdi).",
-    plan: "Price fees from eth_feeHistory, tighten the fallback, and replace stuck transactions.",
-  },
-  {
-    title: "Qdrant compatibility is search-only",
-    issue: 15,
-    today: "Qdrant upserts and deletes return success without writing.",
-    plan: "Route them through the same writer as the REST API.",
+    plan: "entities:prepare already returns unsigned transactions keyed to the wallet's real nonces. Next, the SDKs hand them to the user's own wallet (MetaMask, WalletConnect, hardware wallets), plus encrypted keystores and remote signers for servers.",
   },
   {
     title: "Tested on the Rabdi testnet only",
     issue: 16,
     today: "Mainnet is configurable (rpc_urls, chain_id) but untried.",
-    plan: "Run the sync and write suites against mainnet once its endpoints are published.",
+    plan: "Run the sync and write suites against mainnet once its endpoints are published, and measure gas reservations against real usage there.",
   },
   {
-    title: "Linux and Docker only, two SDK languages",
+    title: "Linux and Docker only",
     issue: 17,
-    today: "macOS and Windows use the container. SDKs exist for Python and Node.js.",
-    plan: "Port the few glibc-specific calls; the repository already has placeholders for C, C++ and Rust SDKs.",
+    today: "macOS and Windows use the container.",
+    plan: "Port the few glibc-specific calls.",
+  },
+  {
+    title: "Two SDK languages",
+    issue: 18,
+    today: "SDKs exist for Python and Node.js.",
+    plan: "The repository already has placeholders for C, C++ and Rust SDKs.",
+  },
+];
+
+/** Shipped after v1.1.0, kept here so the roadmap shows what changed. */
+const DONE: { title: string; what: string; issue: number }[] = [
+  {
+    title: "HNSW graphs survive restarts",
+    issue: 11,
+    what: "Graphs are saved per expiry band under data_dir/segments and loaded at startup, so only what changed since the save is indexed. Rebuilds run on a background thread while sync keeps going, and a band whose entities have all expired is dropped whole. Corrupt files are rejected and rebuilt, never trusted.",
+  },
+  {
+    title: "Entity keys follow the wallet's on-chain nonce",
+    issue: 13,
+    what: "Writes read entityNonce from the Arkiv contract before predicting keys, and take the final keys from the EntityCreated receipt logs when they wait for receipts. entities:prepare uses the wallet's real nonces too.",
+  },
+  {
+    title: "Dynamic gas fees",
+    issue: 14,
+    what: "Fees come from eth_feeHistory (then eth_gasPrice, then config) with a configurable cap, the gas limit is the estimate plus a configurable margin, and a stuck transaction is resent with bumped fees.",
+  },
+  {
+    title: "Qdrant writes are real",
+    issue: 15,
+    what: "Qdrant upserts and deletes go through the same writer as the REST API, searches return payloads, and a daemon without a signer refuses writes instead of faking success.",
   },
 ];
 
@@ -150,7 +156,7 @@ export function Next() {
         </h1>
         <p className="mt-3 max-w-[64ch] text-[16px] bg-paper">
           Everything in the install guide works and was tested end to end, including on the Rabdi testnet. These are the parts that
-          are not finished yet, and how each one gets fixed.
+          are not finished yet, and how each one gets fixed. Below them: what was fixed since v1.1.0.
         </p>
       </Page>
 
@@ -186,6 +192,29 @@ export function Next() {
       </Page>
 
       <Page className="pb-12">
+        <H2>Done since v1.1.0</H2>
+        <div className="sheet">
+          {DONE.map((it, i) => (
+            <div
+              key={it.title}
+              className={`grid md:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)] ${i ? "border-t border-dashed border-ink" : ""}`}
+            >
+              <div className="px-4 pt-3 md:py-3 font-semibold">
+                <span className="text-arkiv-blue mr-1" aria-hidden="true">
+                  ✓
+                </span>
+                {it.title}
+                <a href={`${REPO}/issues/${it.issue}`} target="_blank" rel="noreferrer" className="ml-2 font-mono text-[12.5px] font-normal">
+                  #{it.issue}
+                </a>
+              </div>
+              <div className="px-4 pb-3 md:py-3 md:border-l border-dashed border-ink text-[13.5px]">{it.what}</div>
+            </div>
+          ))}
+        </div>
+      </Page>
+
+      <Page className="pb-12">
         <H2>Signing with the user's wallet</H2>
         <p className="mb-4 max-w-[70ch] bg-paper">
           The daemon already builds unsigned transactions through <code className="chip">entities:prepare</code>. The missing piece is
@@ -200,7 +229,7 @@ export function Next() {
           Collections with an hnsw index keep pgvector's graph next to the exact vectors. A search starts at the top layer, walks
           greedily towards the query, then drops a layer and repeats, so it scores a small fraction of the vectors. The planner picks
           the graph for large candidate sets and an exact scan for small or very selective ones, and every hit is rescored with the
-          real operator. Next: graphs that survive restarts instead of being rebuilt.
+          real operator. Graphs are kept per expiry band, saved to disk and rebuilt in the background.
         </p>
         <HnswSketch />
         <div className="mt-8 flex flex-wrap items-center gap-4">

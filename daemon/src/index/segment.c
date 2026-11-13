@@ -663,3 +663,414 @@ av_status av_segment_scan_exact(const av_segment *s, const void *query, const av
     *n_out = n;
     return AV_OK;
 }
+
+/* ------------------------------------------------------------------ HNSW persistence */
+
+#include "bitvec.h"
+#include "halfvec.h"
+#include "sparsevec.h"
+#include "storage/spin.h"
+#include "utils/varbit.h"
+#include "vector.h"
+
+#define GRAPH_HDR ((size_t) MAXALIGN(sizeof(HnswGraph)))
+
+av_status av_segment_hnsw_snapshot(const av_segment *s, void **bytes, size_t *len, av_seg_hnsw_info *info,
+                                   av_err *e)
+{
+    *bytes = NULL;
+    *len = 0;
+    if (s == NULL || s->kind != AV_SEG_HNSW || s->graph == NULL) {
+        av_err_set(e, "internal", "not an HNSW segment");
+        return AV_ERR;
+    }
+    size_t used = av_arena_file_used(s->data);
+    void *copy = malloc(used > 0 ? used : 1);
+    if (copy == NULL) {
+        av_err_set(e, "internal", "out of memory copying the HNSW graph (%zu bytes)", used);
+        return AV_ERR;
+    }
+    memcpy(copy, av_arena_file_base(s->data), used);
+    memset(info, 0, sizeof(*info));
+    info->type = s->type;
+    info->dim = s->dim;
+    info->m = s->m;
+    info->ef_construction = s->ef_construction;
+    info->count = atomic_load_explicit(&s->count, memory_order_acquire);
+    info->arena_bytes = used;
+    info->min_docid = s->min_docid;
+    info->max_docid = s->max_docid;
+    *bytes = copy;
+    *len = used;
+    return AV_OK;
+}
+
+/* Offset of a relptr target in the image, or SIZE_MAX for NULL. False when out of bounds,
+ * misaligned or overlapping the graph header, or when fewer than need bytes follow it. */
+static bool img_ptr(Size raw, size_t len, size_t need, size_t *off)
+{
+    if (raw == 0) {
+        *off = SIZE_MAX;
+        return true;
+    }
+    size_t o = (size_t) raw - 1;
+    if (o < GRAPH_HDR || o % MAXIMUM_ALIGNOF != 0 || o > len || need > len - o)
+        return false;
+    *off = o;
+    return true;
+}
+
+static int cmp_size(const void *a, const void *b)
+{
+    size_t x = *(const size_t *) a, y = *(const size_t *) b;
+    return x < y ? -1 : x > y;
+}
+
+typedef struct {
+    size_t lo, hi;
+} img_region;
+
+static int cmp_region(const void *a, const void *b)
+{
+    const img_region *x = a, *y = b;
+    return x->lo < y->lo ? -1 : x->lo > y->lo;
+}
+
+/* Record [off, off + n): every structure of the image must be disjoint, because restore resets the
+ * lock words and readers write to them, which would corrupt any structure overlapping them. */
+static bool img_region_add(img_region **r, size_t *n, size_t *cap, size_t off, size_t len)
+{
+    if (*n == *cap) {
+        size_t nc = *cap ? *cap * 2 : 256;
+        img_region *nr = realloc(*r, nc * sizeof *nr);
+        if (nr == NULL)
+            return false;
+        *r = nr;
+        *cap = nc;
+    }
+    (*r)[*n].lo = off;
+    (*r)[*n].hi = off + len;
+    (*n)++;
+    return true;
+}
+
+static bool img_is_element(const size_t *offs, size_t n, size_t off)
+{
+    return bsearch(&off, offs, n, sizeof(size_t), cmp_size) != NULL;
+}
+
+/* A stored index value must have the exact pgvector layout for (type, dim). */
+static bool img_value_ok(const char *b, size_t len, size_t off, av_vtype type, int dim)
+{
+    if (off == SIZE_MAX || len - off < 8)
+        return false;
+    const char *p = b + off;
+    if (!VARATT_IS_4B_U(p))
+        return false;
+    size_t sz = VARSIZE(p);
+    if (sz > len - off)
+        return false;
+    switch (type) {
+    case AV_VT_VECTOR: {
+        const Vector *v = (const Vector *) p;
+        return v->dim == dim && v->unused == 0 && sz == VECTOR_SIZE((size_t) dim);
+    }
+    case AV_VT_HALFVEC: {
+        const HalfVector *v = (const HalfVector *) p;
+        return v->dim == dim && v->unused == 0 && sz == HALFVEC_SIZE((size_t) dim);
+    }
+    case AV_VT_SPARSEVEC: {
+        if (sz < offsetof(SparseVector, indices))
+            return false;
+        const SparseVector *v = (const SparseVector *) p;
+        if (v->dim != dim || v->nnz < 0 || v->nnz > dim || v->unused != 0 || sz != SPARSEVEC_SIZE(v->nnz))
+            return false;
+        for (int i = 0; i < v->nnz; i++)
+            if (v->indices[i] < 0 || v->indices[i] >= dim || (i > 0 && v->indices[i] <= v->indices[i - 1]))
+                return false;
+        return true;
+    }
+    case AV_VT_BIT: {
+        if (sz < VARHDRSZ + sizeof(int32))
+            return false;
+        const VarBit *v = (const VarBit *) p;
+        return v->bit_len == dim && sz == (size_t) VARBITTOTALLEN((size_t) dim);
+    }
+    }
+    return false;
+}
+
+av_status av_segment_hnsw_restore(const void *bytes, size_t len, const av_seg_hnsw_info *expect,
+                                  const av_opclass *oc, size_t reserve_bytes, av_segment **out, av_err *e)
+{
+    *out = NULL;
+    const char *b = bytes;
+    if (bytes == NULL || len < GRAPH_HDR || len % MAXIMUM_ALIGNOF != 0 || len != expect->arena_bytes) {
+        av_err_set(e, "invalid_argument", "graph image has a bad size (%zu bytes)", len);
+        return AV_ERR;
+    }
+    if (expect->m < 2 || expect->m > HNSW_MAX_M || expect->dim < 1 || expect->count > DEFAULT_MAX_DOCIDS ||
+        expect->max_docid >= DEFAULT_MAX_DOCIDS) {
+        av_err_set(e, "invalid_argument", "graph parameters out of range");
+        return AV_ERR;
+    }
+    HnswGraph g;
+    memcpy(&g, b, sizeof g);
+    int max_level = (int) HnswGetMaxLevel((size_t) expect->m);
+
+    /* 1. Walk the element list: bounded by the expected count (also stops cycles). */
+    size_t cap = expect->count > 0 ? expect->count : 1;
+    size_t *offs = malloc(cap * sizeof(size_t));
+    roaring_bitmap_t *seen = roaring_bitmap_create();
+    av_status st = AV_ERR;
+    const char *why = NULL;
+    size_t n = 0, n_tids = 0;
+    img_region *regs = NULL;
+    size_t n_regs = 0, cap_regs = 0;
+    if (offs == NULL || seen == NULL) {
+        why = "out of memory";
+        goto done;
+    }
+    size_t cur = 0;
+    if (!img_ptr(g.head.relptr.relptr_off, len, sizeof(HnswElementData), &cur)) {
+        why = "head pointer out of bounds";
+        goto done;
+    }
+    while (cur != SIZE_MAX) {
+        if (n >= expect->count) {
+            why = "more elements than recorded (or a cycle)";
+            goto done;
+        }
+        offs[n++] = cur;
+        const HnswElementData *el = (const HnswElementData *) (b + cur);
+        if (!img_ptr(el->next.relptr.relptr_off, len, sizeof(HnswElementData), &cur)) {
+            why = "element link out of bounds";
+            goto done;
+        }
+    }
+    qsort(offs, n, sizeof(size_t), cmp_size);
+    for (size_t i = 1; i < n; i++)
+        if (offs[i] == offs[i - 1] || offs[i] - offs[i - 1] < sizeof(HnswElementData)) {
+            why = "overlapping elements";
+            goto done;
+        }
+
+    /* 2. Each element: docids, level, value, neighbour lists. */
+    for (size_t i = 0; i < n; i++) {
+        const HnswElementData *el = (const HnswElementData *) (b + offs[i]);
+        if (!img_region_add(&regs, &n_regs, &cap_regs, offs[i], sizeof(HnswElementData))) {
+            why = "out of memory";
+            goto done;
+        }
+        if (el->heaptidsLength < 1 || el->heaptidsLength > HNSW_HEAPTIDS || el->level > max_level ||
+            el->deleted != 0) {
+            why = "element header out of range";
+            goto done;
+        }
+        for (int t = 0; t < el->heaptidsLength; t++) {
+            uint32_t id = av_tid_to_docid(&el->heaptids[t]);
+            if (id > expect->max_docid || roaring_bitmap_contains(seen, id)) {
+                why = "docid out of range or duplicated";
+                goto done;
+            }
+            roaring_bitmap_add(seen, id);
+            n_tids++;
+        }
+        size_t voff = 0;
+        if (!img_ptr(el->value.relptr.relptr_off, len, 8, &voff) ||
+            !img_value_ok(b, len, voff, expect->type, expect->dim) ||
+            !img_region_add(&regs, &n_regs, &cap_regs, voff, VARSIZE(b + voff))) {
+            why = "element value malformed";
+            goto done;
+        }
+        size_t noff = 0;
+        if (!img_ptr(el->neighbors.relptr.relptr_off, len,
+                     sizeof(HnswNeighborArrayPtr) * (size_t) (el->level + 1), &noff) ||
+            noff == SIZE_MAX ||
+            !img_region_add(&regs, &n_regs, &cap_regs, noff,
+                            sizeof(HnswNeighborArrayPtr) * (size_t) (el->level + 1))) {
+            why = "neighbour table out of bounds";
+            goto done;
+        }
+        const HnswNeighborArrayPtr *lists = (const HnswNeighborArrayPtr *) (b + noff);
+        for (int lc = 0; lc <= el->level; lc++) {
+            int lm = HnswGetLayerM(expect->m, lc);
+            size_t aoff = 0;
+            if (!img_ptr(lists[lc].relptr.relptr_off, len, HNSW_NEIGHBOR_ARRAY_SIZE((size_t) lm), &aoff) ||
+                aoff == SIZE_MAX ||
+                !img_region_add(&regs, &n_regs, &cap_regs, aoff, HNSW_NEIGHBOR_ARRAY_SIZE((size_t) lm))) {
+                why = "neighbour list out of bounds";
+                goto done;
+            }
+            const HnswNeighborArray *na = (const HnswNeighborArray *) (b + aoff);
+            if (na->length < 0 || na->length > lm) {
+                why = "neighbour count out of range";
+                goto done;
+            }
+            for (int j = 0; j < na->length; j++) {
+                size_t to = 0;
+                if (!img_ptr(na->items[j].element.relptr.relptr_off, len, sizeof(HnswElementData), &to) ||
+                    to == SIZE_MAX || !img_is_element(offs, n, to) ||
+                    ((const HnswElementData *) (b + to))->level < lc) {
+                    why = "neighbour is not a valid element of that layer";
+                    goto done;
+                }
+            }
+        }
+    }
+    if (n_tids != expect->count) {
+        why = "docid count differs from the header";
+        goto done;
+    }
+    if (n_regs > 1)
+        qsort(regs, n_regs, sizeof *regs, cmp_region);
+    for (size_t i = 1; i < n_regs; i++)
+        if (regs[i].lo < regs[i - 1].hi) {
+            why = "structures overlap";
+            goto done;
+        }
+    size_t ep = 0;
+    if (!img_ptr(g.entryPoint.relptr.relptr_off, len, sizeof(HnswElementData), &ep) ||
+        (n == 0) != (ep == SIZE_MAX) || (ep != SIZE_MAX && !img_is_element(offs, n, ep))) {
+        why = "entry point is not an element";
+        goto done;
+    }
+
+    /* 3. Valid: copy into a writable arena and rebuild the docid table. */
+    {
+        av_segment *s = NULL;
+        size_t reserve = reserve_bytes > len + GRAPH_HDR ? reserve_bytes : len + GRAPH_HDR;
+        if (av_segment_create_hnsw(NULL, expect->type, expect->dim, oc, expect->m, expect->ef_construction,
+                                   reserve, &s, e) != AV_OK)
+            goto done_err;
+        char *base = av_arena_file_base(s->data);
+        if ((char *) s->graph != base ||
+            (len > GRAPH_HDR &&
+             av_arena_file_alloc(s->data, len - GRAPH_HDR, MAXIMUM_ALIGNOF, e) != base + GRAPH_HDR)) {
+            av_segment_destroy(s);
+            why = "arena layout mismatch";
+            goto done;
+        }
+        Size total = s->graph->memoryTotal;
+        memcpy(base, b, len);
+        HnswGraph *gr = s->graph;
+        SpinLockInit(&gr->lock);
+        LWLockInitialize(&gr->entryLock, hnsw_lock_tranche_id);
+        LWLockInitialize(&gr->entryWaitLock, hnsw_lock_tranche_id);
+        LWLockInitialize(&gr->allocatorLock, hnsw_lock_tranche_id);
+        LWLockInitialize(&gr->flushLock, hnsw_lock_tranche_id);
+        gr->memoryTotal = total;
+        gr->memoryUsed = (Size) av_arena_file_used(s->data);
+        gr->flushed = false;
+        if (expect->count > 0 &&
+            av_arena_file_ensure(s->table, ((size_t) expect->max_docid + 1) * sizeof(uint64_t), e) != AV_OK) {
+            av_segment_destroy(s);
+            goto done_err;
+        }
+        uint64_t *tbl = av_arena_file_base(s->table);
+        bool any = false;
+        for (size_t i = 0; i < n; i++) {
+            HnswElementData *el = (HnswElementData *) (base + offs[i]);
+            LWLockInitialize(&el->lock, hnsw_lock_tranche_id);
+            uint64_t voff = (uint64_t) (el->value.relptr.relptr_off - 1);
+            for (int t = 0; t < el->heaptidsLength; t++) {
+                uint32_t id = av_tid_to_docid(&el->heaptids[t]);
+                tbl[id] = voff;
+                if (!any || id < s->min_docid)
+                    s->min_docid = id;
+                if (!any || id > s->max_docid)
+                    s->max_docid = id;
+                any = true;
+            }
+        }
+        s->has_docid_range = any;
+        atomic_store_explicit(&s->table_len, any ? (size_t) s->max_docid + 1 : 0, memory_order_release);
+        atomic_store_explicit(&s->count, n_tids, memory_order_release);
+        *out = s;
+        st = AV_OK;
+    }
+done:
+    if (st != AV_OK && why != NULL)
+        av_err_set(e, "invalid_argument", "graph image rejected: %s", why);
+done_err:
+    free(offs);
+    free(regs);
+    roaring_bitmap_free(seen);
+    return st;
+}
+
+typedef struct {
+    const av_segment *g;
+    const av_segment *flat;
+    size_t mismatches;
+} verify_ctx;
+
+static bool verify_cb(uint32_t id, void *p)
+{
+    verify_ctx *v = p;
+    const void *raw = av_segment_get(v->flat, (av_docid) id);
+    const char *stored = av_segment_get(v->g, (av_docid) id);
+    if (stored == NULL)
+        return true; /* not in the graph: nothing to verify */
+    if (raw == NULL) {
+        v->mismatches++;
+        return true;
+    }
+    Datum in = PointerGetDatum(raw);
+    Datum value;
+    bool isnull = false;
+    HnswSupport supp = v->g->support;
+    if (!HnswFormIndexValue(&value, &in, &isnull, v->g->typeInfo, &supp)) {
+        v->mismatches++;
+        return true;
+    }
+    const char *want = DatumGetPointer(value);
+    if (VARSIZE_ANY(want) != VARSIZE_ANY(stored) || memcmp(want, stored, VARSIZE_ANY(want)) != 0)
+        v->mismatches++;
+    if (want != raw)
+        pfree((void *) want);
+    return true;
+}
+
+av_status av_segment_hnsw_verify(const av_segment *g, const av_segment *flat, const roaring_bitmap_t *live,
+                                 size_t *mismatches, av_err *e)
+{
+    *mismatches = 0;
+    if (g == NULL || g->kind != AV_SEG_HNSW || flat == NULL || live == NULL)
+        return AV_OK;
+    verify_ctx v = {g, flat, 0};
+    MemoryContext old = CurrentMemoryContext;
+    MemoryContext volatile ctx = NULL;
+    volatile av_status st = AV_OK;
+    PG_TRY();
+    {
+        ctx = AllocSetContextCreate(NULL, "hnsw_verify", ALLOCSET_DEFAULT_SIZES);
+        MemoryContextSwitchTo(ctx);
+        roaring_iterate(live, verify_cb, &v);
+    }
+    PG_CATCH();
+    {
+        av_err_set(e, "internal", "hnsw verify: %s", av_pg_error_data()->message);
+        FlushErrorState();
+        st = AV_ERR;
+    }
+    PG_END_TRY();
+    MemoryContextSwitchTo(old);
+    if (ctx != NULL)
+        MemoryContextDelete(ctx);
+    *mismatches = v.mismatches;
+    return st;
+}
+
+roaring_bitmap_t *av_segment_docids(const av_segment *s)
+{
+    roaring_bitmap_t *r = roaring_bitmap_create();
+    if (r == NULL || s == NULL)
+        return r;
+    size_t n = atomic_load_explicit(&s->table_len, memory_order_acquire);
+    const uint64_t *tbl = av_arena_file_base(s->table);
+    for (size_t i = 0; i < n; i++)
+        if (tbl[i] != 0)
+            roaring_bitmap_add(r, (uint32_t) i);
+    return r;
+}

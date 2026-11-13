@@ -16,6 +16,7 @@
 #include <roaring.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "codec/vtype.h"
 #include "index/docid.h"
@@ -89,6 +90,49 @@ av_status av_segment_scan_exact(const av_segment *s, const void *query, const av
 av_status av_segment_search_hnsw(const av_segment *s, const void *query, int ef_search, int iterative_mode,
                                  int max_scan_tuples, const roaring_bitmap_t *cand, size_t offset, size_t k,
                                  av_hit *out, size_t *n_out, av_err *e);
+
+/* ---- HNSW persistence (GitHub issue #11): snapshot / validated restore of a graph arena ---- */
+
+typedef struct {
+    av_vtype type;
+    int dim;
+    int m;
+    int ef_construction;
+    size_t count;       /* elements (one docid each) */
+    size_t arena_bytes; /* bytes of the arena image, HnswGraph at offset 0 */
+    uint32_t min_docid;
+    uint32_t max_docid;
+} av_seg_hnsw_info;
+
+/*
+ * Copy of an HNSW segment's arena [0, used) and its parameters. The caller keeps the graph from
+ * changing for the duration (the HNSW index lock, shared). *bytes is malloc'd (caller frees).
+ */
+av_status av_segment_hnsw_snapshot(const av_segment *s, void **bytes, size_t *len, av_seg_hnsw_info *info,
+                                   av_err *e);
+
+/*
+ * Writable HNSW segment from an arena image read from disk. The image is UNTRUSTED: every relative
+ * pointer is bounds- and alignment-checked, every element is reachable once from the head list,
+ * levels, neighbour counts and neighbour targets are valid (a neighbour at layer l has level >= l),
+ * values have the exact pgvector layout for (type, dim), docids are unique and <= expect->max_docid,
+ * and count / entry point match. Locks in the image are reset. expect gives the collection's type,
+ * dim, m, ef_construction and opclass, the element count and the docid bound. reserve_bytes is the
+ * address space for growth (at least len). Fuzzed by fuzz_hnsw_file.
+ */
+av_status av_segment_hnsw_restore(const void *bytes, size_t len, const av_seg_hnsw_info *expect,
+                                  const av_opclass *oc, size_t reserve_bytes, av_segment **out, av_err *e);
+
+/*
+ * Check that every docid of graph g that is in live holds the index form (normalized for cosine)
+ * of the raw vector of the same docid in flat. A mismatch means the image does not belong to this
+ * store (docids reassigned): *mismatches counts them. AV_ERR only on pgvector errors.
+ */
+av_status av_segment_hnsw_verify(const av_segment *g, const av_segment *flat, const roaring_bitmap_t *live,
+                                 size_t *mismatches, av_err *e);
+
+/* Docids stored in a segment (caller frees). NULL on out of memory. */
+roaring_bitmap_t *av_segment_docids(const av_segment *s);
 
 #define AV_SEG_MAGIC "AVSEG1"
 

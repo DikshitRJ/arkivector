@@ -5,6 +5,7 @@
  *   1: eth_getLogs result array (av_events_parse)
  *   2: one log object           (av_event_parse)
  *   3: entity array, as in an arkiv_query "data" member
+ *   4: eth_feeHistory result     (av_fee_history_parse + av_fee_from_history)
  * Parsed entities are deep-copied with av_entity_copy to exercise the canonical-bytes invariants.
  */
 #include <stdint.h>
@@ -13,6 +14,7 @@
 
 #include "arkiv/entity.h"
 #include "arkiv/logs.h"
+#include "write/fees.h"
 #include "yyjson.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
@@ -44,7 +46,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     yyjson_val *root = yyjson_doc_get_root(d);
     av_arena *a = av_arena_create("fuzz", 64 * 1024, 64 * 1024 * 1024);
     av_err err;
-    switch (data[0] % 4) {
+    switch (data[0] % 5) {
     case 0: {
         av_entity e;
         if (av_entity_from_json(root, a, &e, &err) == AV_OK)
@@ -62,6 +64,22 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         av_event ev;
         bool known;
         (void) av_event_parse(root, &ev, &known, &err);
+        break;
+    }
+    case 4: {
+        static av_fee_history h;
+        if (av_fee_history_parse(root, &h, &err) == AV_OK) {
+            if (h.n_blocks > AV_FEE_HISTORY_MAX_BLOCKS)
+                abort();
+            av_fee_config c;
+            memset(&c, 0, sizeof c);
+            av_fee_config_defaults(&c);
+            c.max_fee_cap = (uint64_t) data[size - 1] * 1000000000ULL;
+            av_fee_quote q;
+            if (av_fee_from_history(&h, &c, &q) && (q.max_priority_fee_per_gas > q.max_fee_per_gas ||
+                                                    (c.max_fee_cap > 0 && q.max_fee_per_gas > c.max_fee_cap)))
+                abort();
+        }
         break;
     }
     default: {

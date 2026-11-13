@@ -25,4 +25,9 @@ av_status av_nonce_tracker_resync(av_nonce_tracker *nt, av_err *e);
 /* Peek current tracked nonce */
 uint64_t av_nonce_tracker_current(const av_nonce_tracker *nt);
 
+/* Forget the local nonce: the next av_nonce_tracker_next resyncs from eth_getTransactionCount
+ * ("pending"). Call after a failed send, a revert or a receipt timeout, so a nonce gap never
+ * leaves every later transaction stuck. */
+void av_nonce_tracker_invalidate(av_nonce_tracker *nt);
+
 #endif /* AV_WRITE_NONCE_H */

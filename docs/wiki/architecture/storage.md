@@ -20,7 +20,7 @@ Each vector version gets a dense 32-bit **docid**. Keys map to docids and back (
 
 The **flat segment** (`<collection>.flat`) stores every vector version as pgvector's in-memory struct (`Vector`, `HalfVector`, `VarBit`, `SparseVector`) in a memory-mapped, append-only arena file, plus a docid → offset table. Exact scans and the final rescoring of HNSW hits read vectors in place, with no copy and no decoding. It is rebuilt from the LMDB rows at start.
 
-Collections with an HNSW index also keep an **HNSW graph** in memory: pgvector's own in-memory graph, built by pgvector's insert code ([Search and HNSW](search.md)). The flat segment stays the source of truth: the graph only decides which candidates to score.
+Collections with an HNSW index also keep **HNSW graphs**, one per expiry band: pgvector's own in-memory graph, built by pgvector's insert code ([Search and HNSW](search.md)). They are saved to `segments/<collection>/<band>.hnsw` (a 256-byte header with the build parameters, opclass, pgvector version, docid bound, block watermark and CRC-32, then the graph's arena image, which uses relative pointers and loads at any address). The flat segment stays the source of truth: the graphs only decide which candidates to score, and a graph file can always be deleted (it is rebuilt).
 
 ## Live bitmap
 

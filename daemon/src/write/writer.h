@@ -16,6 +16,7 @@
 #include "log.h"
 #include "store/lmdb_store.h"
 #include "write/batcher.h"
+#include "write/fees.h"
 #include "write/nonce.h"
 #include "yyjson.h"
 
@@ -25,10 +26,30 @@ typedef struct {
     uint64_t chain_id;
     uint8_t contract_addr[20];
     av_batcher_config batcher;
-    uint64_t gas_limit;
-    uint64_t max_fee_per_gas;
-    uint64_t max_priority_fee_per_gas;
+    uint64_t gas_limit;                /* fallback base gas when eth_estimateGas fails (default 60000) */
+    uint64_t max_fee_per_gas;          /* static fee, last resort of the fee chain (default 20 gwei) */
+    uint64_t max_priority_fee_per_gas; /* static tip, last resort of the fee chain (default 1.5 gwei) */
+    uint64_t max_fee_cap;              /* wei, 0 = no cap (write.max_fee_cap_gwei) */
+    double priority_fee_percentile;    /* eth_feeHistory percentile (write.priority_fee_percentile, 50) */
+    uint32_t fee_history_blocks;       /* eth_feeHistory block count (write.fee_history_blocks, 20) */
+    uint32_t gas_margin_pct;           /* margin over eth_estimateGas (write.gas_margin_pct, 20) */
+    uint32_t replace_after_blocks;     /* resend a stuck tx after this many blocks (0 = default 10) */
+    uint32_t max_replacements;         /* resends per transaction (default 3; set no_replace to disable) */
+    bool no_replace;
 } av_writer_config;
+
+/*
+ * Concurrency: one writer is shared by every HTTP worker. Entity-nonce reservation, transaction
+ * nonce allocation, signing and eth_sendRawTransaction run under the writer's submit mutex, so the
+ * order of entity keys predicted for concurrent requests matches the order their transactions take
+ * on chain. Receipt waits run outside the mutex.
+ *
+ * Entity keys (GitHub issue #13): creates are keyed by the signer's on-chain entityNonce (eth_call
+ * entityNonce(address) at "pending"), advanced locally per create. The local floor covers this
+ * daemon's own transactions still in flight; the chain value covers creates made elsewhere by the
+ * same wallet. With wait "receipt"/"indexed" the keys come from the EntityCreated logs of the
+ * receipts, so they are exact even when the prediction was not.
+ */
 
 typedef struct av_writer av_writer;
 

@@ -5,9 +5,11 @@
 
 #include <inttypes.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "postgres.h"
@@ -17,6 +19,7 @@
 #include "arkiv/abi.h"
 #include "arkiv/entity.h"
 #include "arkiv/keccak.h"
+#include "arkiv/logs.h"
 #include "arkiv/tx.h"
 #include "codec/base64.h"
 #include "codec/hex.h"
@@ -25,7 +28,16 @@
 #include "codec/vtype.h"
 #include "core/coldef.h"
 #include "filter/value.h"
+#include "server/metrics.h"
 #include "store/schema.h"
+
+/*
+ * Fallback gas when eth_estimateGas is unavailable. One create of a small halfvec entity used about
+ * 135k gas on Rabdi (21k intrinsic + calldata + storage); 150k per op plus a 60k base covers it
+ * without the old 500k-per-transaction over-reservation (gas limit x max fee must be affordable).
+ */
+#define AV_GAS_PER_OP_FALLBACK 150000ULL
+#define AV_GAS_BASE_FALLBACK   60000ULL
 
 struct av_writer {
     av_writer_config cfg;
@@ -34,6 +46,10 @@ struct av_writer {
     av_store *store;
     av_registry *reg;
     av_nonce_tracker *nonce_tracker;
+    /* submit_mu: entity-nonce reservation + tx nonce allocation + broadcast (see writer.h) */
+    pthread_mutex_t submit_mu;
+    uint64_t entity_nonce_floor; /* next entityNonce after this daemon's own in-flight creates */
+    bool entity_nonce_valid;
 };
 
 av_writer *av_writer_create(const av_writer_config *cfg, av_signer *signer, av_rpc *rpc, av_store *store,
@@ -51,11 +67,22 @@ av_writer *av_writer_create(const av_writer_config *cfg, av_signer *signer, av_r
         av_addr_from_hex(AV_ARKIV_CONTRACT_ADDR, w->cfg.contract_addr);
     }
     if (w->cfg.gas_limit == 0)
-        w->cfg.gas_limit = 500000;
+        w->cfg.gas_limit = AV_GAS_BASE_FALLBACK;
     if (w->cfg.max_fee_per_gas == 0)
         w->cfg.max_fee_per_gas = 20000000000ULL; /* 20 gwei */
     if (w->cfg.max_priority_fee_per_gas == 0)
         w->cfg.max_priority_fee_per_gas = 1500000000ULL; /* 1.5 gwei */
+    if (w->cfg.priority_fee_percentile <= 0.0 || w->cfg.priority_fee_percentile > 100.0)
+        w->cfg.priority_fee_percentile = 50.0;
+    if (w->cfg.fee_history_blocks == 0)
+        w->cfg.fee_history_blocks = 20;
+    if (w->cfg.gas_margin_pct == 0)
+        w->cfg.gas_margin_pct = 20;
+    if (w->cfg.replace_after_blocks == 0)
+        w->cfg.replace_after_blocks = 10;
+    if (w->cfg.max_replacements == 0)
+        w->cfg.max_replacements = 3;
+    pthread_mutex_init(&w->submit_mu, NULL);
 
     w->signer = signer;
     w->rpc = rpc;
@@ -78,6 +105,7 @@ void av_writer_destroy(av_writer *w)
         av_nonce_tracker_destroy(w->nonce_tracker);
         w->nonce_tracker = NULL;
     }
+    pthread_mutex_destroy(&w->submit_mu);
     free(w);
 }
 
@@ -332,66 +360,524 @@ static av_status parse_entity_vector(yyjson_val *vec_val, yyjson_val *vb_val, co
     return AV_ERR;
 }
 
-/* Helper to broadcast a batch of transactions and wait for receipts */
+/* ------------------------------------------------------------------ transactions */
 
-/* Fallback gas limit when eth_estimateGas is unavailable: the old 50k per op was too low (a create
- * costs about 110k on Rabdi), so 10-entity batches ran out of gas and reverted. */
-#define AV_GAS_PER_OP_FALLBACK 130000ULL
+#define AV_MAX_REPLACEMENTS 8
+
+static av_mfamily *g_m_gas_used, *g_m_gas_reserved, *g_m_gas_price, *g_m_fee_source, *g_m_gas_fallback,
+    *g_m_replacements, *g_m_txs;
+static pthread_once_t g_metrics_once = PTHREAD_ONCE_INIT;
+
+static void writer_metrics_init(void)
+{
+    static const char *const src_label[] = {"source"};
+    g_m_gas_used = av_metric_register("arkivector_write_gas_used_total",
+                                      "Gas used by mined write transactions", AV_MTYPE_COUNTER, NULL, 0);
+    g_m_gas_reserved =
+        av_metric_register("arkivector_write_gas_reserved_total",
+                           "Gas limit reserved by mined write transactions", AV_MTYPE_COUNTER, NULL, 0);
+    g_m_gas_price =
+        av_metric_register("arkivector_write_effective_gas_price_wei",
+                           "effectiveGasPrice of the last mined write transaction", AV_MTYPE_GAUGE, NULL, 0);
+    g_m_fee_source = av_metric_register("arkivector_write_fee_quotes_total",
+                                        "Fee quotes by source (fee_history, gas_price, static)",
+                                        AV_MTYPE_COUNTER, src_label, 1);
+    g_m_gas_fallback = av_metric_register("arkivector_write_gas_estimate_fallback_total",
+                                          "Transactions whose gas limit fell back to the static estimate",
+                                          AV_MTYPE_COUNTER, NULL, 0);
+    g_m_replacements =
+        av_metric_register("arkivector_write_tx_replacements_total",
+                           "Stuck transactions resent with bumped fees", AV_MTYPE_COUNTER, NULL, 0);
+    g_m_txs = av_metric_register("arkivector_write_transactions_total", "Write transactions broadcast",
+                                 AV_MTYPE_COUNTER, NULL, 0);
+}
+
+static av_fee_config fee_config(const av_writer *w)
+{
+    av_fee_config fc;
+    memset(&fc, 0, sizeof(fc));
+    fc.max_fee_cap = w->cfg.max_fee_cap;
+    fc.priority_percentile = w->cfg.priority_fee_percentile;
+    fc.history_blocks = w->cfg.fee_history_blocks;
+    fc.static_max_fee = w->cfg.max_fee_per_gas;
+    fc.static_priority_fee = w->cfg.max_priority_fee_per_gas;
+    av_fee_config_defaults(&fc);
+    return fc;
+}
+
+static char *hex_alloc(av_arena *arena, const uint8_t *b, size_t n)
+{
+    static const char hexd[] = "0123456789abcdef";
+    char *s = av_arena_alloc(arena, n * 2 + 3, 1);
+    if (s == NULL)
+        return NULL;
+    s[0] = '0';
+    s[1] = 'x';
+    for (size_t i = 0; i < n; i++) {
+        s[2 + 2 * i] = hexd[b[i] >> 4];
+        s[3 + 2 * i] = hexd[b[i] & 15];
+    }
+    s[2 + 2 * n] = '\0';
+    return s;
+}
 
 /*
- * Ask the chain what the transaction needs (eth_estimateGas) and add a 30% margin.
- * Returns `fallback` when the call fails, so a flaky RPC never blocks a write.
+ * eth_estimateGas plus gas_margin_pct. Returns the static fallback (and counts/logs it) when the call
+ * fails, so a flaky RPC never blocks a write. *used_fallback tells the caller which path ran.
  */
 static uint64_t estimate_gas_limit(av_writer *w, const uint8_t from[20], const uint8_t *data, size_t data_len,
-                                   av_arena *arena, uint64_t fallback)
+                                   size_t n_ops, av_arena *arena, bool *used_fallback)
 {
-    if (w->rpc == NULL || from == NULL)
-        return fallback;
-    static const char hexd[] = "0123456789abcdef";
-    size_t cap = 160 + data_len * 2;
-    char *params = av_arena_alloc(arena, cap, 0);
-    if (params == NULL)
-        return fallback;
-    size_t n = 0;
-    n += (size_t) snprintf(params + n, cap - n, "[{\"from\":\"0x");
-    for (size_t i = 0; i < 20; i++) {
-        params[n++] = hexd[from[i] >> 4];
-        params[n++] = hexd[from[i] & 15];
-    }
-    n += (size_t) snprintf(params + n, cap - n, "\",\"to\":\"0x");
-    for (size_t i = 0; i < 20; i++) {
-        params[n++] = hexd[w->cfg.contract_addr[i] >> 4];
-        params[n++] = hexd[w->cfg.contract_addr[i] & 15];
-    }
-    n += (size_t) snprintf(params + n, cap - n, "\",\"data\":\"0x");
-    for (size_t i = 0; i < data_len; i++) {
-        params[n++] = hexd[data[i] >> 4];
-        params[n++] = hexd[data[i] & 15];
-    }
-    snprintf(params + n, cap - n, "\"}]");
-
-    yyjson_doc *doc = NULL;
-    yyjson_val *res = NULL;
-    int code = 0;
+    (void) pthread_once(&g_metrics_once, writer_metrics_init);
+    *used_fallback = false;
+    const char *why = "no RPC configured";
     av_err ee;
     av_err_clear(&ee);
-    uint64_t out = fallback;
-    if (av_rpc_call(w->rpc, "eth_estimateGas", params, &doc, &res, &code, &ee) == AV_OK && res != NULL) {
-        const char *hex = yyjson_get_str(res);
-        if (hex != NULL) {
-            char *end = NULL;
-            unsigned long long est = strtoull(hex, &end, 16);
-            if (end != hex && est > 0 && est < 30000000ULL) {
-                out = (uint64_t) est + (uint64_t) est * 3 / 10 + 21000;
+    if (w->rpc != NULL && from != NULL) {
+        char *from_hex = hex_alloc(arena, from, 20);
+        char *to_hex = hex_alloc(arena, w->cfg.contract_addr, 20);
+        char *data_hex = hex_alloc(arena, data, data_len);
+        size_t cap = data_len * 2 + 160;
+        char *params = av_arena_alloc(arena, cap, 1);
+        why = "out of memory";
+        if (from_hex != NULL && to_hex != NULL && data_hex != NULL && params != NULL) {
+            snprintf(params, cap, "[{\"from\":\"%s\",\"to\":\"%s\",\"data\":\"%s\"}]", from_hex, to_hex,
+                     data_hex);
+            yyjson_doc *doc = NULL;
+            yyjson_val *res = NULL;
+            int code = 0;
+            why = "eth_estimateGas returned an unusable value";
+            if (av_rpc_call(w->rpc, "eth_estimateGas", params, &doc, &res, &code, &ee) == AV_OK) {
+                uint64_t est = 0;
+                const char *hex = yyjson_get_str(res);
+                bool ok = hex != NULL && av_qty_parse(hex, &est) && est > 0 && est < 30000000ULL;
+                yyjson_doc_free(doc);
+                if (ok)
+                    return est + est * w->cfg.gas_margin_pct / 100;
+            } else {
+                why = ee.msg;
             }
         }
     }
-    if (doc != NULL)
-        yyjson_doc_free(doc);
+    uint64_t out = w->cfg.gas_limit + (uint64_t) n_ops * AV_GAS_PER_OP_FALLBACK;
+    *used_fallback = true;
+    av_log(AV_LOG_WARN, "writer", "gas estimate fallback (%s): %" PRIu64 " gas for %zu ops", why, out, n_ops);
+    av_metric_inc(g_m_gas_fallback, NULL, 1);
     return out;
 }
 
+/* eth_call entityNonce(owner) at "pending" on the Arkiv contract. */
+static av_status fetch_entity_nonce(av_writer *w, const uint8_t owner[20], uint64_t *out, av_err *e)
+{
+    if (w->rpc == NULL) {
+        av_err_set(e, "arkiv_rpc_error", "no Arkiv RPC configured to read entityNonce");
+        return AV_ERR;
+    }
+    static const char hexd[] = "0123456789abcdef";
+    char to_hex[43];
+    av_addr_to_hex(w->cfg.contract_addr, to_hex);
+    char data[2 + 8 + 64 + 1];
+    memcpy(data, "0x36917bfd", 10); /* entityNonce(address) */
+    memset(data + 10, '0', 24);
+    for (size_t i = 0; i < 20; i++) {
+        data[34 + 2 * i] = hexd[owner[i] >> 4];
+        data[35 + 2 * i] = hexd[owner[i] & 15];
+    }
+    data[74] = '\0';
+    char params[192];
+    snprintf(params, sizeof(params), "[{\"to\":\"%s\",\"data\":\"%s\"},\"pending\"]", to_hex, data);
+    yyjson_doc *doc = NULL;
+    yyjson_val *res = NULL;
+    int code = 0;
+    if (av_rpc_call(w->rpc, "eth_call", params, &doc, &res, &code, e) != AV_OK)
+        return AV_ERR;
+    uint8_t word[32];
+    const char *hex = yyjson_get_str(res);
+    bool ok = hex != NULL && av_key_from_hex(hex, word);
+    if (ok) {
+        for (size_t i = 0; i < 24; i++)
+            if (word[i] != 0)
+                ok = false;
+    }
+    if (doc != NULL)
+        yyjson_doc_free(doc);
+    if (!ok) {
+        av_err_set(e, "arkiv_rpc_error", "entityNonce returned a malformed value");
+        return AV_ERR;
+    }
+    uint64_t n = 0;
+    for (size_t i = 24; i < 32; i++)
+        n = (n << 8) | word[i];
+    *out = n;
+    return AV_OK;
+}
+
+static void invalidate_nonces(av_writer *w)
+{
+    pthread_mutex_lock(&w->submit_mu);
+    w->entity_nonce_valid = false;
+    pthread_mutex_unlock(&w->submit_mu);
+    av_nonce_tracker_invalidate(w->nonce_tracker);
+}
+
+/* One broadcast transaction and its replacements (same nonce, bumped fees). */
+typedef struct {
+    av_tx_desc desc;
+    av_fee_quote fee;
+    char hashes[AV_MAX_REPLACEMENTS + 1][67];
+    size_t n_hashes;
+    uint64_t sent_block;
+    size_t first_create; /* index into the create list (keys from the receipt logs) */
+    size_t n_creates;
+    char mined_hash[67];
+    uint64_t block;
+} pending_tx;
+
+/* Sign desc and eth_sendRawTransaction it; writes the hash. */
+static av_status sign_and_send(av_writer *w, const av_tx_desc *desc, av_arena *arena, char hash_out[67],
+                               av_err *e)
+{
+    uint8_t *raw_tx = NULL;
+    size_t raw_len = 0;
+    uint8_t tx_hash[32];
+    if (av_tx_sign_and_encode(desc, w->signer, arena, &raw_tx, &raw_len, tx_hash, e) != AV_OK)
+        return AV_ERR;
+    av_key_to_hex(tx_hash, hash_out);
+    if (w->rpc == NULL)
+        return AV_OK;
+    char *raw_hex = hex_alloc(arena, raw_tx, raw_len);
+    size_t cap = raw_len * 2 + 16;
+    char *params = av_arena_alloc(arena, cap, 1);
+    if (raw_hex == NULL || params == NULL) {
+        av_err_set(e, "internal", "out of memory for raw transaction");
+        return AV_ERR;
+    }
+    snprintf(params, cap, "[\"%s\"]", raw_hex);
+    yyjson_doc *doc = NULL;
+    yyjson_val *res = NULL;
+    int code = 0;
+    av_status st = av_rpc_call(w->rpc, "eth_sendRawTransaction", params, &doc, &res, &code, e);
+    if (doc != NULL)
+        yyjson_doc_free(doc);
+    if (st != AV_OK) {
+        /* av_rpc_call reports JSON-RPC errors (reverts at submission, underpriced, nonce) as arkiv_rpc_error */
+        if (code != 0) {
+            char msg[sizeof(e->msg)];
+            snprintf(msg, sizeof(msg), "%s", e->msg);
+            av_err_set(e, "tx_reverted", "transaction rejected: %s", msg);
+        }
+        return AV_ERR;
+    }
+    av_metric_inc(g_m_txs, NULL, 1);
+    return AV_OK;
+}
+
+typedef struct {
+    av_upsert_item_result *results; /* NULL for delete/extend */
+    const size_t *create_res;       /* create i -> results index */
+    size_t n_creates;
+    bool strict_prediction; /* wait none: a failed entityNonce read fails the request */
+} key_plan;
+
+/*
+ * Reserve entity nonces, allocate transaction nonces, sign and broadcast every batch, in order,
+ * under the submit mutex. Gas limits and the fee quote are computed before taking it.
+ */
+static av_status submit_batches(av_writer *w, const av_op_batch *batches, size_t n_batches,
+                                const av_mutation_op *ops_base, key_plan *kp, av_arena *arena,
+                                pending_tx **out, av_err *e)
+{
+    (void) pthread_once(&g_metrics_once, writer_metrics_init);
+    *out = NULL;
+    pending_tx *txs = av_arena_alloc(arena, n_batches * sizeof(*txs), _Alignof(pending_tx));
+    if (txs == NULL) {
+        av_err_set(e, "internal", "out of memory allocating transactions");
+        return AV_ERR;
+    }
+    memset(txs, 0, n_batches * sizeof(*txs));
+
+    av_fee_config fc = fee_config(w);
+    av_fee_quote fee;
+    av_fee_quote_rpc(w->rpc, &fc, &fee);
+    const char *src_name = av_fee_source_name(fee.source);
+    av_metric_inc(g_m_fee_source, &src_name, 1);
+
+    const uint8_t *from = av_signer_get_address(w->signer);
+    size_t create_cursor = 0;
+    for (size_t i = 0; i < n_batches; i++) {
+        bool fb = false;
+        txs[i].desc.chain_id = w->cfg.chain_id;
+        txs[i].desc.max_priority_fee_per_gas = fee.max_priority_fee_per_gas;
+        txs[i].desc.max_fee_per_gas = fee.max_fee_per_gas;
+        txs[i].desc.gas_limit = estimate_gas_limit(w, from, batches[i].calldata, batches[i].calldata_len,
+                                                   batches[i].n_ops, arena, &fb);
+        memcpy(txs[i].desc.to, w->cfg.contract_addr, 20);
+        txs[i].desc.data = batches[i].calldata;
+        txs[i].desc.data_len = batches[i].calldata_len;
+        txs[i].fee = fee;
+        txs[i].first_create = create_cursor;
+        for (size_t j = 0; j < batches[i].n_ops; j++)
+            if (batches[i].ops[j].type == AV_OP_CREATE)
+                txs[i].n_creates++;
+        create_cursor += txs[i].n_creates;
+    }
+    (void) ops_base;
+
+    pthread_mutex_lock(&w->submit_mu);
+    if (kp != NULL && kp->n_creates > 0) {
+        uint64_t chain_nonce = 0;
+        av_err ne;
+        av_err_clear(&ne);
+        bool have = fetch_entity_nonce(w, from, &chain_nonce, &ne) == AV_OK;
+        if (!have && kp->strict_prediction) {
+            pthread_mutex_unlock(&w->submit_mu);
+            av_err_set(e, "arkiv_rpc_error",
+                       "cannot predict entity keys: reading entityNonce failed (%s); retry, or use wait "
+                       "\"receipt\" to take keys from the receipts",
+                       ne.msg);
+            return AV_ERR;
+        }
+        if (!have)
+            av_log(AV_LOG_WARN, "writer", "entityNonce read failed (%s); keys will come from the receipts",
+                   ne.msg);
+        uint64_t base = chain_nonce;
+        if (w->entity_nonce_valid && w->entity_nonce_floor > base)
+            base = w->entity_nonce_floor;
+        if (!have && !w->entity_nonce_valid)
+            base = 0; /* placeholder: replaced from the receipt logs */
+        size_t ci = 0;
+        for (size_t i = 0; i < n_batches; i++) {
+            for (size_t j = 0; j < batches[i].n_ops; j++) {
+                const av_mutation_op *op = &batches[i].ops[j];
+                if (op->type != AV_OP_CREATE)
+                    continue;
+                av_abi_predict_entity_key(w->cfg.chain_id, w->cfg.contract_addr, from, base + ci,
+                                          op->u.create.salt, kp->results[kp->create_res[ci]].key);
+                ci++;
+            }
+        }
+        if (have || w->entity_nonce_valid) {
+            w->entity_nonce_floor = base + kp->n_creates;
+            w->entity_nonce_valid = true;
+        }
+    }
+    for (size_t i = 0; i < n_batches; i++) {
+        uint64_t nonce = 0;
+        av_status st = av_nonce_tracker_next(w->nonce_tracker, &nonce, e);
+        if (st == AV_OK) {
+            txs[i].desc.nonce = nonce;
+            st = sign_and_send(w, &txs[i].desc, arena, txs[i].hashes[0], e);
+        }
+        if (st != AV_OK) {
+            w->entity_nonce_valid = false;
+            pthread_mutex_unlock(&w->submit_mu);
+            av_nonce_tracker_invalidate(w->nonce_tracker);
+            return AV_ERR;
+        }
+        txs[i].n_hashes = 1;
+        if (w->rpc != NULL)
+            (void) av_rpc_block_number(w->rpc, &txs[i].sent_block, e);
+        av_err_clear(e);
+        av_log(AV_LOG_INFO, "writer",
+               "tx %s nonce %" PRIu64 ": %zu ops, gas limit %" PRIu64 ", max fee %" PRIu64
+               " wei, tip %" PRIu64 " wei (%s)",
+               txs[i].hashes[0], nonce, batches[i].n_ops, txs[i].desc.gas_limit, txs[i].desc.max_fee_per_gas,
+               txs[i].desc.max_priority_fee_per_gas, src_name);
+    }
+    pthread_mutex_unlock(&w->submit_mu);
+    *out = txs;
+    return AV_OK;
+}
+
+/* Resend tx with the same nonce and bumped fees. Errors (already mined, underpriced) are logged only. */
+static void replace_tx(av_writer *w, pending_tx *tx, av_arena *arena)
+{
+    av_fee_config fc = fee_config(w);
+    av_fee_quote fresh, bumped;
+    av_fee_quote_rpc(w->rpc, &fc, &fresh);
+    av_fee_bump(&tx->fee, &fresh, &fc, &bumped);
+    av_tx_desc d = tx->desc;
+    d.max_fee_per_gas = bumped.max_fee_per_gas;
+    d.max_priority_fee_per_gas = bumped.max_priority_fee_per_gas;
+    av_err e;
+    av_err_clear(&e);
+    char hash[67];
+    if (sign_and_send(w, &d, arena, hash, &e) != AV_OK) {
+        av_log(AV_LOG_WARN, "writer", "replacement of tx %s (nonce %" PRIu64 ") not accepted: %s",
+               tx->hashes[tx->n_hashes - 1], d.nonce, e.msg);
+        tx->fee = bumped; /* the next attempt bumps from here */
+        return;
+    }
+    av_log(AV_LOG_WARN, "writer",
+           "tx %s (nonce %" PRIu64 ") not mined after %u blocks: replaced by %s (max fee %" PRIu64
+           " wei, tip %" PRIu64 " wei)",
+           tx->hashes[tx->n_hashes - 1], d.nonce, w->cfg.replace_after_blocks, hash, d.max_fee_per_gas,
+           d.max_priority_fee_per_gas);
+    memcpy(tx->hashes[tx->n_hashes++], hash, 67);
+    tx->desc = d;
+    tx->fee = bumped;
+    av_metric_inc(g_m_replacements, NULL, 1);
+}
+
+/* Keys of the EntityCreated logs (Arkiv contract only) of one receipt, in log order. */
+static size_t receipt_created_keys(yyjson_val *receipt, const uint8_t contract[20], uint8_t (*keys)[32],
+                                   size_t max)
+{
+    size_t n = 0;
+    yyjson_val *logs = yyjson_obj_get(receipt, "logs");
+    size_t idx, mx;
+    yyjson_val *lg;
+    if (!yyjson_is_arr(logs))
+        return 0;
+    yyjson_arr_foreach(logs, idx, mx, lg)
+    {
+        uint8_t addr[20];
+        const char *as = yyjson_get_str(yyjson_obj_get(lg, "address"));
+        if (as == NULL || !av_addr_from_hex(as, addr) || memcmp(addr, contract, 20) != 0)
+            continue;
+        av_event ev;
+        bool known = false;
+        av_err pe;
+        if (av_event_parse(lg, &ev, &known, &pe) != AV_OK || !known || ev.kind != AV_EV_CREATED)
+            continue;
+        if (n < max)
+            memcpy(keys[n], ev.key, 32);
+        n++;
+    }
+    return n;
+}
+
+static void receipt_metrics(const pending_tx *tx, yyjson_val *rc)
+{
+    uint64_t gas_used = 0, price = 0;
+    const char *gu = yyjson_get_str(yyjson_obj_get(rc, "gasUsed"));
+    const char *ep = yyjson_get_str(yyjson_obj_get(rc, "effectiveGasPrice"));
+    bool has_gu = gu != NULL && av_qty_parse(gu, &gas_used);
+    bool has_ep = ep != NULL && av_qty_parse(ep, &price);
+    if (has_gu) {
+        av_metric_inc(g_m_gas_used, NULL, (double) gas_used);
+        av_metric_inc(g_m_gas_reserved, NULL, (double) tx->desc.gas_limit);
+    }
+    if (has_ep)
+        av_metric_set(g_m_gas_price, NULL, (double) price);
+    av_log(AV_LOG_INFO, "writer",
+           "tx %s mined in block %" PRIu64 ": gas used %" PRIu64 " of %" PRIu64
+           " reserved, effective gas price %" PRIu64 " wei",
+           tx->mined_hash, tx->block, gas_used, tx->desc.gas_limit, price);
+}
+
+/*
+ * Poll receipts for every transaction (all of its hashes). A transaction not mined after
+ * replace_after_blocks blocks is resent with bumped fees (max_replacements times). Created-entity
+ * keys are taken from the receipt logs when kp is given.
+ */
+static av_status wait_receipts(av_writer *w, pending_tx *txs, size_t n, int timeout_ms, key_plan *kp,
+                               av_arena *arena, uint64_t *highest, av_err *e)
+{
+    *highest = 0;
+    if (w->rpc == NULL)
+        return AV_OK;
+    int max_wait = timeout_ms > 0 ? timeout_ms : 60000;
+    struct timespec t0;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    uint32_t replace_after = w->cfg.replace_after_blocks > 0 ? w->cfg.replace_after_blocks : 10;
+    uint32_t max_repl = w->cfg.no_replace ? 0 : w->cfg.max_replacements;
+    if (max_repl > AV_MAX_REPLACEMENTS)
+        max_repl = AV_MAX_REPLACEMENTS;
+
+    for (size_t i = 0; i < n; i++) {
+        pending_tx *tx = &txs[i];
+        int sleep_ms = 50;
+        uint64_t last_head_check = 0;
+        for (;;) {
+            for (size_t h = 0; h < tx->n_hashes && tx->mined_hash[0] == '\0'; h++) {
+                char qparams[96];
+                snprintf(qparams, sizeof(qparams), "[\"%s\"]", tx->hashes[h]);
+                yyjson_doc *rc_doc = NULL;
+                yyjson_val *rc = NULL;
+                int rc_code = 0;
+                av_err pe;
+                av_err_clear(&pe);
+                if (av_rpc_call(w->rpc, "eth_getTransactionReceipt", qparams, &rc_doc, &rc, &rc_code, &pe) !=
+                        AV_OK ||
+                    rc == NULL || yyjson_is_null(rc)) {
+                    if (rc_doc != NULL)
+                        yyjson_doc_free(rc_doc);
+                    continue;
+                }
+                const char *st_str = yyjson_get_str(yyjson_obj_get(rc, "status"));
+                if (st_str != NULL && strcmp(st_str, "0x0") == 0) {
+                    yyjson_doc_free(rc_doc);
+                    invalidate_nonces(w);
+                    av_err_set(e, "tx_reverted", "transaction %s reverted on-chain", tx->hashes[h]);
+                    return AV_ERR;
+                }
+                const char *bn = yyjson_get_str(yyjson_obj_get(rc, "blockNumber"));
+                if (bn != NULL)
+                    (void) av_qty_parse(bn, &tx->block);
+                memcpy(tx->mined_hash, tx->hashes[h], 67);
+                receipt_metrics(tx, rc);
+                if (kp != NULL && kp->results != NULL && tx->n_creates > 0) {
+                    uint8_t (*keys)[32] = av_arena_alloc(arena, tx->n_creates * 32, 1);
+                    size_t got = keys != NULL
+                                     ? receipt_created_keys(rc, w->cfg.contract_addr, keys, tx->n_creates)
+                                     : 0;
+                    if (got == tx->n_creates) {
+                        for (size_t c = 0; c < tx->n_creates; c++) {
+                            uint8_t *dst = kp->results[kp->create_res[tx->first_create + c]].key;
+                            if (memcmp(dst, keys[c], 32) != 0) {
+                                char pk[67], rk[67];
+                                av_key_to_hex(dst, pk);
+                                av_key_to_hex(keys[c], rk);
+                                av_log(AV_LOG_WARN, "writer",
+                                       "predicted key %s differs from the mined key %s", pk, rk);
+                                memcpy(dst, keys[c], 32);
+                            }
+                        }
+                    } else {
+                        av_log(AV_LOG_WARN, "writer", "receipt %s has %zu EntityCreated logs for %zu creates",
+                               tx->mined_hash, got, tx->n_creates);
+                    }
+                }
+                yyjson_doc_free(rc_doc);
+            }
+            if (tx->mined_hash[0] != '\0')
+                break;
+
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            long elapsed = (long) (now.tv_sec - t0.tv_sec) * 1000L + (now.tv_nsec - t0.tv_nsec) / 1000000L;
+            if (elapsed >= max_wait) {
+                invalidate_nonces(w);
+                av_err_set(e, "consistency_timeout", "timeout waiting for the receipt of transaction %s",
+                           tx->hashes[tx->n_hashes - 1]);
+                return AV_ERR;
+            }
+            /* Stuck? Check the head about every 500 ms. */
+            if (tx->n_hashes <= max_repl && (uint64_t) elapsed >= last_head_check + 500) {
+                last_head_check = (uint64_t) elapsed;
+                uint64_t head = 0;
+                av_err be;
+                av_err_clear(&be);
+                if (av_rpc_block_number(w->rpc, &head, &be) == AV_OK &&
+                    head >= tx->sent_block + replace_after) {
+                    replace_tx(w, tx, arena);
+                    tx->sent_block = head;
+                }
+            }
+            usleep((useconds_t) (sleep_ms * 1000));
+            if (sleep_ms < 250)
+                sleep_ms += 50;
+        }
+        if (tx->block > *highest)
+            *highest = tx->block;
+    }
+    return AV_OK;
+}
+
+/* Submit, then wait as requested. tx hashes reported are the mined ones (after any replacement). */
 static av_status broadcast_and_wait(av_writer *w, av_collection *col, av_op_batch *batches, size_t n_batches,
+                                    const av_mutation_op *ops_base, key_plan *kp,
                                     av_write_wait_mode wait_mode, int timeout_ms, av_arena *arena,
                                     char (**out_hashes)[67], size_t *out_n_hashes, uint64_t *out_block_number,
                                     bool *has_block, av_err *e)
@@ -399,147 +885,35 @@ static av_status broadcast_and_wait(av_writer *w, av_collection *col, av_op_batc
     *out_n_hashes = 0;
     *has_block = false;
     *out_block_number = 0;
-
     if (n_batches == 0)
         return AV_OK;
 
-    char (*tx_hashes)[67] = av_arena_alloc(arena, n_batches * sizeof(*tx_hashes), 0);
+    pending_tx *txs = NULL;
+    if (submit_batches(w, batches, n_batches, ops_base, kp, arena, &txs, e) != AV_OK)
+        return AV_ERR;
+
+    char (*tx_hashes)[67] = av_arena_alloc(arena, n_batches * sizeof(*tx_hashes), 1);
     if (tx_hashes == NULL) {
         av_err_set(e, "internal", "out of memory allocating tx hashes");
         return AV_ERR;
     }
-
-    uint64_t highest_block = 0;
-
-    for (size_t i = 0; i < n_batches; i++) {
-        uint64_t nonce = 0;
-        if (av_nonce_tracker_next(w->nonce_tracker, &nonce, e) != AV_OK)
-            return AV_ERR;
-
-        av_tx_desc desc;
-        memset(&desc, 0, sizeof(desc));
-        desc.chain_id = w->cfg.chain_id;
-        desc.nonce = nonce;
-        desc.max_priority_fee_per_gas = w->cfg.max_priority_fee_per_gas;
-        desc.max_fee_per_gas = w->cfg.max_fee_per_gas;
-        desc.gas_limit = estimate_gas_limit(w, av_signer_get_address(w->signer), batches[i].calldata,
-                                            batches[i].calldata_len, arena,
-                                            w->cfg.gas_limit + batches[i].n_ops * AV_GAS_PER_OP_FALLBACK);
-        memcpy(desc.to, w->cfg.contract_addr, 20);
-        desc.data = batches[i].calldata;
-        desc.data_len = batches[i].calldata_len;
-
-        uint8_t *raw_tx = NULL;
-        size_t raw_len = 0;
-        uint8_t tx_hash[32];
-        if (av_tx_sign_and_encode(&desc, w->signer, arena, &raw_tx, &raw_len, tx_hash, e) != AV_OK)
-            return AV_ERR;
-
-        av_key_to_hex(tx_hash, tx_hashes[i]);
-
-        if (w->rpc != NULL) {
-            char *raw_hex = av_arena_alloc(arena, raw_len * 2 + 3, 0);
-            if (raw_hex == NULL) {
-                av_err_set(e, "internal", "out of memory for raw hex");
-                return AV_ERR;
-            }
-            raw_hex[0] = '0';
-            raw_hex[1] = 'x';
-            static const char hex_digits[] = "0123456789abcdef";
-            for (size_t b = 0; b < raw_len; b++) {
-                raw_hex[2 + b * 2] = hex_digits[(raw_tx[b] >> 4) & 0x0f];
-                raw_hex[2 + b * 2 + 1] = hex_digits[raw_tx[b] & 0x0f];
-            }
-            raw_hex[2 + raw_len * 2] = '\0';
-
-            char params_json[raw_len * 2 + 16];
-            snprintf(params_json, sizeof(params_json), "[\"%s\"]", raw_hex);
-
-            yyjson_doc *resp_doc = NULL;
-            yyjson_val *resp_val = NULL;
-            int rpc_code = 0;
-            av_status st = av_rpc_call(w->rpc, "eth_sendRawTransaction", params_json, &resp_doc, &resp_val,
-                                       &rpc_code, e);
-            if (st != AV_OK)
-                return AV_ERR;
-
-            if (resp_doc != NULL) {
-                yyjson_val *root = yyjson_doc_get_root(resp_doc);
-                yyjson_val *err_val = yyjson_obj_get(root, "error");
-                if (err_val != NULL) {
-                    yyjson_val *msg = yyjson_obj_get(err_val, "message");
-                    const char *mstr = yyjson_get_str(msg);
-                    av_err_set(e, "tx_reverted", "transaction rejected: %s", mstr ? mstr : "unknown error");
-                    yyjson_doc_free(resp_doc);
-                    return AV_ERR;
-                }
-                yyjson_doc_free(resp_doc);
-            }
-
-            /* Wait for receipt if requested */
-            if (wait_mode != AV_WAIT_NONE) {
-                int elapsed = 0;
-                int sleep_step = 50;
-                int max_wait = timeout_ms > 0 ? timeout_ms : 60000;
-                bool got_receipt = false;
-
-                while (elapsed < max_wait) {
-                    char qparams[128];
-                    snprintf(qparams, sizeof(qparams), "[\"%s\"]", tx_hashes[i]);
-                    yyjson_doc *rc_doc = NULL;
-                    yyjson_val *rc_val = NULL;
-                    int rc_code = 0;
-                    if (av_rpc_call(w->rpc, "eth_getTransactionReceipt", qparams, &rc_doc, &rc_val, &rc_code,
-                                    e) == AV_OK &&
-                        rc_doc != NULL) {
-                        if (rc_val != NULL && !yyjson_is_null(rc_val)) {
-                            yyjson_val *status_val = yyjson_obj_get(rc_val, "status");
-                            const char *st_str = yyjson_get_str(status_val);
-                            if (st_str != NULL && strcmp(st_str, "0x0") == 0) {
-                                yyjson_doc_free(rc_doc);
-                                av_err_set(e, "tx_reverted", "transaction reverted on-chain");
-                                return AV_ERR;
-                            }
-                            yyjson_val *bn_val = yyjson_obj_get(rc_val, "blockNumber");
-                            const char *bn_str = yyjson_get_str(bn_val);
-                            if (bn_str != NULL) {
-                                uint64_t bnum = 0;
-                                if (av_qty_parse(bn_str, &bnum)) {
-                                    if (bnum > highest_block)
-                                        highest_block = bnum;
-                                }
-                            }
-                            got_receipt = true;
-                            yyjson_doc_free(rc_doc);
-                            break;
-                        }
-                        yyjson_doc_free(rc_doc);
-                    }
-                    usleep((useconds_t) (sleep_step * 1000));
-                    elapsed += sleep_step;
-                }
-
-                if (!got_receipt) {
-                    av_err_set(e, "consistency_timeout", "timeout waiting for transaction receipt");
-                    return AV_ERR;
-                }
-            }
-        }
-    }
-
+    uint64_t highest = 0;
+    if (wait_mode != AV_WAIT_NONE &&
+        wait_receipts(w, txs, n_batches, timeout_ms, kp, arena, &highest, e) != AV_OK)
+        return AV_ERR;
+    for (size_t i = 0; i < n_batches; i++)
+        memcpy(tx_hashes[i], txs[i].mined_hash[0] != '\0' ? txs[i].mined_hash : txs[i].hashes[0], 67);
     *out_hashes = tx_hashes;
     *out_n_hashes = n_batches;
 
-    if (wait_mode != AV_WAIT_NONE && highest_block > 0) {
-        *out_block_number = highest_block;
+    if (wait_mode != AV_WAIT_NONE && highest > 0) {
+        *out_block_number = highest;
         *has_block = true;
-
         if (wait_mode == AV_WAIT_INDEXED && col != NULL) {
-            if (av_collection_wait_block(col, highest_block, timeout_ms, e) != AV_OK)
+            if (av_collection_wait_block(col, highest, timeout_ms, e) != AV_OK)
                 return AV_ERR;
         }
     }
-
     return AV_OK;
 }
 
@@ -573,7 +947,12 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
     }
 
     size_t n_ops = 0;
-    size_t create_counter = 0;
+    size_t n_creates = 0;
+    size_t *create_res = av_arena_alloc(arena, count * sizeof(size_t), _Alignof(size_t));
+    if (create_res == NULL) {
+        av_err_set(e, "internal", "out of memory allocating upsert operations");
+        return AV_ERR;
+    }
 
     for (size_t i = 0; i < count; i++) {
         yyjson_val *ent_val = yyjson_arr_get(entities_arr, i);
@@ -721,9 +1100,8 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
                 salt[s] = (uint8_t) (rand() & 0xff);
             }
 
-            av_abi_predict_entity_key(w->cfg.chain_id, w->cfg.contract_addr, signer_addr, create_counter,
-                                      salt, results[i].key);
-            create_counter++;
+            memset(results[i].key, 0, 32); /* assigned in submit_batches / from the receipt */
+            create_res[n_creates++] = i;
 
             ops[n_ops].type = AV_OP_CREATE;
             memcpy(ops[n_ops].u.create.salt, salt, 16);
@@ -752,8 +1130,9 @@ av_status av_writer_upsert(av_writer *w, av_collection *col, yyjson_val *entitie
     uint64_t block_number = 0;
     bool has_block = false;
 
-    if (broadcast_and_wait(w, col, batches, n_batches, wait_mode, timeout_ms, arena, &tx_hashes, &n_tx_hashes,
-                           &block_number, &has_block, e) != AV_OK) {
+    key_plan kp = {results, create_res, n_creates, wait_mode == AV_WAIT_NONE};
+    if (broadcast_and_wait(w, col, batches, n_batches, ops, &kp, wait_mode, timeout_ms, arena, &tx_hashes,
+                           &n_tx_hashes, &block_number, &has_block, e) != AV_OK) {
         return AV_ERR;
     }
 
@@ -823,8 +1202,8 @@ av_status av_writer_delete_refs(av_writer *w, av_collection *col, const char *co
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
-                           &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, ops, NULL, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes,
+                           &n_hashes, &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -892,8 +1271,8 @@ av_status av_writer_delete_filter(av_writer *w, av_collection *col, const roarin
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
-                           &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, ops, NULL, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes,
+                           &n_hashes, &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -964,8 +1343,8 @@ av_status av_writer_extend_refs(av_writer *w, av_collection *col, const char *co
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
-                           &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, ops, NULL, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes,
+                           &n_hashes, &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -1036,8 +1415,8 @@ av_status av_writer_extend_filter(av_writer *w, av_collection *col, const roarin
     size_t n_hashes = 0;
     uint64_t bnum = 0;
     bool has_b = false;
-    if (broadcast_and_wait(w, col, batches, n_batches, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes, &n_hashes,
-                           &bnum, &has_b, e) != AV_OK)
+    if (broadcast_and_wait(w, col, batches, n_batches, ops, NULL, AV_WAIT_RECEIPT, 60000, arena, &tx_hashes,
+                           &n_hashes, &bnum, &has_b, e) != AV_OK)
         return AV_ERR;
 
     out->affected = n_ops;
@@ -1069,7 +1448,30 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
     }
 
     size_t n_ops = 0;
-    size_t create_counter = 0;
+    uint64_t create_counter = 0;
+    /* Keys and nonces follow the chain state of `from` (issue #13): entityNonce and the pending
+     * transaction count. Without an RPC (unit tests) both start at 0. */
+    uint64_t first_tx_nonce = 0;
+    if (w->rpc != NULL) {
+        if (fetch_entity_nonce(w, from_addr, &create_counter, e) != AV_OK)
+            return AV_ERR;
+        char addr_hex[43];
+        av_addr_to_hex(from_addr, addr_hex);
+        char params[96];
+        snprintf(params, sizeof(params), "[\"%s\",\"pending\"]", addr_hex);
+        yyjson_doc *nd = NULL;
+        yyjson_val *nv = NULL;
+        int ncode = 0;
+        if (av_rpc_call(w->rpc, "eth_getTransactionCount", params, &nd, &nv, &ncode, e) != AV_OK)
+            return AV_ERR;
+        const char *nh = yyjson_get_str(nv);
+        bool ok = nh != NULL && av_qty_parse(nh, &first_tx_nonce);
+        yyjson_doc_free(nd);
+        if (!ok) {
+            av_err_set(e, "arkiv_rpc_error", "eth_getTransactionCount returned a malformed value");
+            return AV_ERR;
+        }
+    }
 
     for (size_t i = 0; i < count; i++) {
         yyjson_val *ent_val = yyjson_arr_get(entities_arr, i);
@@ -1245,8 +1647,10 @@ av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entiti
     for (size_t b = 0; b < n_batches; b++) {
         snprintf(txs[b].to, sizeof(txs[b].to), "%s", AV_ARKIV_CONTRACT_ADDR);
         snprintf(txs[b].value, sizeof(txs[b].value), "%s", "0x0");
-        txs[b].nonce = b;
-        txs[b].gas_estimate = w->cfg.gas_limit + batches[b].n_ops * AV_GAS_PER_OP_FALLBACK;
+        txs[b].nonce = first_tx_nonce + b;
+        bool fb = false;
+        txs[b].gas_estimate = estimate_gas_limit(w, from_addr, batches[b].calldata, batches[b].calldata_len,
+                                                 batches[b].n_ops, arena, &fb);
 
         size_t c_len = batches[b].calldata_len;
         char *hex_str = av_arena_alloc(arena, c_len * 2 + 3, 0);

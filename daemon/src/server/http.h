@@ -50,6 +50,7 @@ typedef struct av_http_resp {
     bool has_as_of;
     const char *retry_after; /* seconds, or NULL */
     const char *allow;       /* Allow header (405), or NULL */
+    const char *warning;     /* Warning header value (static or request-arena string), or NULL */
     const char *request_id;  /* pre-filled by the server; used by av_problem_from_err */
 } av_http_resp;
 

@@ -1,0 +1,1 @@
+{"must":[{"key":"a","range":{"gte":1.5,"lt":10}}],"should":[{"key":"b","match":{"any":[1,"x"]}}],"must_not":[{"has_id":[1,"0123456789abcdef0123456789abcdef"]}]}

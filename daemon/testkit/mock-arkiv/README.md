@@ -20,8 +20,10 @@ timestamps `1_700_000_000 + 2n`, entity keys per `entity-key-derivation.md`, tx 
 `arkiv_query`, `arkiv_getEntity`, `arkiv_getBlockTiming`, `eth_chainId`, `eth_blockNumber`, `eth_getBlockByNumber`,
 `eth_getBlockByHash`, `eth_getLogs` (range cap -> `-32005`), `eth_getTransactionByHash` (input = `execute(ops)`
 calldata, selector `0x49650044`), `eth_getTransactionReceipt`, `eth_getTransactionCount`, `eth_call`
-(`entityNonce(address)`), `eth_estimateGas` (size based), `eth_gasPrice`, `net_version`, `web3_clientVersion`,
-`eth_syncing`, `eth_sendRawTransaction` (returns `-32601 "not implemented in mock v0"`, phase D5).
+(`entityNonce(address)`), `eth_estimateGas` (size based), `eth_gasPrice` (base fee + tip), `eth_feeHistory`
+(constant base fee and reward, see `/_mock/fees`), `net_version`, `web3_clientVersion`, `eth_syncing`,
+`eth_sendRawTransaction` (EIP-1559 or legacy `execute(ops)`; applied to the pending block, or held while its tip is
+below `min_tip_wei`).
 WS only: `eth_subscribe` (`newHeads`, `logs` with `address`/`topics` filter) and `eth_unsubscribe`; a notification is pushed
 per mined block (and `removed:true` logs for blocks rolled back by a reorg). Batches are supported.
 
@@ -30,6 +32,12 @@ Errors: `-32001` parse, `-32002` type, `-32003` literal, `-32004` limits (query 
 Liveness: an entity is visible at head `B` iff `expiresAt > B`. Reads see only sealed blocks.
 
 ## Control API (`/_mock/*`, JSON, never affected by faults)
+
+`GET|POST /_mock/fees` `{"base_fee_wei", "tip_wei", "min_tip_wei", "fee_history": bool, "gas_price": bool}`: fee
+answers of `eth_feeHistory`/`eth_gasPrice` (`false` makes the method fail with `-32601`). A raw transaction whose tip is
+below `min_tip_wei` is **held** (accepted, never mined) until a replacement with the same sender and nonce arrives;
+a replacement must raise both fees by at least 10% (else `-32000 "replacement transaction underpriced"`). The response
+also reports `held`, `held_total`, `replaced_total` and the fee method call counts. `/_mock/reset` restores the defaults.
 
 Mutations go into the **pending block** (head+1); they become visible when mined.
 Attribute objects: `{"name","type","value"[,"indexed"]}` with `value` in wire encoding (`u64`/`u256` as int or hex string,

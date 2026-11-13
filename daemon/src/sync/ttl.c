@@ -3,6 +3,7 @@
  */
 #include "sync/ttl.h"
 
+#include <roaring.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -188,4 +189,40 @@ av_status av_ttl_compact(av_ttl *t)
         sift_down(t, i);
     }
     return AV_OK;
+}
+
+size_t av_ttl_count_due(const av_ttl *t, uint64_t block, const struct roaring_bitmap_s *in)
+{
+    if (t == NULL || t->n == 0 || t->heap[0].expires_at > block)
+        return 0;
+    /* iterative DFS over the heap, descending only into due nodes */
+    size_t count = 0;
+    size_t cap = 64, top = 0;
+    size_t *stack = malloc(cap * sizeof *stack);
+    if (stack == NULL)
+        return 0;
+    stack[top++] = 0;
+    while (top > 0) {
+        size_t i = stack[--top];
+        const entry *e = &t->heap[i];
+        if (e->expires_at > block)
+            continue;
+        if (is_current(t, e) &&
+            (in == NULL || roaring_bitmap_contains((const roaring_bitmap_t *) in, e->docid)))
+            count++;
+        for (size_t c = 2 * i + 1; c <= 2 * i + 2 && c < t->n; c++) {
+            if (top == cap) {
+                size_t *ns = realloc(stack, cap * 2 * sizeof *ns);
+                if (ns == NULL) {
+                    free(stack);
+                    return count;
+                }
+                stack = ns;
+                cap *= 2;
+            }
+            stack[top++] = c;
+        }
+    }
+    free(stack);
+    return count;
 }

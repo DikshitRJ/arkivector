@@ -34,6 +34,11 @@ void av_ttl_remove(av_ttl *t, uint32_t docid);
  */
 size_t av_ttl_pop_expired(av_ttl *t, uint64_t block, uint32_t *out, size_t max);
 
+/* Number of current (non-stale) entries due at block (expires_at <= block) whose docid is in
+ * `in` (NULL = all). Walks only the due part of the heap: O(due). */
+struct roaring_bitmap_s;
+size_t av_ttl_count_due(const av_ttl *t, uint64_t block, const struct roaring_bitmap_s *in);
+
 /* Current expiry of a docid (0 if unscheduled). */
 uint64_t av_ttl_expiry(const av_ttl *t, uint32_t docid);
 

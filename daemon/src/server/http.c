@@ -783,7 +783,7 @@ static void send_job(job *j)
     av_log(AV_LOG_DEBUG, "http", "%s %s -> %d (%.2f ms) rid=%s", j->method, j->path, status,
            (double) (uv_hrtime() - j->t0_ns) / 1e6, r->request_id != NULL ? r->request_id : "");
 
-    char extra[256];
+    char extra[512];
     size_t xo = 0;
     if (r->has_as_of) {
         xo += (size_t) snprintf(extra + xo, sizeof(extra) - xo, "Arkivector-As-Of-Block: %llu\r\n",
@@ -794,6 +794,9 @@ static void send_job(job *j)
     }
     if (r->allow != NULL && xo < sizeof(extra)) {
         xo += (size_t) snprintf(extra + xo, sizeof(extra) - xo, "Allow: %.96s\r\n", r->allow);
+    }
+    if (r->warning != NULL && xo < sizeof(extra)) {
+        xo += (size_t) snprintf(extra + xo, sizeof(extra) - xo, "Warning: %.200s\r\n", r->warning);
     }
     if (xo >= sizeof(extra)) {
         xo = sizeof(extra) - 1;

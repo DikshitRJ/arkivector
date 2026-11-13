@@ -123,6 +123,7 @@ static av_status services_start(const av_config *cfg, av_err *e)
         return AV_ERR;
 
     /* 2. Load registry */
+    av_collection_set_hnsw_config(cfg->hnsw.persist != 0, (uint64_t) cfg->hnsw.band_blocks);
     g_registry = av_registry_create(g_store, cfg->storage.data_dir, e);
     if (g_registry == NULL)
         return AV_ERR;
@@ -204,6 +205,16 @@ static av_status services_start(const av_config *cfg, av_err *e)
     av_writer_config wcfg;
     memset(&wcfg, 0, sizeof(wcfg));
     wcfg.chain_id = (uint64_t) cfg->arkiv.chain_id;
+    wcfg.gas_limit = (uint64_t) cfg->write.fallback_gas_base;
+    wcfg.max_fee_per_gas = (uint64_t) (cfg->write.max_fee_gwei * 1e9);
+    wcfg.max_priority_fee_per_gas = (uint64_t) (cfg->write.priority_fee_gwei * 1e9);
+    wcfg.max_fee_cap = (uint64_t) (cfg->write.max_fee_cap_gwei * 1e9);
+    wcfg.priority_fee_percentile = cfg->write.priority_fee_percentile;
+    wcfg.fee_history_blocks = (uint32_t) cfg->write.fee_history_blocks;
+    wcfg.gas_margin_pct = (uint32_t) cfg->write.gas_margin_pct;
+    wcfg.replace_after_blocks = (uint32_t) cfg->write.replace_after_blocks;
+    wcfg.max_replacements = (uint32_t) cfg->write.max_replacements;
+    wcfg.no_replace = cfg->write.max_replacements == 0;
     g_writer = av_writer_create(&wcfg, g_signer, g_rpc, g_store, g_registry, e);
     av_rest_set_writer(g_writer, g_idem);
     av_rest_set_info(cfg->arkiv.chain_id, g_signer != NULL);

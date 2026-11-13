@@ -31,7 +31,7 @@ curl -s $AV/v1/collections/notes/entities -H 'content-type: application/json' -d
 | Field | Default | Meaning |
 | :--- | :--- | :--- |
 | `entities` | | 1–1000 entities (below) |
-| `wait` | `receipt` | `none`: return after broadcast (`202`, keys predicted, `block_number: null`). `receipt`: after the transaction is mined. `indexed`: after it is mined **and** searchable on this daemon |
+| `wait` | `receipt` | `none`: return after broadcast (`202`, keys predicted from the wallet's on-chain `entityNonce`, `block_number: null`). `receipt`: after the transaction is mined; keys come from the `EntityCreated` logs. `indexed`: after it is mined **and** searchable on this daemon |
 | `timeout_ms` | 60000 | How long to wait for receipts or indexing |
 
 Entity fields:
