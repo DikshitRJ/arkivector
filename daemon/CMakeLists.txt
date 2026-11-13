@@ -159,6 +159,7 @@ set(AV_CORE_SOURCES
     src/sync/ttl.c
     src/sync/syncer.c
     src/arkiv/rlp.c
+    src/arkiv/rawtx.c
     src/arkiv/keccak.c
     src/arkiv/entity.c
     src/arkiv/logs.c

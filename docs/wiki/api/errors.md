@@ -36,7 +36,7 @@ Every error is an RFC 9457 problem document (`application/problem+json`). Branch
 | `bad_request` | 400 | no | Malformed JSON, wrong JSON types, unknown body fields |
 | `unauthorized` | 401 | no | API key missing or invalid |
 | `forbidden` | 403 | no | Key lacks the scope; MCP Origin rejected |
-| `write_disabled` | 403 | no | The daemon has no signer |
+| `write_disabled` | 403 | no | The daemon has no signer, or its remote signer is unreachable, refused, or returned a transaction that doesn't match the request |
 | `collection_not_found` | 404 | no | |
 | `entity_not_found` | 404 | no | Not live at `as_of_block` |
 | `route_not_found` | 404 / 405 | no | Unknown path, or method not allowed (`Allow` header) |

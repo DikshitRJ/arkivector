@@ -24,6 +24,9 @@ from conftest import DAEMON_BIN, DaemonClient, MockArkiv, _free_port
 @pytest.fixture
 def auth_daemon(mock_arkiv: MockArkiv) -> Iterator[tuple[DaemonClient, str, str]]:
     """Daemon running with auth enabled (read_key and admin_key)."""
+    # A collection created at runtime bootstraps once the syncer sees new blocks; without them it
+    # stays in bootstrap and point lookups answer 503 not_ready (correct daemon behaviour).
+    mock_arkiv.ctl("POST", "/auto_mine", {"interval_ms": 100})
     port = _free_port()
     temp_dir = Path(tempfile.mkdtemp(prefix="arkivectord-auth-test-"))
     data_dir = temp_dir / "data"
@@ -141,6 +144,18 @@ def test_auth_and_scopes(auth_daemon: tuple[DaemonClient, str, str]) -> None:
     # 6. Admin endpoint with admin token -> 201
     st, body = client.post("/v1/collections", col_def, headers={"Authorization": f"Bearer {admin_token}"})
     assert st in (200, 201)
+
+    # Wait until the new collection is live: right after creation it is bootstrapping and point
+    # lookups correctly answer 503 not_ready. (Asserting 404 at once raced the syncer.) /readyz is
+    # unauthenticated; polled below the 5 req/s rate limit.
+    deadline = time.time() + 15.0
+    while time.time() < deadline:
+        st, body = client.get("/readyz")
+        if st == 200 and body.get("collections", {}).get("auth_test_col") == "live":
+            break
+        time.sleep(0.25)
+    else:
+        raise AssertionError(f"auth_test_col did not become live: {body}")
 
     # 7. Entity point lookup with ?verify=true
     st, body = client.get("/v1/collections/auth_test_col/entities/nonexistent?verify=true",

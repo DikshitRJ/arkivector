@@ -9,6 +9,16 @@ import { ApiError, TransportError, errorFromProblem } from "./errors.js";
 /**
  * Convert camelCase string to snake_case.
  */
+/**
+ * Remove trailing "/" characters. A loop instead of /\/+$/, which backtracks polynomially on
+ * long runs of slashes (CodeQL js/polynomial-redos).
+ */
+export function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 export function camelToSnake(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 }
@@ -121,7 +131,7 @@ export function isOperationRetryable(
   if (idempotencyKey && idempotencyKey.length > 0) {
     return true;
   }
-  const normalizedPath = path.split("?")[0].replace(/\/+$/, "");
+  const normalizedPath = trimTrailingSlashes(path.split("?")[0]);
   if (
     normalizedPath.endsWith("/search") ||
     normalizedPath.endsWith("/search:batch") ||
@@ -173,7 +183,7 @@ export class HttpTransport {
   readonly userAgent: string;
 
   constructor(options: HttpTransportOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, "");
+    this.baseUrl = trimTrailingSlashes(options.baseUrl);
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 10000;
     this.maxRetries = options.maxRetries ?? 3;

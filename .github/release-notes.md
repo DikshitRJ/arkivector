@@ -54,7 +54,7 @@ Every config key can be set as `ARKIVECTOR_<SECTION>_<KEY>` (environment overrid
 
 | Variable | Default | Meaning |
 | :--- | :--- | :--- |
-| `ARKIV_PRIVATE_KEY` | unset | Wallet private key (hex, `0x` optional) used to sign writes. Unset = read-only. Never put it in the config file. |
+| `ARKIV_PRIVATE_KEY` | unset | Wallet private key (hex, `0x` optional) used to sign managed writes. Unset = no managed signer (client-side signing with `entities:prepare` + `entities:submit` still works). Never put it in the config file; for an encrypted keystore or a remote signer use `[write.signer]` (`ARKIVECTOR_WRITE_SIGNER_*`). |
 | `ARKIVECTOR_ARKIV_ACCESS_KEY` | empty | Arkiv Hub access key. |
 | `ARKIVECTOR_ARKIV_RPC_URLS` | Rabdi RPC | Comma-separated JSON-RPC URLs. |
 | `ARKIVECTOR_ARKIV_WS_URL` | Rabdi WS | WebSocket URL; empty = HTTP polling. |
@@ -112,5 +112,5 @@ Add the daemon wallet's address to each collection's `writers`, otherwise the da
 
 ## Known limitations
 - Verified on the Arkiv **Rabdi testnet** only; mainnet is untested.
-- HNSW graphs are kept in memory and rebuilt from the local store at startup; rebuilds after many updates run on the sync thread.
-- The signer comes from `ARKIV_PRIVATE_KEY` only (keystore and remote signers are not wired); gas uses a fixed limit.
+- Client-side signing was tested against a mock chain with `eth_account`, viem and ethers signers; a Rabdi run with MetaMask in a browser is still to do.
+- The remote signer is reached without authentication: run it on localhost or a private network.

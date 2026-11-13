@@ -30,7 +30,7 @@
 | :--- | :--- | :--- |
 | `X-Request-Id` | both | Client MAY send (≤ 64 chars, `[A-Za-z0-9._-]`). Daemon echoes it, or generates a ULID. Always present on responses and repeated as `request_id` in problems. |
 | `Arkivector-As-Of-Block` | response | Present on every data response (collections, entities, search, scroll, count). Equals the body's `as_of_block`. |
-| `Arkivector-Api-Version` | response | Contract version (e.g. `1.0.0`). |
+| `Arkivector-Api-Version` | response | Contract version (e.g. `1.1.0`). |
 | `Idempotency-Key` | request | Optional on write endpoints ([entities.md §6](entities.md#6-idempotency)). |
 | `Retry-After` | response | Seconds. Present on `429`, `503`. |
 | `User-Agent` | request | SDKs MUST send `arkivector-<lang>/<sdk-version>` (e.g. `arkivector-python/0.1.0`). |
@@ -63,6 +63,7 @@
 | Limit | Value | Error |
 | :--- | ---: | :--- |
 | Entities per upsert / prepare / delete / extend | 1,000 | `invalid_argument` |
+| Transactions per submit | 256 | `invalid_argument` |
 | `k` | 1–1,000 | `invalid_argument` |
 | `offset + k` | ≤ 1,000 | `invalid_argument` |
 | Searches per batch | 64 | `invalid_argument` |
@@ -84,4 +85,4 @@
 - Default client timeout: **30 s** for writes with `wait=receipt`/`indexed`, **10 s** otherwise. Configurable.
 - **Retry only** when the problem has `retryable: true`, or on transport errors (connection refused/reset, timeout before any response byte).
 - **Idempotent operations** (all GETs, search, search:batch, scroll, count, prepare) MAY be retried automatically: up to 3 attempts, exponential backoff 200 ms × 2ⁿ with ±20% jitter, honouring `Retry-After` when present.
-- **Write operations** (upsert, delete, extend) MUST NOT be auto-retried **unless** the SDK sent an `Idempotency-Key`. SDKs SHOULD generate one (UUIDv4) per write call by default, which makes write retries safe.
+- **Write operations** (upsert, delete, extend, submit) MUST NOT be auto-retried **unless** the SDK sent an `Idempotency-Key`. SDKs SHOULD generate one (UUIDv4) per write call by default, which makes write retries safe.

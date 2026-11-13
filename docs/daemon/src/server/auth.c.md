@@ -7,6 +7,6 @@ Implements API key parsing, hashing, and authorization checks.
 - **Timing-Attack Resistance**: Uses OpenSSL's `CRYPTO_memcmp` to perform constant-time comparisons of SHA-256 digests.
 - **Scope Enforcement**: Maps REST operations to granular permissions:
   - Admin: collection creation, deletion, follow by manifest.
-  - Write: entity upsert, prepare, delete, extend.
+  - Write: entity upsert, prepare, submit, delete, extend.
   - Read: vector search, scroll, count, entity point lookup.
 - **Unauthenticated Paths**: Whitelists health probes (`/healthz`, `/readyz`), Prometheus metrics (`/metrics`), and API version info (`/v1/version`).

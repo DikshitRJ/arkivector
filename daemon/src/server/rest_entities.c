@@ -2,6 +2,7 @@
  * server/rest_entities.c: REST entity endpoints (point lookup, write stubs).
  */
 #include <errno.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -525,14 +526,36 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
     yyjson_mut_doc_set_root(res_doc, res_root);
     yyjson_mut_obj_add_uint(res_doc, res_root, "chain_id", out.chain_id);
 
+    char from_hex[43];
+    av_addr_to_hex(from_addr, from_hex);
+    char max_fee_hex[24], tip_hex[24];
+    snprintf(max_fee_hex, sizeof(max_fee_hex), "0x%" PRIx64, out.max_fee_per_gas);
+    snprintf(tip_hex, sizeof(tip_hex), "0x%" PRIx64, out.max_priority_fee_per_gas);
+    yyjson_mut_obj_add_strcpy(res_doc, res_root, "from", from_hex);
+    if (out.n_transactions > 0) {
+        yyjson_mut_val *fees = yyjson_mut_obj(res_doc);
+        yyjson_mut_obj_add_strcpy(res_doc, fees, "max_fee_per_gas", max_fee_hex);
+        yyjson_mut_obj_add_strcpy(res_doc, fees, "max_priority_fee_per_gas", tip_hex);
+        yyjson_mut_obj_add_str(res_doc, fees, "source", out.fee_source != NULL ? out.fee_source : "static");
+        yyjson_mut_obj_add_val(res_doc, res_root, "fees", fees);
+    }
+
+    /* Each transaction is complete enough to sign as is (EIP-1559), or to hand to a wallet's
+     * eth_sendTransaction after renaming the keys to camelCase (the SDKs do this). */
     yyjson_mut_val *txs_arr = yyjson_mut_arr(res_doc);
     for (size_t i = 0; i < out.n_transactions; i++) {
         yyjson_mut_val *to = yyjson_mut_obj(res_doc);
+        yyjson_mut_obj_add_uint(res_doc, to, "type", 2);
+        yyjson_mut_obj_add_uint(res_doc, to, "chain_id", out.chain_id);
+        yyjson_mut_obj_add_strcpy(res_doc, to, "from", from_hex);
         yyjson_mut_obj_add_strcpy(res_doc, to, "to", out.transactions[i].to);
         yyjson_mut_obj_add_strcpy(res_doc, to, "data", out.transactions[i].data);
         yyjson_mut_obj_add_strcpy(res_doc, to, "value", out.transactions[i].value);
         yyjson_mut_obj_add_uint(res_doc, to, "nonce", out.transactions[i].nonce);
         yyjson_mut_obj_add_uint(res_doc, to, "gas_estimate", out.transactions[i].gas_estimate);
+        yyjson_mut_obj_add_uint(res_doc, to, "gas", out.transactions[i].gas_estimate);
+        yyjson_mut_obj_add_strcpy(res_doc, to, "max_fee_per_gas", max_fee_hex);
+        yyjson_mut_obj_add_strcpy(res_doc, to, "max_priority_fee_per_gas", tip_hex);
         yyjson_mut_arr_add_val(txs_arr, to);
     }
     yyjson_mut_obj_add_val(res_doc, res_root, "transactions", txs_arr);
@@ -560,6 +583,188 @@ static void h_prepare_entities(const av_http_req *req, const char *const *params
         av_writer_destroy(w);
     av_collection_release(c);
     yyjson_doc_free(req_doc);
+}
+
+/* wait mode from the query string, else the body; false on an unknown value. */
+static bool parse_wait(const av_http_req *req, yyjson_val *root, av_write_wait_mode *out)
+{
+    char buf[64];
+    const char *ws = NULL;
+    if (get_query_param(req->query, "wait", buf, sizeof(buf))) {
+        ws = buf;
+    } else {
+        yyjson_val *wval = yyjson_obj_get(root, "wait");
+        if (wval != NULL && !yyjson_is_str(wval))
+            return false;
+        ws = yyjson_get_str(wval);
+    }
+    if (ws == NULL)
+        return true;
+    if (strcmp(ws, "none") == 0)
+        *out = AV_WAIT_NONE;
+    else if (strcmp(ws, "receipt") == 0)
+        *out = AV_WAIT_RECEIPT;
+    else if (strcmp(ws, "indexed") == 0)
+        *out = AV_WAIT_INDEXED;
+    else
+        return false;
+    return true;
+}
+
+#define AV_SUBMIT_MAX_TXS 256
+
+/*
+ * POST /v1/collections/{name}/entities:submit (CCR-0001, GitHub issue #12): broadcast transactions a
+ * client signed (signed_transactions), or wait for ones its wallet already broadcast (tx_hashes).
+ * No daemon signer is needed. See av_writer_submit for the checks.
+ */
+static void h_submit_entities(const av_http_req *req, const char *const *params, size_t n_params,
+                              av_http_resp *resp, void *ctx)
+{
+    (void) n_params;
+    (void) ctx;
+    av_idempotency_store *idem = NULL;
+    void *idem_handle = NULL;
+    if (!check_idempotency(req, resp, &idem, &idem_handle)) {
+        return;
+    }
+    av_err e;
+    av_err_clear(&e);
+
+    yyjson_doc *req_doc = yyjson_read_opts((char *) req->body, req->body_len, 0, NULL, NULL);
+    yyjson_val *root = req_doc != NULL ? yyjson_doc_get_root(req_doc) : NULL;
+    av_collection *c = NULL;
+    if (root == NULL || !yyjson_is_obj(root)) {
+        av_err_set(&e, "bad_request", "request body must be a JSON object");
+        goto fail;
+    }
+    {
+        yyjson_obj_iter it;
+        yyjson_obj_iter_init(root, &it);
+        yyjson_val *k;
+        while ((k = yyjson_obj_iter_next(&it)) != NULL) {
+            const char *ks = yyjson_get_str(k);
+            if (strcmp(ks, "signed_transactions") != 0 && strcmp(ks, "tx_hashes") != 0 &&
+                strcmp(ks, "wait") != 0 && strcmp(ks, "timeout_ms") != 0) {
+                char fp[96];
+                snprintf(fp, sizeof(fp), "/%s", ks);
+                av_err_set(&e, "bad_request", "unknown field '%s'", ks);
+                av_err_field(&e, fp);
+                goto fail;
+            }
+        }
+    }
+    yyjson_val *raw_val = yyjson_obj_get(root, "signed_transactions");
+    yyjson_val *hash_val = yyjson_obj_get(root, "tx_hashes");
+    if ((raw_val == NULL) == (hash_val == NULL)) {
+        av_err_set(&e, "invalid_argument", "give exactly one of 'signed_transactions' or 'tx_hashes'");
+        goto fail;
+    }
+    yyjson_val *arr = raw_val != NULL ? raw_val : hash_val;
+    const char *field = raw_val != NULL ? "/signed_transactions" : "/tx_hashes";
+    size_t n = yyjson_is_arr(arr) ? yyjson_arr_size(arr) : 0;
+    if (n == 0 || n > AV_SUBMIT_MAX_TXS) {
+        av_err_set(&e, "invalid_argument", "%s must be an array of 1 to %d strings", field + 1,
+                   AV_SUBMIT_MAX_TXS);
+        av_err_field(&e, field);
+        goto fail;
+    }
+    const char **strs = av_arena_alloc(req->arena, n * sizeof(*strs), _Alignof(const char *));
+    size_t *lens = av_arena_alloc(req->arena, n * sizeof(*lens), _Alignof(size_t));
+    if (strs == NULL || lens == NULL) {
+        av_err_set(&e, "internal", "out of memory");
+        goto fail;
+    }
+    for (size_t i = 0; i < n; i++) {
+        yyjson_val *v = yyjson_arr_get(arr, i);
+        if (!yyjson_is_str(v)) {
+            char fp[48];
+            snprintf(fp, sizeof(fp), "%s/%zu", field, i);
+            av_err_set(&e, "invalid_argument", "%s[%zu] must be a string", field + 1, i);
+            av_err_field(&e, fp);
+            goto fail;
+        }
+        strs[i] = yyjson_get_str(v);
+        lens[i] = yyjson_get_len(v);
+    }
+
+    av_write_wait_mode wait_mode = AV_WAIT_RECEIPT;
+    if (!parse_wait(req, root, &wait_mode)) {
+        av_err_set(&e, "invalid_argument", "wait must be one of none, receipt, indexed");
+        av_err_field(&e, "/wait");
+        goto fail;
+    }
+    int timeout_ms = 60000;
+    char buf[32];
+    if (get_query_param(req->query, "timeout_ms", buf, sizeof(buf))) {
+        timeout_ms = (int) parse_long_clamped(buf, 1, 600000, 60000);
+    } else {
+        yyjson_val *tval = yyjson_obj_get(root, "timeout_ms");
+        if (tval != NULL) {
+            if (!yyjson_is_uint(tval) || yyjson_get_uint(tval) < 1 || yyjson_get_uint(tval) > 600000) {
+                av_err_set(&e, "invalid_argument", "timeout_ms must be an integer in [1, 600000]");
+                av_err_field(&e, "/timeout_ms");
+                goto fail;
+            }
+            timeout_ms = (int) yyjson_get_uint(tval);
+        }
+    }
+
+    av_registry *reg = av_rest_get_registry();
+    c = reg != NULL ? av_registry_get(reg, params[0]) : NULL;
+    if (c == NULL) {
+        av_err_set(&e, "collection_not_found", "collection '%s' does not exist", params[0]);
+        goto fail;
+    }
+    av_writer *w = av_rest_get_writer();
+    bool temp_writer = false;
+    if (w == NULL) {
+        av_writer_config wcfg;
+        memset(&wcfg, 0, sizeof(wcfg));
+        w = av_writer_create(&wcfg, NULL, av_rest_get_rpc(), av_rest_get_store(), reg, &e);
+        temp_writer = true;
+    }
+    av_submit_result out;
+    av_status st = av_writer_submit(w, c, raw_val != NULL ? strs : NULL, lens, raw_val != NULL ? n : 0,
+                                    hash_val != NULL ? strs : NULL, hash_val != NULL ? n : 0, wait_mode,
+                                    timeout_ms, req->arena, &out, &e);
+    if (temp_writer)
+        av_writer_destroy(w);
+    if (st != AV_OK)
+        goto fail;
+
+    yyjson_mut_doc *res_doc = yyjson_mut_doc_new(NULL);
+    yyjson_mut_val *res_root = yyjson_mut_obj(res_doc);
+    yyjson_mut_doc_set_root(res_doc, res_root);
+    yyjson_mut_val *txs = yyjson_mut_arr(res_doc);
+    for (size_t i = 0; i < out.n_tx_hashes; i++)
+        yyjson_mut_arr_add_strcpy(res_doc, txs, out.tx_hashes[i]);
+    yyjson_mut_obj_add_val(res_doc, res_root, "tx_hashes", txs);
+    if (out.has_block_number)
+        yyjson_mut_obj_add_uint(res_doc, res_root, "block_number", out.block_number);
+    else
+        yyjson_mut_obj_add_null(res_doc, res_root, "block_number");
+    yyjson_mut_val *keys = yyjson_mut_arr(res_doc);
+    for (size_t i = 0; i < out.n_created_keys; i++) {
+        char kh[67];
+        av_key_to_hex(out.created_keys[i], kh);
+        yyjson_mut_arr_add_strcpy(res_doc, keys, kh);
+    }
+    yyjson_mut_obj_add_val(res_doc, res_root, "created_keys", keys);
+    (void) av_resp_json(resp, wait_mode == AV_WAIT_NONE ? 202 : 200, res_doc);
+    complete_idempotency(idem, idem_handle, resp);
+    av_collection_release(c);
+    yyjson_doc_free(req_doc);
+    return;
+
+fail:
+    if (c != NULL)
+        av_collection_release(c);
+    if (req_doc != NULL)
+        yyjson_doc_free(req_doc);
+    if (idem_handle != NULL)
+        av_idempotency_abort(idem, idem_handle);
+    av_problem_from_err(&e, resp, req->path);
 }
 
 static void h_upsert_entities(const av_http_req *req, const char *const *params, size_t n_params,
@@ -1148,4 +1353,5 @@ void av_rest_register_entities(av_router *r, bool debug_routes, void *ctx)
     (void) av_router_add(r, "POST", "/v1/collections/{name}/entities:delete", h_delete_entities, NULL, &e);
     (void) av_router_add(r, "POST", "/v1/collections/{name}/entities:extend", h_extend_entities, NULL, &e);
     (void) av_router_add(r, "POST", "/v1/collections/{name}/entities:prepare", h_prepare_entities, NULL, &e);
+    (void) av_router_add(r, "POST", "/v1/collections/{name}/entities:submit", h_submit_entities, NULL, &e);
 }

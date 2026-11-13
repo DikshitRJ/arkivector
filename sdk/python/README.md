@@ -42,6 +42,23 @@ res = client.search("notes", [1, 0.05, 0, 0], k=1, filter=F.eq("topic", "pets"))
 print(res.hits[0].id, res.hits[0].distance)  # cat 0.0012...
 ```
 
+**Sign with your own wallet** (no key on the daemon): `prepare` builds the transactions, your wallet signs, `submit` hands them back and waits until they are indexed. One call:
+
+```python
+from eth_account import Account  # any signer works; the SDK itself has no dependencies
+from arkivector import eth_account_signer
+
+acct = Account.from_key(user_key)
+client.upsert_signed(
+    "notes",
+    [EntityInput(id="fish", vector=[0, 1, 0, 0])],
+    from_address=acct.address,
+    sign=eth_account_signer(acct),
+)
+```
+
+Or step by step (`client.prepare`, sign `tx.to_eth_account()` or hand `tx.to_rpc()` to MetaMask, `client.submit`). Guide: [Signing writes](https://arkivector.dikshitrj.in/docs/getting-started/signing).
+
 **Documentation:** [Python SDK](https://arkivector.dikshitrj.in/docs/python) · [REST API](https://arkivector.dikshitrj.in/docs/api) · [MCP server](https://arkivector.dikshitrj.in/docs/mcp) · [website](https://arkivector.dikshitrj.in) · [wiki](https://github.com/DikshitRJ/arkivector/wiki)
 
 MIT licensed.

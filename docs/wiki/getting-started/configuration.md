@@ -24,9 +24,14 @@ map_size = 1073741824         # LMDB map size in bytes
 [sync]
 poll_interval_ms = 2000
 
-[write]                       # managed writes (need ARKIV_PRIVATE_KEY)
+[write]                       # managed writes (need a signer, see [write.signer])
 # max_fee_cap_gwei = 50       # never pay more than this per gas
 # gas_margin_pct = 20         # margin over eth_estimateGas
+
+[write.signer]                # optional; without it ARKIV_PRIVATE_KEY is used when set
+# kind = "keystore"           # auto | none | env | keystore | remote
+# keystore_path = "/etc/arkivector/signer.json"
+# passphrase_credential = "keystore-pass"
 
 [hnsw]
 # persist = 1                 # save graphs under data_dir/segments and load them at start
@@ -43,7 +48,7 @@ Defaults are what the daemon uses when a key is absent (the example file sets so
 
 | Key (`ARKIVECTOR_<SECTION>_<KEY>`) | Default | Meaning |
 | :--- | :--- | :--- |
-| `ARKIV_PRIVATE_KEY` (plain env var) | unset | Wallet private key that signs writes (hex, `0x` optional). Unset = read-only. Never put it in the file |
+| `ARKIV_PRIVATE_KEY` (plain env var) | unset | Wallet private key for managed writes with `write.signer.kind` `auto` (default) or `env` (hex, `0x` optional). Unset = no managed writes. Never put it in the file |
 | `server.listen` | `127.0.0.1:8080` (`0.0.0.0:8080` in Docker) | HTTP listen address |
 | `server.threads` | `0` (= 4) | Query worker threads |
 | `server.max_body` | 32 MiB | Request body limit |
@@ -80,6 +85,24 @@ Defaults are what the daemon uses when a key is absent (the example file sets so
 
 For example `storage.map_size` is `ARKIVECTOR_STORAGE_MAP_SIZE`. Client-side variables read by the SDKs: `ARKIVECTOR_URL` (default `http://127.0.0.1:8080`) and `ARKIVECTOR_API_KEY`.
 
+## Signer
+
+`[write.signer]` chooses who signs **managed** writes (upsert, delete, extend, MCP and Qdrant writes). Writes signed by your own wallet through [prepare + submit](signing.md) need none of this. A top-level `[signer]` table is accepted as an alias. Environment overrides are `ARKIVECTOR_WRITE_SIGNER_<KEY>`, e.g. `ARKIVECTOR_WRITE_SIGNER_KIND=none`.
+
+| Key | Default | Meaning |
+| :--- | :--- | :--- |
+| `kind` | `auto` | `auto`: sign with `env_var` when it is set, else no signer (a bad key only logs a warning). `none`: never sign (read-only, prepare/submit still work). `env`, `keystore`, `remote`: as below; if they fail, the daemon refuses to start |
+| `env_var` | `ARKIV_PRIVATE_KEY` | Environment variable holding the hex key (`auto`, `env`) |
+| `keystore_path` | | Web3 Secret Storage v3 JSON file (scrypt or pbkdf2) (`keystore`) |
+| `passphrase_file` | | File whose first line is the keystore passphrase (`keystore`; exactly one of these two) |
+| `passphrase_credential` | | systemd credential name: the passphrase is read from `$CREDENTIALS_DIRECTORY/<name>` (`LoadCredential=` / `LoadCredentialEncrypted=`) |
+| `remote_url` | | `http(s)://` JSON-RPC endpoint of Web3Signer, geth or Clef (`remote`) |
+| `remote_address` | | Signing address; empty = ask `eth_accounts` (`account_list` for Clef), which must return exactly one |
+| `remote_method` | `eth_signTransaction` | `account_signTransaction` for Clef |
+| `remote_timeout_ms` | `10000` | Per signing call |
+
+`GET /v1/version` reports the result as `writes_enabled` and `signer: {kind, address}`. Examples: [Signing writes](signing.md#the-daemons-signer).
+
 ## API keys file
 
 ```toml
@@ -89,7 +112,7 @@ key = "a-long-random-secret"     # or: sha256 = "<hex sha256 of the secret>"
 scopes = ["read", "write"]       # read | write | admin
 ```
 
-Clients send `Authorization: Bearer <secret>`. Scopes: `read` (GET, search, scroll, count), `write` (entity writes, plus read), `admin` (create, follow and delete collections, plus write). See [Security](../operations/security.md).
+Clients send `Authorization: Bearer <secret>`. Scopes: `read` (GET, search, scroll, count), `write` (entity writes including prepare and submit, plus read), `admin` (create, follow and delete collections, plus write). See [Security](../operations/security.md).
 
 ## Command line
 

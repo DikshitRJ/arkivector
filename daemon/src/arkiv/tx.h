@@ -4,9 +4,11 @@
 #ifndef AV_ARKIV_TX_H
 #define AV_ARKIV_TX_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arkiv/rawtx.h"
 #include "arkiv/signer.h"
 #include "core/arena.h"
 #include "log.h"
@@ -30,7 +32,11 @@ av_status av_tx_encode_signed(const av_tx_desc *tx, uint8_t v_parity, const uint
                               const uint8_t s[32], av_arena *arena, uint8_t **out_raw, size_t *out_len,
                               uint8_t out_tx_hash[32], av_err *e);
 
-/* Convenience: sign and encode transaction in one call */
+/* True when the decoded signed transaction rt carries exactly the fields of tx (value 0, no access list). */
+bool av_tx_matches(const av_tx_desc *tx, const av_rawtx *rt);
+
+/* Sign and encode in one call. Local signers sign the sighash; a remote signer receives the whole
+ * transaction and its answer is decoded and checked with av_tx_matches and the signer address. */
 av_status av_tx_sign_and_encode(const av_tx_desc *tx, const av_signer *signer, av_arena *arena,
                                 uint8_t **out_raw, size_t *out_len, uint8_t out_tx_hash[32], av_err *e);
 

@@ -2,42 +2,37 @@
 
 ## Purpose
 
-Implements the SECP256k1 signing backends declared in `signer.h`. It parses and decrypts Web3 Secret Storage v3 JSON files using OpenSSL EVP primitives (PBKDF2, scrypt, AES-128-CTR), parses raw keys from environment variables, generates ECDSA signatures with malleability protection, and handles HTTP communication with remote signers.
+Implements the three signer backends declared in `signer.h`: `env` (hex key from an environment variable), `keystore` (Web3 Secret Storage v3 JSON file, decrypted with OpenSSL scrypt/PBKDF2 and AES-128-CTR, Keccak-256 MAC check) and `remote` (a Web3Signer / geth / Clef JSON-RPC endpoint). Formats addresses as EIP-55.
 
 ## Role in Architecture
 
-Serves as the cryptographic heart of Phase D5. Enables `writer.c` to produce authentic EVM transactions signed by the daemon's configured account without exposing raw private keys or credentials across thread boundaries.
+Gives `writer.c` (through `tx.c`) one signer handle for managed writes. `main.c` selects the backend from `[write.signer]` (GitHub issue #12). The local backends sign a 32-byte sighash with libsecp256k1. The remote backend does not sign hashes: `tx.c` sends it the whole transaction and checks the answer.
 
-## Key Types and Functions
+## Key Functions
 
-| Function / Helper | Role |
+| Function | Role |
 | :--- | :--- |
-| `decrypt_keystore_v3` | Parses JSON keystore parameters (`crypto.kdf`, `cipher`, `mac`), derives decryption keys via OpenSSL PBKDF2/scrypt, decrypts ciphertext via AES-128-CTR, and verifies Keccak-256 MAC. |
-| `derive_address` | Computes 20-byte Ethereum address from SECP256k1 public key: `keccak256(pubkey[1..64])[12..31]`. |
-| `secp256k1_sign_digest` | Generates raw ECDSA signature, enforces low-S normalization ($s = N - s$ if $s > N/2$), and extracts recovery parity bit. |
-| `signer_sign_keystore` | Backend signing implementation for keystore and env keys using in-memory SECP256k1 context. |
-| `signer_sign_remote` | Backend signing implementation formatting JSON-RPC `eth_sign` requests to external Web3Signer endpoint. |
-| `av_signer_create` | Factory function setting up backend function vtables and address caches. |
-| `av_signer_destroy` | Wipes private key storage using `explicit_bzero` and frees memory. |
+| `av_signer_create_env` | Reads and parses the hex key, derives the address. |
+| `av_signer_create_keystore` | Reads the file (max 1 MiB), checks cipher `aes-128-ctr`, bounds the KDF parameters (scrypt N ≤ 2^20, r, p ≤ 16; PBKDF2 c ≤ 10^7), derives the key, checks the MAC in constant time, decrypts, derives the address. |
+| `av_signer_create_remote_ex` | Validates `url` and `method`, creates an `av_rpc` client for the signer (2 retries), uses `remote_address` or asks `eth_accounts` / `account_list` (exactly one account required). |
+| `av_signer_remote_call` | One JSON-RPC call to the remote signer. Errors become `write_disabled` with the signer's message. |
+| `av_signer_sign` | Recoverable ECDSA over a sighash (local backends only; remote returns an error). |
+| `av_signer_get_kind`, `av_signer_kind_name` | `env`, `keystore` or `remote` (reported by `GET /v1/version`). |
+| `av_signer_destroy` | Wipes the key with `explicit_bzero`, frees the RPC client. |
 
 ## Memory Ownership
 
-- **Private Key Storage**: The decrypted 32-byte private key is retained in a securely allocated heap struct and zeroed with `explicit_bzero()` upon destruction.
-- **Remote Signer Buffers**: URL and token strings are duplicated and owned by the `av_signer` handle.
+The signer owns the 32-byte key (local backends), the remote URL copy and the remote `av_rpc` client. Decrypted and derived key buffers on the stack are wiped before return on every path.
 
 ## Invariants
 
-- **Zeroization**: Private keys are never written to disk, never formatted into logs, and unconditionally scrubbed from RAM upon `av_signer_destroy`.
-- **EIP-2 Malleability**: Every signature produced conforms strictly to EIP-2 low-S rules.
-- **Non-blocking Keystore Parse**: Keystore decryption occurs once during initialization, avoiding costly KDF evaluations during transaction signing.
+- Key material is never logged and never leaves the process. The remote backend never sees or stores a key.
+- An invalid key, wrong passphrase or unreachable signer fails at creation, so `main.c` can stop startup.
 
 ## Error Handling
 
-- Keystore MAC verification failure sets `code = "unauthorized"` with message `"invalid keystore passphrase or corrupted MAC"`.
-- OpenSSL initialization or allocation failures return `AV_ERR` with `code = "internal"`.
-- Remote signer HTTP timeouts or non-200 responses map to `code = "upstream_error"`.
+`invalid_argument` for bad configuration, malformed keys, unsupported KDF/cipher and MAC mismatch (`keystore password incorrect (MAC mismatch)`); `internal` for allocation or OpenSSL failures; `write_disabled` for remote-signer call failures.
 
 ## Thread Safety
 
-- **Local Signers (keystore/env)**: Signature operations are lock-free and reentrant across multiple threads.
-- **Remote Signer**: Employs an internal mutex around the HTTP connection handle to serialize concurrent signature RPCs.
+Local signing is reentrant (read-only key and context). Remote calls use the thread-safe `av_rpc` client (one curl handle per call).

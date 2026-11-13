@@ -42,7 +42,7 @@ Upserts and deletes go through the same managed writer as [`POST /v1/collections
 - On search, the payload is rebuilt from the attributes plus the document: a JSON-object document is merged back key by key, any other document comes back as `page_content`.
 - An upsert of an existing id patches the entity in place. Attributes missing from the new payload are not removed.
 - Deleting ids that do not exist is not an error (like Qdrant). Deleting with an empty filter is refused.
-- **Without a signer** (no `ARKIV_PRIVATE_KEY`) the daemon is read-only: upsert and delete return `403` with `write_disabled`, never a fake success.
+- **Without a signer** (no `ARKIV_PRIVATE_KEY`, keystore or remote signer; see [Signing writes](../getting-started/signing.md)) the daemon is read-only: upsert and delete return `403` with `write_disabled`, never a fake success.
 
 ## Filters
 

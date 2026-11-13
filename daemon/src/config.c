@@ -71,6 +71,16 @@ static const field k_fields[] = {
     F("write", "replace_after_blocks", K_INT, write.replace_after_blocks, 1, 10000),
     F("write", "max_replacements", K_INT, write.max_replacements, 0, 8),
 
+    F("write.signer", "kind", K_STR, signer.kind, 0, 0),
+    F("write.signer", "env_var", K_STR, signer.env_var, 0, 0),
+    F("write.signer", "keystore_path", K_STR, signer.keystore_path, 0, 0),
+    F("write.signer", "passphrase_file", K_STR, signer.passphrase_file, 0, 0),
+    F("write.signer", "passphrase_credential", K_STR, signer.passphrase_credential, 0, 0),
+    F("write.signer", "remote_url", K_STR, signer.remote_url, 0, 0),
+    F("write.signer", "remote_address", K_STR, signer.remote_address, 0, 0),
+    F("write.signer", "remote_method", K_STR, signer.remote_method, 0, 0),
+    F("write.signer", "remote_timeout_ms", K_INT, signer.remote_timeout_ms, 100, 300000),
+
     F("hnsw", "persist", K_INT, hnsw.persist, 0, 1),
     F("hnsw", "band_blocks", K_INT, hnsw.band_blocks, 0, 100000000),
 
@@ -81,7 +91,6 @@ static const field k_fields[] = {
 #define N_FIELDS (sizeof(k_fields) / sizeof(k_fields[0]))
 
 static const char *const k_sections[] = {"server", "arkiv", "storage", "sync", "write", "hnsw", "log"};
-static const char *const k_reserved[] = {"signer"};
 /* [hnsw] keys from the ARCHITECTURE section 16.3 example, accepted (and ignored) since the section was
  * reserved: they are per-search knobs today (ef_search, iterative_scan, max_scan_tuples on requests). */
 static const char *const k_hnsw_ignored[] = {"ef_search", "iterative_scan", "max_scan_tuples",
@@ -182,6 +191,7 @@ av_status av_config_defaults(av_config *c, av_err *e)
     c->write.fallback_gas_base = 60000;
     c->write.replace_after_blocks = 10;
     c->write.max_replacements = 3;
+    c->signer.remote_timeout_ms = 10000;
     c->hnsw.persist = 1;
     c->hnsw.band_blocks = 1296000; /* 30 days of 2 s blocks */
     static const char *const urls[] = {"https://rpc.rabdi.db-chain.testnet.arkiv.network"};
@@ -193,6 +203,14 @@ av_status av_config_defaults(av_config *c, av_err *e)
         av_config_set_string(&c->storage.data_dir, "/var/lib/arkivector", e) != AV_OK ||
         av_config_set_string(&c->log.level, "info", e) != AV_OK ||
         av_config_set_string(&c->log.format, "text", e) != AV_OK ||
+        av_config_set_string(&c->signer.kind, "auto", e) != AV_OK ||
+        av_config_set_string(&c->signer.env_var, "ARKIV_PRIVATE_KEY", e) != AV_OK ||
+        av_config_set_string(&c->signer.keystore_path, "", e) != AV_OK ||
+        av_config_set_string(&c->signer.passphrase_file, "", e) != AV_OK ||
+        av_config_set_string(&c->signer.passphrase_credential, "", e) != AV_OK ||
+        av_config_set_string(&c->signer.remote_url, "", e) != AV_OK ||
+        av_config_set_string(&c->signer.remote_address, "", e) != AV_OK ||
+        av_config_set_string(&c->signer.remote_method, "eth_signTransaction", e) != AV_OK ||
         set_list(c, &c->arkiv.rpc_urls, &c->arkiv.n_rpc_urls, urls, 1, e) != AV_OK) {
         return AV_ERR;
     }
@@ -209,6 +227,14 @@ void av_config_free(av_config *c)
     free(c->storage.data_dir);
     free(c->log.level);
     free(c->log.format);
+    free(c->signer.kind);
+    free(c->signer.env_var);
+    free(c->signer.keystore_path);
+    free(c->signer.passphrase_file);
+    free(c->signer.passphrase_credential);
+    free(c->signer.remote_url);
+    free(c->signer.remote_address);
+    free(c->signer.remote_method);
     free_list(&c->collections_json, &c->n_collections);
     memset(c, 0, sizeof(*c));
 }
@@ -560,6 +586,41 @@ static av_status load_collections(av_config *c, toml_table_t *root, const ctx *c
     return AV_OK;
 }
 
+/* [write.signer], or its alias [signer] (not both). */
+static av_status load_signer(av_config *c, toml_table_t *root, const ctx *cx, av_err *e)
+{
+    toml_table_t *wtab = toml_table_in(root, "write");
+    toml_table_t *nested = wtab != NULL ? toml_table_in(wtab, "signer") : NULL;
+    toml_table_t *alias = toml_table_in(root, "signer");
+    if (alias == NULL && toml_key_exists(root, "signer")) {
+        cfg_err(e, cx, NULL, NULL, "'signer' must be a table");
+        return AV_ERR;
+    }
+    if (nested != NULL && alias != NULL) {
+        cfg_err(e, cx, "signer", NULL, "give either [write.signer] or [signer], not both");
+        return AV_ERR;
+    }
+    toml_table_t *tab = nested != NULL ? nested : alias;
+    if (tab == NULL) {
+        return AV_OK;
+    }
+    for (int i = 0;; i++) {
+        const char *key = toml_key_in(tab, i);
+        if (key == NULL) {
+            break;
+        }
+        const field *f = find_field("write.signer", key);
+        if (f == NULL) {
+            cfg_err(e, cx, "write.signer", key, "unknown key");
+            return AV_ERR;
+        }
+        if (load_field(c, f, tab, cx, e) != AV_OK) {
+            return AV_ERR;
+        }
+    }
+    return AV_OK;
+}
+
 static av_status load_table(av_config *c, toml_table_t *root, const ctx *cx, av_err *e)
 {
     /* Top level: only known sections. */
@@ -572,9 +633,8 @@ static av_status load_table(av_config *c, toml_table_t *root, const ctx *cx, av_
             strcmp(key, "collections") == 0) {
             continue;
         }
-        if (in_list(key, k_reserved, sizeof(k_reserved) / sizeof(k_reserved[0]))) {
-            av_log(AV_LOG_WARN, "config", "section [%s] is not used by this build yet and is ignored", key);
-            continue;
+        if (strcmp(key, "signer") == 0) {
+            continue; /* alias of [write.signer], loaded below */
         }
         cfg_err(e, cx, key, NULL, "unknown section or top-level key '%s'", key);
         return AV_ERR;
@@ -593,6 +653,10 @@ static av_status load_table(av_config *c, toml_table_t *root, const ctx *cx, av_
             if (key == NULL) {
                 break;
             }
+            if (strcmp(k_sections[s], "write") == 0 && strcmp(key, "signer") == 0 &&
+                toml_table_in(tab, key) != NULL) {
+                continue; /* [write.signer], loaded below */
+            }
             const field *f = find_field(k_sections[s], key);
             if (f == NULL && strcmp(k_sections[s], "hnsw") == 0 &&
                 in_list(key, k_hnsw_ignored, sizeof(k_hnsw_ignored) / sizeof(k_hnsw_ignored[0]))) {
@@ -610,6 +674,9 @@ static av_status load_table(av_config *c, toml_table_t *root, const ctx *cx, av_
                 return AV_ERR;
             }
         }
+    }
+    if (load_signer(c, root, cx, e) != AV_OK) {
+        return AV_ERR;
     }
     return load_collections(c, root, cx, e);
 }
@@ -664,6 +731,9 @@ static void env_name(char *out, size_t cap, const field *f)
 {
     snprintf(out, cap, "ARKIVECTOR_%s_%s", f->section, f->key);
     for (char *p = out; *p != '\0'; p++) {
+        if (*p == '.') {
+            *p = '_'; /* write.signer -> WRITE_SIGNER */
+        }
         *p = (char) toupper((unsigned char) *p);
     }
 }
@@ -757,6 +827,52 @@ static bool has_prefix(const char *s, const char *p)
     return strncmp(s, p, strlen(p)) == 0;
 }
 
+static av_status validate_signer(const av_config *c, av_err *e)
+{
+    static const char *const kinds[] = {"auto", "none", "env", "keystore", "remote"};
+    const char *k = c->signer.kind;
+    if (!in_list(k, kinds, sizeof(kinds) / sizeof(kinds[0]))) {
+        cfg_err(e, NULL, "write.signer", "kind", "'%s' is not one of auto, none, env, keystore, remote", k);
+        return AV_ERR;
+    }
+    if ((strcmp(k, "env") == 0 || strcmp(k, "auto") == 0) && c->signer.env_var[0] == '\0') {
+        cfg_err(e, NULL, "write.signer", "env_var", "must not be empty");
+        return AV_ERR;
+    }
+    if (strcmp(k, "keystore") == 0) {
+        if (c->signer.keystore_path[0] == '\0') {
+            cfg_err(e, NULL, "write.signer", "keystore_path", "is required for kind = \"keystore\"");
+            return AV_ERR;
+        }
+        bool pf = c->signer.passphrase_file[0] != '\0';
+        bool pc = c->signer.passphrase_credential[0] != '\0';
+        if (pf == pc) {
+            cfg_err(e, NULL, "write.signer", "passphrase_file",
+                    "kind = \"keystore\" needs exactly one of passphrase_file, passphrase_credential");
+            return AV_ERR;
+        }
+        if (pc && strchr(c->signer.passphrase_credential, '/') != NULL) {
+            cfg_err(e, NULL, "write.signer", "passphrase_credential", "is a credential name, not a path");
+            return AV_ERR;
+        }
+    }
+    if (strcmp(k, "remote") == 0) {
+        if (!has_prefix(c->signer.remote_url, "http://") && !has_prefix(c->signer.remote_url, "https://")) {
+            cfg_err(e, NULL, "write.signer", "remote_url",
+                    "kind = \"remote\" needs an http:// or https:// JSON-RPC endpoint");
+            return AV_ERR;
+        }
+        if (strcmp(c->signer.remote_method, "eth_signTransaction") != 0 &&
+            strcmp(c->signer.remote_method, "account_signTransaction") != 0) {
+            cfg_err(e, NULL, "write.signer", "remote_method",
+                    "'%s' is not one of eth_signTransaction, account_signTransaction",
+                    c->signer.remote_method);
+            return AV_ERR;
+        }
+    }
+    return AV_OK;
+}
+
 av_status av_config_validate(const av_config *c, av_err *e)
 {
     for (size_t i = 0; i < N_FIELDS; i++) {
@@ -808,6 +924,9 @@ av_status av_config_validate(const av_config *c, av_err *e)
         !has_prefix(c->arkiv.ws_url, "wss://")) {
         cfg_err(e, NULL, "arkiv", "ws_url", "'%s' must start with ws:// or wss:// (or be empty)",
                 c->arkiv.ws_url);
+        return AV_ERR;
+    }
+    if (validate_signer(c, e) != AV_OK) {
         return AV_ERR;
     }
     for (size_t i = 0; i < c->n_collections; i++) {
@@ -868,6 +987,9 @@ void av_config_log_summary(const av_config *c)
            c->write.max_fee_cap_gwei, c->write.max_fee_gwei, c->write.priority_fee_gwei,
            (long long) c->write.gas_margin_pct, (long long) c->write.replace_after_blocks,
            (long long) c->write.max_replacements);
+    av_log(AV_LOG_INFO, "config", "signer kind=%s%s%s", c->signer.kind,
+           strcmp(c->signer.kind, "remote") == 0 ? " method=" : "",
+           strcmp(c->signer.kind, "remote") == 0 ? c->signer.remote_method : "");
     av_log(AV_LOG_INFO, "config", "hnsw persist=%lld band_blocks=%lld", (long long) c->hnsw.persist,
            (long long) c->hnsw.band_blocks);
     av_log(AV_LOG_INFO, "config", "collections=%zu", c->n_collections);

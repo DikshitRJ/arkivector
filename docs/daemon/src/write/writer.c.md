@@ -19,7 +19,8 @@ Orchestrates the entire Phase D5 write stack. Coordinates interaction between `s
 | `poll_receipts` | Periodically queries `eth_getTransactionReceipt` via `av_rpc` with exponential backoff until all transactions are mined or deadline is reached. |
 | `apply_write_through` | Commits written entities directly into LMDB and collection postings under the collection's publish lock at receipt block height. |
 | `av_writer_upsert` | Core entrypoint for managed entity writes. |
-| `av_writer_prepare` | Entrypoint for client-side signing, returning unsigned calldata and predicted keys. |
+| `av_writer_prepare` | Entrypoint for client-side signing, returning unsigned transactions (nonce, gas limit), predicted keys and a fee quote (`av_fee_quote_rpc`). |
+| `av_writer_submit` | Client-signed transactions (`entities:submit`): decodes each with `rawtx.c` and checks chain id, Arkiv contract, value 0, `execute` selector and that the sender is a writer, before any broadcast; relays them in order (`already known` counts as accepted); or takes hashes a wallet broadcast. Polls receipts (no replacement), collects `EntityCreated` keys, and waits for the collection with `wait=indexed`. Invalidates the writer's nonces if a submitted transaction came from the daemon's own address. |
 
 ## Memory Ownership
 

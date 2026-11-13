@@ -50,8 +50,8 @@ The full documentation lives in [`docs/wiki/`](docs/wiki/README.md), one Markdow
 
 | Section | Pages |
 | :--- | :--- |
-| Getting started | [Install and get started](docs/wiki/install.md) · [Quick start](docs/wiki/getting-started/quickstart.md) · [Concepts](docs/wiki/getting-started/concepts.md) · [Configuration](docs/wiki/getting-started/configuration.md) |
-| REST API (curl) | [Overview](docs/wiki/api/README.md) · [Health and version](docs/wiki/api/health.md) · [Collections](docs/wiki/api/collections.md) · [Upsert](docs/wiki/api/entities-upsert.md) · [Get](docs/wiki/api/entities-get.md) · [Delete and extend](docs/wiki/api/entities-delete-extend.md) · [Prepare](docs/wiki/api/entities-prepare.md) · [Search](docs/wiki/api/search.md) · [Batch search](docs/wiki/api/search-batch.md) · [Scroll](docs/wiki/api/scroll.md) · [Count](docs/wiki/api/count.md) · [Filters](docs/wiki/api/filters.md) · [Vectors](docs/wiki/api/vectors.md) · [Consistency](docs/wiki/api/consistency.md) · [Errors](docs/wiki/api/errors.md) · [Qdrant](docs/wiki/api/qdrant.md) |
+| Getting started | [Install and get started](docs/wiki/install.md) · [Quick start](docs/wiki/getting-started/quickstart.md) · [Concepts](docs/wiki/getting-started/concepts.md) · [Configuration](docs/wiki/getting-started/configuration.md) · [Signing writes](docs/wiki/getting-started/signing.md) |
+| REST API (curl) | [Overview](docs/wiki/api/README.md) · [Health and version](docs/wiki/api/health.md) · [Collections](docs/wiki/api/collections.md) · [Upsert](docs/wiki/api/entities-upsert.md) · [Get](docs/wiki/api/entities-get.md) · [Delete and extend](docs/wiki/api/entities-delete-extend.md) · [Prepare](docs/wiki/api/entities-prepare.md) · [Submit](docs/wiki/api/entities-submit.md) · [Search](docs/wiki/api/search.md) · [Batch search](docs/wiki/api/search-batch.md) · [Scroll](docs/wiki/api/scroll.md) · [Count](docs/wiki/api/count.md) · [Filters](docs/wiki/api/filters.md) · [Vectors](docs/wiki/api/vectors.md) · [Consistency](docs/wiki/api/consistency.md) · [Errors](docs/wiki/api/errors.md) · [Qdrant](docs/wiki/api/qdrant.md) |
 | Python SDK | [Overview](docs/wiki/python/README.md) · [Client](docs/wiki/python/client.md) · [Collections](docs/wiki/python/collections.md) · [Writing](docs/wiki/python/writing.md) · [Searching](docs/wiki/python/searching.md) · [Reading](docs/wiki/python/reading.md) · [Filters](docs/wiki/python/filters.md) · [Types](docs/wiki/python/types.md) · [Errors](docs/wiki/python/errors.md) · [LangChain and LlamaIndex](docs/wiki/python/integrations.md) |
 | Node.js SDK | [Overview](docs/wiki/node/README.md) · [Client](docs/wiki/node/client.md) · [Collections](docs/wiki/node/collections.md) · [Writing](docs/wiki/node/writing.md) · [Searching](docs/wiki/node/searching.md) · [Reading](docs/wiki/node/reading.md) · [Filters](docs/wiki/node/filters.md) · [Types](docs/wiki/node/types.md) · [Errors](docs/wiki/node/errors.md) · [LangChain.js](docs/wiki/node/integrations.md) |
 | MCP server | [Overview](docs/wiki/mcp/README.md) · [Connect a client](docs/wiki/mcp/setup.md) · [Tools](docs/wiki/mcp/tools.md) |
@@ -109,7 +109,7 @@ The daemon now listens on `http://127.0.0.1:8080` and syncs from the Arkiv Rabdi
 Download the latest release and run it:
 
 ```bash
-VERSION=1.1.0
+VERSION=1.2.0
 curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/arkivectord-${VERSION}-linux-x86_64.tar.gz
 tar xzf arkivectord-${VERSION}-linux-x86_64.tar.gz
 cd arkivectord-${VERSION}-linux-x86_64
@@ -127,7 +127,7 @@ The daemon needs libcurl 8.11 or newer for WebSocket support. If your distributi
 
 ### 2. Give it a wallet
 
-Reading works without a wallet. Writing means sending Arkiv transactions, and those need a signer and a bit of gas.
+Reading works without a wallet. Writing means sending Arkiv transactions, and those need a signer and a bit of gas. The signer can be the daemon (below), or each of your users' own wallets (MetaMask, a hardware wallet, `eth_account`, viem, ethers, a KMS), in which case the daemon needs no key at all: see [Signing writes](docs/wiki/getting-started/signing.md).
 
 1. Create a fresh EVM wallet for the daemon (MetaMask, Rabby, or anything that can export a private key). Don't reuse the wallet that holds your savings.
 2. Get free test GLM from the faucet: <https://hub.arkiv.network/faucet>.
@@ -136,7 +136,7 @@ Reading works without a wallet. Writing means sending Arkiv transactions, and th
 
 | Variable | Required | What it does |
 | :--- | :--- | :--- |
-| `ARKIV_PRIVATE_KEY` | For writes | Hex private key that signs transactions (`0x` prefix optional). Without it the daemon is read-only. Keep it out of config files and shell history. |
+| `ARKIV_PRIVATE_KEY` | For managed writes | Hex private key that signs transactions (`0x` prefix optional). Without it the daemon can't sign, but it still relays writes signed by your users' wallets. Keep it out of config files and shell history; in production prefer an encrypted keystore or a remote signer (`[write.signer]`). |
 | `ARKIVECTOR_ARKIV_ACCESS_KEY` | Recommended | Your Arkiv Hub access key, so you are not on the throttled public pool. |
 | `ARKIVECTOR_STORAGE_DATA_DIR` | Binary only | Where the local index lives. The Docker image uses `/data`. |
 | `ARKIVECTOR_URL` | SDKs | Where the SDKs find the daemon. Defaults to `http://127.0.0.1:8080`. |
@@ -388,17 +388,17 @@ This was built for a hackathon. Everything in the quick start works and was test
 
 | Limitation | Effect today | Plan |
 | :--- | :--- | :--- |
-| Transactions are signed with a private key in an environment variable | The daemon holds a hot wallet. | The `entities:prepare` endpoint already returns unsigned transactions, with nonces and keys taken from the wallet's on-chain state. Next is letting the SDK hand them to the user's own wallet (MetaMask, WalletConnect, a hardware wallet), plus encrypted keystore files and remote signers for servers ([#12](https://github.com/DikshitRJ/arkivector/issues/12)). |
 | Tested on the Rabdi testnet only | Mainnet is configurable through `rpc_urls` and `chain_id` but has not been tried. | Run the sync and write tests against mainnet once its endpoints are published, and check gas reservations against real usage there ([#16](https://github.com/DikshitRJ/arkivector/issues/16)). |
 | Linux only | macOS and Windows use the Docker image. | Port the few glibc-specific calls ([#17](https://github.com/DikshitRJ/arkivector/issues/17)). |
 | Two SDK languages | SDKs exist for Python and Node.js. | C, C++ and Rust SDKs ([#18](https://github.com/DikshitRJ/arkivector/issues/18)). |
 
-Fixed since v1.1.0:
+Fixed in v1.2.0:
 
 - **HNSW graphs survive restarts** ([#11](https://github.com/DikshitRJ/arkivector/issues/11)). Each collection's graphs are grouped by expiry band, saved under `<data_dir>/segments/<collection>/` and loaded at startup, so only what changed since the save is indexed. Rebuilds run on a background thread while sync continues, and a band whose entities have all expired is released whole. A corrupt or mismatched file is rejected with a warning and rebuilt. Settings: `[hnsw] persist`, `band_blocks`.
 - **Entity keys follow the wallet's on-chain nonce** ([#13](https://github.com/DikshitRJ/arkivector/issues/13)). Writes read `entityNonce` from the Arkiv contract before predicting keys and take the final keys from the `EntityCreated` receipt logs. `entities:prepare` uses the wallet's real nonces.
 - **Dynamic gas** ([#14](https://github.com/DikshitRJ/arkivector/issues/14)). Fees come from `eth_feeHistory`, then `eth_gasPrice`, then the config, capped by `write.max_fee_cap_gwei`. The gas limit is `eth_estimateGas` plus `write.gas_margin_pct`. A stuck transaction is resent with bumped fees.
 - **Qdrant writes are real** ([#15](https://github.com/DikshitRJ/arkivector/issues/15)). Upserts and deletes go through the REST writer, searches return payloads, and a daemon without a signer refuses writes.
+- **Sign with your own wallet** ([#12](https://github.com/DikshitRJ/arkivector/issues/12)). `entities:prepare` returns EIP-1559 transactions ready to sign (gas and fee included), and the new `entities:submit` takes them back signed (or the hashes a wallet like MetaMask broadcast), checks them, broadcasts them and waits until they are indexed. The SDKs do it in one call (`upsert_signed` / `upsertSigned`) with MetaMask, viem, ethers, `eth_account` or any function, so the daemon needs no key. For the daemon's own signer, `[write.signer]` adds encrypted keystores (passphrase file or systemd credential) and remote signers (Web3Signer, Clef); `/v1/version` reports the signer kind. Guide: [Signing writes](docs/wiki/getting-started/signing.md).
 
 The open work is tracked task by task in `openspec/changes/integration-e2e-verify/tasks.md` and `openspec/changes/daemon-hnsw-ci-fix/tasks.md`.
 

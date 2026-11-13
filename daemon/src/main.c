@@ -30,6 +30,7 @@
 #include "store/lmdb_store.h"
 #include "sync/syncer.h"
 #include "arkiv/signer.h"
+#include "core/fileio.h"
 #include "server/idempotency.h"
 #include "write/writer.h"
 
@@ -115,6 +116,95 @@ static av_writer *g_writer = NULL;
 static av_idempotency_store *g_idem = NULL;
 static av_signer *g_signer = NULL;
 
+/* Keystore passphrase from passphrase_file or the systemd credential $CREDENTIALS_DIRECTORY/<name>.
+ * The first line is used (a trailing CR/LF is stripped). The buffer is wiped by the caller. */
+static av_status read_passphrase(const av_config *cfg, char *out, size_t cap, av_err *e)
+{
+    char path[4096];
+    if (cfg->signer.passphrase_credential[0] != '\0') {
+        const char *dir = getenv("CREDENTIALS_DIRECTORY");
+        if (dir == NULL || dir[0] == '\0') {
+            av_err_set(
+                e, "invalid_argument",
+                "write.signer.passphrase_credential is set but CREDENTIALS_DIRECTORY is not (run under "
+                "systemd with LoadCredential=/SetCredentialEncrypted=)");
+            return AV_ERR;
+        }
+        snprintf(path, sizeof(path), "%s/%s", dir, cfg->signer.passphrase_credential);
+    } else {
+        snprintf(path, sizeof(path), "%s", cfg->signer.passphrase_file);
+    }
+    size_t n = 0;
+    char *buf = av_read_file(path, "keystore passphrase", cap - 1, &n, e);
+    if (buf == NULL)
+        return AV_ERR;
+    size_t len = strcspn(buf, "\r\n");
+    memcpy(out, buf, len);
+    out[len] = '\0';
+    explicit_bzero(buf, n);
+    free(buf);
+    return AV_OK;
+}
+
+/*
+ * [write.signer] (GitHub issue #12). kind "auto" keeps the historical behaviour: sign with the key in
+ * env_var (ARKIV_PRIVATE_KEY, or the legacy ARKIVECTOR_SIGNER_KEY) when it is set, otherwise run
+ * read-only; a bad key there only logs a warning. An explicitly chosen kind that fails stops startup.
+ */
+static av_status create_signer(const av_config *cfg, av_signer **out, av_err *e)
+{
+    *out = NULL;
+    const char *kind = cfg->signer.kind;
+    if (strcmp(kind, "none") == 0) {
+        av_log(AV_LOG_INFO, "signer", "signer disabled: managed writes are off (prepare/submit still work)");
+        return AV_OK;
+    }
+    if (strcmp(kind, "auto") == 0) {
+        const char *vars[2] = {cfg->signer.env_var, "ARKIVECTOR_SIGNER_KEY"};
+        for (size_t i = 0; i < 2; i++) {
+            const char *v = getenv(vars[i]);
+            if (v == NULL || v[0] == '\0')
+                continue;
+            av_err s_err;
+            av_err_clear(&s_err);
+            if (av_signer_create_env(vars[i], out, &s_err) == AV_OK)
+                break;
+            av_log(AV_LOG_WARN, "signer", "ignoring %s: %s", vars[i], s_err.msg);
+        }
+    } else if (strcmp(kind, "env") == 0) {
+        if (av_signer_create_env(cfg->signer.env_var, out, e) != AV_OK)
+            return AV_ERR;
+    } else if (strcmp(kind, "keystore") == 0) {
+        char pass[1024];
+        if (read_passphrase(cfg, pass, sizeof(pass), e) != AV_OK)
+            return AV_ERR;
+        av_status st = av_signer_create_keystore(cfg->signer.keystore_path, pass, out, e);
+        explicit_bzero(pass, sizeof(pass));
+        if (st != AV_OK)
+            return AV_ERR;
+    } else if (strcmp(kind, "remote") == 0) {
+        av_signer_remote_config rc;
+        memset(&rc, 0, sizeof(rc));
+        rc.url = cfg->signer.remote_url;
+        rc.address = cfg->signer.remote_address;
+        rc.method = cfg->signer.remote_method;
+        rc.chain_id = (uint64_t) cfg->arkiv.chain_id;
+        rc.timeout_ms = (int) cfg->signer.remote_timeout_ms;
+        if (av_signer_create_remote_ex(&rc, out, e) != AV_OK)
+            return AV_ERR;
+    }
+    if (*out != NULL) {
+        char addr[43];
+        av_signer_get_address_hex(*out, addr);
+        av_log(AV_LOG_INFO, "signer", "managed writes enabled: %s signer, address %s",
+               av_signer_kind_name(*out), addr);
+    } else {
+        av_log(AV_LOG_INFO, "signer",
+               "no signer configured: managed writes are off (prepare/submit still work)");
+    }
+    return AV_OK;
+}
+
 static av_status services_start(const av_config *cfg, av_err *e)
 {
     /* 1. Open LMDB store */
@@ -189,18 +279,8 @@ static av_status services_start(const av_config *cfg, av_err *e)
 
     /* 7. Signer and Writer */
     g_signer = NULL;
-    const char *pk_env = getenv("ARKIV_PRIVATE_KEY");
-    if (pk_env == NULL || pk_env[0] == '\0') {
-        pk_env = getenv("ARKIVECTOR_SIGNER_KEY");
-    }
-    if (pk_env != NULL && pk_env[0] != '\0') {
-        av_err s_err;
-        av_err_clear(&s_err);
-        if (av_signer_create_env("ARKIV_PRIVATE_KEY", &g_signer, &s_err) != AV_OK) {
-            av_err_clear(&s_err);
-            (void) av_signer_create_env("ARKIVECTOR_SIGNER_KEY", &g_signer, &s_err);
-        }
-    }
+    if (create_signer(cfg, &g_signer, e) != AV_OK)
+        return AV_ERR;
 
     av_writer_config wcfg;
     memset(&wcfg, 0, sizeof(wcfg));
@@ -218,6 +298,11 @@ static av_status services_start(const av_config *cfg, av_err *e)
     g_writer = av_writer_create(&wcfg, g_signer, g_rpc, g_store, g_registry, e);
     av_rest_set_writer(g_writer, g_idem);
     av_rest_set_info(cfg->arkiv.chain_id, g_signer != NULL);
+    if (g_signer != NULL) {
+        char addr[43];
+        av_signer_get_address_hex(g_signer, addr);
+        av_rest_set_signer(av_signer_kind_name(g_signer), addr);
+    }
 
     return AV_OK;
 }

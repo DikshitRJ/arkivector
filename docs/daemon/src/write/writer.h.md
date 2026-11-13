@@ -49,7 +49,8 @@ typedef struct {
 | `av_writer_upsert` | Executes managed upsert-by-id for a batch of entities. |
 | `av_writer_delete` | Executes entity deletions for a list of entity keys or external IDs. |
 | `av_writer_extend` | Extends the expiration block height for a list of entities. |
-| `av_writer_prepare` | Prepares unsigned `execute(ops)` transactions and predicted keys for client-side signing without submitting to chain. |
+| `av_writer_prepare` | Prepares unsigned `execute(ops)` transactions and predicted keys for client-side signing without submitting to chain. `av_prepare_result` also carries the fee suggestion (`max_fee_per_gas`, `max_priority_fee_per_gas`, `fee_source`). |
+| `av_writer_submit` | Validates and broadcasts client-signed transactions, or waits for wallet-broadcast hashes; returns `av_submit_result` (tx hashes, highest receipt block, created keys). No signer needed. |
 | `av_writer_result_free` | Releases heap memory allocated within an `av_writer_result` struct. |
 
 ### Function Signatures

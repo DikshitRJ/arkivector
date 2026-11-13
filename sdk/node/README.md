@@ -35,6 +35,15 @@ const res = await client.search("notes", { vector: [1, 0.05, 0, 0], k: 1, filter
 console.log(res.hits[0].id, res.hits[0].distance); // cat 0.0012...
 ```
 
+**Sign with your own wallet** (no key on the daemon): the daemon prepares the transactions, the wallet signs them, and the daemon broadcasts and indexes them.
+
+```ts
+// MetaMask / any EIP-1193 provider, a viem WalletClient, an ethers Signer, or (tx) => rawTx | txHash
+await client.upsertSigned("notes", [{ id: "fish", vector: [0, 1, 0, 0] }], { signer: window.ethereum });
+```
+
+Or step by step: `client.prepare(...)`, convert with `toRpcTransaction` / `toViemTransaction` / `toEthersTransaction`, sign, then `client.submit(collection, { signedTransactions } | { txHashes })`. Guide: [Signing writes](https://arkivector.dikshitrj.in/docs/getting-started/signing).
+
 **Documentation:** [Node.js SDK](https://arkivector.dikshitrj.in/docs/node) · [REST API](https://arkivector.dikshitrj.in/docs/api) · [MCP server](https://arkivector.dikshitrj.in/docs/mcp) · [website](https://arkivector.dikshitrj.in) · [wiki](https://github.com/DikshitRJ/arkivector/wiki)
 
 MIT licensed.

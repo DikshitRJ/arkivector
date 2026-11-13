@@ -3,6 +3,7 @@
  * and the registration hooks declared in rest.h.
  */
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,6 +33,8 @@ static av_sync_provider_fn g_sync_fn;
 static void *g_sync_ctx;
 static int64_t g_chain_id;
 static bool g_writes_enabled;
+static char g_signer_kind[16]; /* "" = no signer */
+static char g_signer_address[43];
 static char *g_caps[MAX_CAPABILITIES];
 static size_t g_n_caps;
 
@@ -173,6 +176,14 @@ void av_rest_set_info(int64_t chain_id, bool writes_enabled)
     pthread_mutex_unlock(&g_mu);
 }
 
+void av_rest_set_signer(const char *kind, const char *address_hex)
+{
+    pthread_mutex_lock(&g_mu);
+    snprintf(g_signer_kind, sizeof(g_signer_kind), "%s", kind != NULL ? kind : "");
+    snprintf(g_signer_address, sizeof(g_signer_address), "%s", address_hex != NULL ? address_hex : "");
+    pthread_mutex_unlock(&g_mu);
+}
+
 av_status av_rest_add_capability(const char *capability, av_err *e)
 {
     av_status st = AV_OK;
@@ -311,6 +322,14 @@ static void h_version(const av_http_req *req, const char *const *params, size_t 
     pthread_mutex_lock(&g_mu);
     yyjson_mut_obj_add_sint(doc, root, "chain_id", g_chain_id);
     yyjson_mut_obj_add_bool(doc, root, "writes_enabled", g_writes_enabled);
+    if (g_signer_kind[0] != '\0') {
+        yyjson_mut_val *sg = yyjson_mut_obj(doc);
+        yyjson_mut_obj_add_strcpy(doc, sg, "kind", g_signer_kind);
+        yyjson_mut_obj_add_strcpy(doc, sg, "address", g_signer_address);
+        yyjson_mut_obj_add_val(doc, root, "signer", sg);
+    } else {
+        yyjson_mut_obj_add_null(doc, root, "signer");
+    }
     yyjson_mut_val *caps = yyjson_mut_arr(doc);
     for (size_t i = 0; i < g_n_caps; i++) {
         yyjson_mut_arr_add_strcpy(doc, caps, g_caps[i]);
@@ -413,6 +432,7 @@ av_status av_rest_register_all(av_router *r, bool debug_routes, av_err *e)
                                                "collections.manifest",
                                                "entities.write",
                                                "entities.prepare",
+                                               "entities.submit",
                                                "entities.verify",
                                                "idempotency",
                                                "auth.api_keys",

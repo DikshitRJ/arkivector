@@ -1,6 +1,6 @@
 # Delete and extend
 
-Remove entities from the chain, or extend their lifetime. Both send Arkiv transactions, so they need a signer and the `write` scope. Only entities owned by the daemon's wallet can be changed.
+Remove entities from the chain, or extend their lifetime. Both send Arkiv transactions, so they need a signer and the `write` scope. Only entities owned by the daemon's wallet can be changed. For entities owned by a user's wallet, sign the `DELETE` / `EXTEND_EXPIRY` transactions with that wallet (e.g. with the Arkiv SDK) and pass them to [submit](entities-submit.md) to wait for the index.
 
 ## Delete one: `DELETE /v1/collections/{name}/entities/{ref}`
 

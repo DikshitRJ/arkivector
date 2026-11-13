@@ -3,9 +3,11 @@
 # Every key can be overridden by an environment variable ARKIVECTOR_<SECTION>_<KEY>,
 # e.g. ARKIVECTOR_ARKIV_ACCESS_KEY=... or ARKIVECTOR_LOG_LEVEL=debug.
 #
-# Writes (managed upserts/deletes) need a signer: set ARKIV_PRIVATE_KEY (hex, 0x optional) in the
-# environment. Without it the daemon runs read-only (search, get, scroll, count, prepare).
-# Never put the private key in this file.
+# Managed writes (upserts/deletes signed by the daemon) need a signer: ARKIV_PRIVATE_KEY (hex, 0x
+# optional) in the environment, an encrypted keystore, or a remote signer ([write.signer] below).
+# Without one the daemon can't sign, but search works and so does client-side signing:
+# entities:prepare + entities:submit, where each user's own wallet signs.
+# Never put a private key in this file.
 
 [server]
 listen = "127.0.0.1:8080"     # bind to 127.0.0.1 unless you also configure api_keys_file
@@ -28,7 +30,7 @@ map_size = 1073741824         # LMDB map size in bytes (1 GiB)
 [sync]
 poll_interval_ms = 2000       # Rabdi produces a block every 2 s
 
-[write]                         # managed writes (needs ARKIV_PRIVATE_KEY)
+[write]                         # managed writes (need a signer)
 # Fees: eth_feeHistory (median of this reward percentile over fee_history_blocks), then
 # eth_gasPrice, then the static max_fee_gwei / priority_fee_gwei below.
 # max_fee_cap_gwei = 50         # never quote more than this per gas (0 = no cap)
@@ -40,6 +42,17 @@ poll_interval_ms = 2000       # Rabdi produces a block every 2 s
 # fallback_gas_base = 60000     # when estimation fails: this + 150000 per operation
 # replace_after_blocks = 10     # resend a stuck tx with fees +12.5% after this many blocks
 # max_replacements = 3          # 0 = never replace
+
+[write.signer]                  # who signs managed writes (env: ARKIVECTOR_WRITE_SIGNER_<KEY>)
+# kind = "auto"                 # auto: ARKIV_PRIVATE_KEY if set | none | env | keystore | remote
+# env_var = "ARKIV_PRIVATE_KEY" # kind env/auto
+# keystore_path = "/etc/arkivector/signer.json"     # kind keystore: Web3 Secret Storage v3
+# passphrase_file = "/run/secrets/keystore-pass"    # ...first line is the passphrase, or:
+# passphrase_credential = "keystore-pass"           # systemd: $CREDENTIALS_DIRECTORY/keystore-pass
+# remote_url = "http://127.0.0.1:9000"              # kind remote: Web3Signer / geth / Clef JSON-RPC
+# remote_address = "0x..."      # optional: else eth_accounts must return exactly one address
+# remote_method = "eth_signTransaction"             # or "account_signTransaction" (Clef)
+# remote_timeout_ms = 10000
 
 [hnsw]
 # persist = 1                   # save graphs under data_dir/segments and load them at startup

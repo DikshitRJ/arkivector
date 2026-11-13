@@ -121,9 +121,39 @@ typedef struct {
     size_t n_transactions;
     av_upsert_item_result *results;
     size_t n_results;
+    /* Fee suggestion (CCR-0001): the same quote the managed writer would use right now. */
+    uint64_t max_fee_per_gas;
+    uint64_t max_priority_fee_per_gas;
+    const char *fee_source; /* "fee_history" | "gas_price" | "static" */
 } av_prepare_result;
 
 av_status av_writer_prepare(av_writer *w, av_collection *col, yyjson_val *entities_arr,
                             const uint8_t from_addr[20], av_arena *arena, av_prepare_result *out, av_err *e);
+
+/*
+ * Submit transactions signed outside the daemon (CCR-0001, GitHub issue #12):
+ * POST /v1/collections/{name}/entities:submit.
+ *
+ * Exactly one of raw (signed EIP-1559 transactions, hex) or hashes (transactions a wallet already
+ * broadcast, e.g. MetaMask eth_sendTransaction) is given. Raw transactions are decoded and checked
+ * (chain id, `to` = the Arkiv contract, value 0, execute(...) calldata, sender is a writer of the
+ * collection) before anything is broadcast, then sent in order with eth_sendRawTransaction. With
+ * wait receipt/indexed the daemon polls the receipts (no fee replacement: it cannot re-sign) and
+ * returns the keys of the EntityCreated logs; indexed also waits for the collection to publish the
+ * highest receipt block. No signer is needed.
+ */
+typedef struct {
+    char (*tx_hashes)[67];
+    size_t n_tx_hashes;
+    uint64_t block_number;
+    bool has_block_number;
+    uint8_t (*created_keys)[32];
+    size_t n_created_keys;
+} av_submit_result;
+
+av_status av_writer_submit(av_writer *w, av_collection *col, const char *const *raw_hex,
+                           const size_t *raw_hex_len, size_t n_raw, const char *const *hashes,
+                           size_t n_hashes, av_write_wait_mode wait_mode, int timeout_ms, av_arena *arena,
+                           av_submit_result *out, av_err *e);
 
 #endif /* AV_WRITE_WRITER_H */

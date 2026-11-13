@@ -805,8 +805,8 @@ The daemon is **read-only unless a signer is configured**.
 | Mode | Who signs | Flow |
 | :--- | :--- | :--- |
 | **Direct** (recommended for dApps) | User wallet | The client encodes `VectorBytes` and writes with `@arkiv-network/sdk` or any Arkiv client. The daemon picks it up via sync. |
-| **Prepare** | User wallet / KMS | `POST …/entities:prepare` returns unsigned `execute(ops)` calldata plus predicted keys. |
-| **Managed** | Daemon signer (encrypted keystore / env / remote signer over HTTP, e.g. Web3Signer) | Encode → batch → sign → broadcast → receipt. |
+| **Prepare + submit** | User wallet / KMS | `POST …/entities:prepare` returns complete unsigned EIP-1559 transactions (nonce, gas, fee suggestion) plus predicted keys; the client signs; `POST …/entities:submit` validates the signed transactions (or takes the hashes a wallet broadcast), broadcasts, waits for receipts/indexing and returns the mined keys (CCR-0001). |
+| **Managed** | Daemon signer (`[write.signer]`: encrypted keystore / env / remote signer over HTTP, e.g. Web3Signer or Clef; remote answers are decoded and checked field by field) | Encode → batch → sign → broadcast → receipt. |
 
 Managed upsert:
 1. Parse the vector (JSON array, pgvector text literal, or raw), validate it with the pgvector rules, cast it to the collection type (`vector_to_halfvec`), set `NORMALIZED` after `l2_normalize` for cosine, encode `VectorBytes`, and sort attributes.
@@ -830,7 +830,8 @@ Deletes map to `DELETE`, and TTL extension maps to `EXTEND_EXPIRY`.
 | `GET /v1/collections` · `GET /v1/collections/{name}` | List / describe (sync state, counts, `as_of_block`, quarantine). |
 | `DELETE /v1/collections/{name}` | Stop following and drop local data (chain untouched). |
 | `POST /v1/collections/{name}/entities` | Upsert batch (managed signer). |
-| `POST /v1/collections/{name}/entities:prepare` | Unsigned calldata. |
+| `POST /v1/collections/{name}/entities:prepare` | Unsigned EIP-1559 transactions for a client-side signer. |
+| `POST /v1/collections/{name}/entities:submit` | Broadcast client-signed transactions (or wait for wallet-broadcast hashes) and wait for indexing. |
 | `GET /v1/collections/{name}/entities/{key_or_id}` | Point lookup (`?verify=true` cross-checks Arkiv). |
 | `DELETE /v1/collections/{name}/entities/{key_or_id}` | Delete (managed signer). |
 | `POST /v1/collections/{name}/entities:extend` | Extend TTL (managed signer). |
@@ -1119,9 +1120,10 @@ iterative_scan = "relaxed_order"
 max_scan_tuples = 20000
 scan_mem_multiplier = 1.0
 
-[signer]                         # omit => read-only daemon
-kind = "keystore"                # keystore | env | remote
-path = "/etc/arkivector/signer.json"
+[write.signer]                   # omit => ARKIV_PRIVATE_KEY if set, else no managed signer
+kind = "keystore"                # auto | none | env | keystore | remote
+keystore_path = "/etc/arkivector/signer.json"
+passphrase_credential = "keystore-pass"   # or passphrase_file; remote: remote_url, remote_address
 
 [[collections]]
 name = "acme.docs"

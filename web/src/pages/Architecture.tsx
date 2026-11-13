@@ -104,7 +104,8 @@ export function Architecture() {
         <ArchDiagram />
         <p className="mt-3 max-w-[72ch] text-[13.5px] bg-paper">
           Your code talks to <code className="chip">arkivectord</code> through an SDK. The daemon writes to Arkiv with signed
-          transactions and reads entities back into its local index. Search never leaves the daemon.
+          transactions (signed by its own keystore or remote signer, or by your users&apos; wallets) and reads entities back
+          into its local index. Search never leaves the daemon.
         </p>
       </Page>
 

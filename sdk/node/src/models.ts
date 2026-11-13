@@ -251,6 +251,16 @@ export interface VersionInfo {
   chainId: number;
   writesEnabled: boolean;
   capabilities: string[];
+  /** Managed signer kind and address (contract 1.1.0); null without one. Never key material. */
+  signer: SignerInfo | null;
+}
+
+/**
+ * The daemon's managed signer, from GET /v1/version (contract 1.1.0).
+ */
+export interface SignerInfo {
+  kind: "env" | "keystore" | "remote" | string;
+  address: string;
 }
 
 /**
@@ -396,6 +406,15 @@ export function parseVersionInfo(raw: Record<string, unknown>): VersionInfo {
     capabilities: Array.isArray(raw.capabilities)
       ? raw.capabilities.map(String)
       : [],
+    signer:
+      raw.signer != null && typeof raw.signer === "object"
+        ? {
+            kind: String((raw.signer as Record<string, unknown>).kind ?? ""),
+            address: String(
+              (raw.signer as Record<string, unknown>).address ?? "",
+            ),
+          }
+        : null,
   };
 }
 
@@ -1074,16 +1093,36 @@ export class UpsertResult {
 }
 
 /**
- * Unsigned transaction for client-side signing.
+ * Unsigned EIP-1559 transaction for client-side signing (plain JSON: safe to send to a browser).
+ * Since contract 1.1.0 it carries everything needed to sign it as is. Convert it with
+ * toRpcTransaction (EIP-1193 wallets such as MetaMask), toViemTransaction or toEthersTransaction.
  * Docs: docs/api/entities.md §4
  */
 export interface PreparedTransaction {
+  /** Always 2 (EIP-1559). */
+  type: number;
+  chainId: number | null;
+  from: string | null;
   to: string;
   data: string;
   value: string;
   nonce: number;
   gasEstimate: number | null;
   gas_estimate?: number | null;
+  /** Gas limit to sign with (eth_estimateGas + margin). */
+  gas: number | null;
+  /** Fee suggestion in wei as 0x-hex; replace it before signing if you like. */
+  maxFeePerGas: string | null;
+  maxPriorityFeePerGas: string | null;
+}
+
+/**
+ * Fee suggestion returned by entities:prepare (wei as 0x-hex).
+ */
+export interface FeeSuggestion {
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  source: "fee_history" | "gas_price" | "static" | string;
 }
 
 /**
@@ -1094,6 +1133,8 @@ export class PrepareResult {
   readonly chainId: number;
   readonly transactions: PreparedTransaction[];
   readonly results: UpsertItemResult[];
+  readonly from: string | null;
+  readonly fees: FeeSuggestion | null;
 
   get chain_id(): number {
     return this.chainId;
@@ -1103,11 +1144,60 @@ export class PrepareResult {
     chainId: number;
     transactions: PreparedTransaction[];
     results: UpsertItemResult[];
+    from?: string | null;
+    fees?: FeeSuggestion | null;
   }) {
     this.chainId = init.chainId;
     this.transactions = init.transactions;
     this.results = init.results;
+    this.from = init.from ?? null;
+    this.fees = init.fees ?? null;
   }
+}
+
+/**
+ * Result of submit(): POST /v1/collections/{name}/entities:submit (contract 1.1.0).
+ * Docs: docs/api/entities.md §4.2
+ */
+export class SubmitResult {
+  readonly txHashes: string[];
+  readonly blockNumber: number | null;
+  /** Keys of the EntityCreated logs of the receipts, in order (empty for wait "none"). */
+  readonly createdKeys: string[];
+
+  get tx_hashes(): string[] {
+    return this.txHashes;
+  }
+  get block_number(): number | null {
+    return this.blockNumber;
+  }
+  get created_keys(): string[] {
+    return this.createdKeys;
+  }
+
+  constructor(init: {
+    txHashes: string[];
+    blockNumber?: number | null;
+    createdKeys?: string[];
+  }) {
+    this.txHashes = init.txHashes;
+    this.blockNumber = init.blockNumber ?? null;
+    this.createdKeys = init.createdKeys ?? [];
+  }
+}
+
+/**
+ * Parse wire JSON into SubmitResult.
+ */
+export function parseSubmitResult(raw: Record<string, unknown>): SubmitResult {
+  const bn = raw.block_number ?? raw.blockNumber;
+  return new SubmitResult({
+    txHashes: Array.isArray(raw.tx_hashes) ? raw.tx_hashes.map(String) : [],
+    blockNumber: typeof bn === "number" ? bn : null,
+    createdKeys: Array.isArray(raw.created_keys)
+      ? raw.created_keys.map(String)
+      : [],
+  });
 }
 
 /**
@@ -1154,6 +1244,20 @@ export interface UpsertOptions {
  */
 export interface PrepareOptions {
   from: string;
+}
+
+/**
+ * Options for submit(): exactly one of signedTransactions or txHashes.
+ */
+export interface SubmitOptions {
+  /** Raw signed EIP-1559 transactions (0x02… hex or bytes); the daemon broadcasts them in order. */
+  signedTransactions?: (string | Uint8Array)[];
+  /** Hashes of transactions a wallet already broadcast (e.g. MetaMask eth_sendTransaction). */
+  txHashes?: string[];
+  wait?: "none" | "receipt" | "indexed" | string;
+  timeoutMs?: number;
+  idempotencyKey?: string;
+  idempotency?: boolean;
 }
 
 /**
@@ -1413,6 +1517,32 @@ export function parsePrepareResult(
   const rawTxs = Array.isArray(raw.transactions) ? raw.transactions : [];
   const transactions: PreparedTransaction[] = rawTxs.map(
     (t: Record<string, unknown>) => ({
+      type: Number(t.type ?? 2),
+      chainId:
+        t.chain_id != null
+          ? Number(t.chain_id)
+          : t.chainId != null
+            ? Number(t.chainId)
+            : null,
+      from: t.from != null ? String(t.from) : null,
+      gas:
+        t.gas != null
+          ? Number(t.gas)
+          : t.gas_estimate != null
+            ? Number(t.gas_estimate)
+            : null,
+      maxFeePerGas:
+        t.max_fee_per_gas != null
+          ? String(t.max_fee_per_gas)
+          : t.maxFeePerGas != null
+            ? String(t.maxFeePerGas)
+            : null,
+      maxPriorityFeePerGas:
+        t.max_priority_fee_per_gas != null
+          ? String(t.max_priority_fee_per_gas)
+          : t.maxPriorityFeePerGas != null
+            ? String(t.maxPriorityFeePerGas)
+            : null,
       to: String(t.to ?? ""),
       data: String(t.data ?? ""),
       value: String(t.value ?? "0x0"),
@@ -1440,7 +1570,19 @@ export function parsePrepareResult(
     }),
   );
 
-  return new PrepareResult({ chainId, transactions, results });
+  const f = raw.fees as Record<string, unknown> | undefined;
+  const fees: FeeSuggestion | null =
+    f != null && typeof f === "object"
+      ? {
+          maxFeePerGas: String(f.max_fee_per_gas ?? f.maxFeePerGas ?? "0x0"),
+          maxPriorityFeePerGas: String(
+            f.max_priority_fee_per_gas ?? f.maxPriorityFeePerGas ?? "0x0",
+          ),
+          source: String(f.source ?? ""),
+        }
+      : null;
+  const from = raw.from != null ? String(raw.from) : null;
+  return new PrepareResult({ chainId, transactions, results, from, fees });
 }
 
 /**

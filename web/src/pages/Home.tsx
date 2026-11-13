@@ -164,6 +164,11 @@ export function Home() {
               it back from the chain. With <code className="chip">session_consistency</code>, the search waits for that block, so
               you always see your own write.
             </p>
+            <p className="mt-3 bg-paper">
+              Users own their data? Let their wallets sign instead: the daemon prepares the transaction, MetaMask, a hardware
+              wallet or your KMS signs it, and the daemon broadcasts and indexes it, with no key on the server.{" "}
+              <Link to="/docs/getting-started/signing">Signing writes</Link>
+            </p>
             <div className="mt-5 flex flex-wrap gap-4">
               <Button href="/docs/install">Install and get started</Button>
               <Button href={REPO} variant="outline" external>

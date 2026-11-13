@@ -6,6 +6,7 @@
   - [Quick start](getting-started/quickstart.md)
   - [Concepts](getting-started/concepts.md)
   - [Configuration](getting-started/configuration.md)
+  - [Signing writes](getting-started/signing.md)
 - REST API
   - [Overview](api/README.md)
   - [Health and version](api/health.md)
@@ -14,6 +15,7 @@
   - [Get an entity](api/entities-get.md)
   - [Delete and extend](api/entities-delete-extend.md)
   - [Prepare (own wallet)](api/entities-prepare.md)
+  - [Submit (own wallet)](api/entities-submit.md)
   - [Search](api/search.md)
   - [Batch search](api/search-batch.md)
   - [Scroll](api/scroll.md)

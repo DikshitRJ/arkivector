@@ -36,6 +36,7 @@ export AV=http://127.0.0.1:8080
 | POST | `/v1/collections/{name}/entities:delete` | [Delete and extend](entities-delete-extend.md) |
 | POST | `/v1/collections/{name}/entities:extend` | [Delete and extend](entities-delete-extend.md) |
 | POST | `/v1/collections/{name}/entities:prepare` | [Prepare](entities-prepare.md) |
+| POST | `/v1/collections/{name}/entities:submit` | [Submit](entities-submit.md) |
 | POST | `/v1/collections/{name}/search` | [Search](search.md) |
 | POST | `/v1/collections/{name}/search:batch` | [Batch search](search-batch.md) |
 | POST | `/v1/collections/{name}/scroll` | [Scroll](scroll.md) |
@@ -47,7 +48,7 @@ Shared request pieces: [Filters](filters.md), [Vectors](vectors.md), [Consistenc
 
 ## Capabilities
 
-`GET /v1/version` lists what this daemon supports (`capabilities`). Writes need a signer (`writes_enabled: true`); a feature that is absent returns `501 not_implemented`. The SDKs check capabilities before calling.
+`GET /v1/version` lists what this daemon supports (`capabilities`). Managed writes need a daemon signer (`writes_enabled: true`); writes signed by your own wallet ([prepare](entities-prepare.md) + [submit](entities-submit.md)) don't. A feature that is absent returns `501 not_implemented`. The SDKs check capabilities before calling.
 
 ## Machine-readable contract
 

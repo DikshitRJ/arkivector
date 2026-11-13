@@ -55,4 +55,4 @@ See [Vectors](../api/vectors.md) for JSON forms and limits.
 
 ## Writers and signing
 
-Writes are Arkiv transactions. The daemon signs them with `ARKIV_PRIVATE_KEY` (a hot wallet), or returns unsigned transactions from [`entities:prepare`](../api/entities-prepare.md) for your own wallet to sign. Either way the signing address must be in the collection's `writers`.
+Writes are Arkiv transactions. Either the daemon signs them (a key in `ARKIV_PRIVATE_KEY`, an encrypted keystore, or a remote signer such as Web3Signer), or your own wallet does: [`entities:prepare`](../api/entities-prepare.md) returns unsigned transactions, you sign them (MetaMask, `eth_account`, viem, ethers, a KMS), and [`entities:submit`](../api/entities-submit.md) broadcasts them and waits until they are indexed. Either way the signing address must be in the collection's `writers`. See [Signing writes](signing.md).

@@ -413,6 +413,47 @@ Notes:
 - The daemon does not sign; client applications sign and broadcast using their own wallet or hardware security modules.
 - Predicted keys enable cross-entity relational referencing before transactions are included in blocks.
 
+
+## submit
+
+Status: D5 (contract 1.1.0, CCR-0001). Executed for `POST /v1/collections/{name}/entities:submit`.
+
+Takes back the transactions from `prepare` after the client signed them, or the hashes of transactions its wallet broadcast. No daemon signer is needed.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant HTTP as rest_entities.c
+    participant W as writer.c
+    participant R as rawtx.c
+    participant RPC as Arkiv RPC
+    participant C as collection
+
+    Client->>HTTP: POST …/entities:submit {signed_transactions | tx_hashes, wait}
+    HTTP->>W: av_writer_submit
+    alt signed_transactions
+        loop each raw tx (before any broadcast)
+            W->>R: av_rawtx_decode_hex
+            R-->>W: fields, sender, hash (or invalid_argument)
+            W->>W: chain id, Arkiv contract, value 0, execute selector, sender ∈ writers (else 403 forbidden)
+        end
+        loop each raw tx, in order
+            W->>RPC: eth_sendRawTransaction ("already known" = accepted)
+        end
+    end
+    opt wait = receipt | indexed
+        loop each tx hash
+            W->>RPC: eth_getTransactionReceipt (poll until mined or timeout)
+            W->>W: to = contract, from ∈ writers, status ok, EntityCreated keys
+        end
+        opt wait = indexed
+            W->>C: av_collection_wait_block(highest receipt block)
+        end
+    end
+    W-->>HTTP: tx_hashes, block_number, created_keys
+    HTTP-->>Client: 200 (202 for wait=none)
+```
+
 ## batch search
 
 Status: D4. Executed for `POST /v1/collections/{name}/search:batch`.

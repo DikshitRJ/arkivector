@@ -1,6 +1,6 @@
 # Arkivector API: Daemon ↔ SDK Contract
 
-> **Status:** frozen at spec version `1.0.0` (see [`spec/VERSION`](../../spec/VERSION)).
+> **Status:** frozen at spec version `1.1.0` (see [`spec/VERSION`](../../spec/VERSION)).
 > **Audience:** the daemon track (implements the server) and every SDK track (implements clients).
 > **Rule:** if code and this contract disagree, the **contract wins** and the code is the bug.
 > Change it only through a CCR ([`spec/changes/README.md`](../../spec/changes/README.md)).
@@ -24,7 +24,7 @@
 | [conventions.md](conventions.md) | Base URL, versioning, auth, headers, JSON conventions, limits, timeouts, retries |
 | [vectors.md](vectors.md) | Vector JSON forms, pgvector text literals, the **VectorBytes v1** binary format |
 | [collections.md](collections.md) | Create / follow / list / get / delete collections, column and index definitions |
-| [entities.md](entities.md) | Point reads, managed upsert, prepare, delete, extend, TTL, idempotency |
+| [entities.md](entities.md) | Point reads, managed upsert, client-side signing (prepare + submit), delete, extend, TTL, idempotency |
 | [search.md](search.md) | Search, batch search, scroll, count, distances, scores, plans |
 | [filters.md](filters.md) | JSON filter AST and the Arkiv `where` language, type rules |
 | [consistency.md](consistency.md) | `as_of_block`, `min_block`, sync states, read-your-writes |
@@ -54,6 +54,7 @@
 | POST | `/v1/collections/{name}/count` | `count` | D3 |
 | POST | `/v1/collections/{name}/entities` | `entities.write` | D5 |
 | POST | `/v1/collections/{name}/entities:prepare` | `entities.prepare` | D5 |
+| POST | `/v1/collections/{name}/entities:submit` | `entities.submit` | D5 (1.1) |
 | POST | `/v1/collections/{name}/entities:delete` | `entities.write` | D5 |
 | POST | `/v1/collections/{name}/entities:extend` | `entities.write` | D5 |
 | DELETE | `/v1/collections/{name}/entities/{ref}` | `entities.write` | D5 |
