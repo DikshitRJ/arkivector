@@ -20,7 +20,7 @@ The `release` workflow then builds and publishes:
 
 Version numbers are stamped at build time: the daemon reports the tag in `/v1/version`, and the SDK versions are set from the tag. The release body is rendered from [`.github/release-notes.md`](https://github.com/DikshitRJ/arkivector/blob/main/.github/release-notes.md) and links [`CHANGELOG.md`](https://github.com/DikshitRJ/arkivector/blob/main/CHANGELOG.md), so update the changelog in the pull request before tagging.
 
-`workflow_dispatch` with a `version` input builds and publishes packages without creating a GitHub Release (useful to test the pipeline).
+Without push access to tags, run the workflow from the Actions tab (**release → Run workflow** on `main`) with `version` = `1.1.0` and **create_release** checked: it builds and publishes everything above, then creates the tag `v1.1.0` on that commit together with the GitHub Release. With `create_release` unchecked it only builds and publishes the packages (useful to test the pipeline).
 
 ## Checklist
 
