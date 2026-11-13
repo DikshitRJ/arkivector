@@ -1,17 +1,20 @@
 import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from "react";
 
 /*
- * History-API routing with clean URLs (/install, not #/install).
+ * History-API routing with clean URLs (/docs, not #/docs).
  * BASE comes from Vite's `base` (VITE_BASE at build time), so the site also works under a
  * sub-path such as /arkivector/ on GitHub Pages. Static hosts need an SPA fallback: on
  * Cloudflare Workers that is `not_found_handling` in wrangler.jsonc; public/404.html covers
  * GitHub Pages.
  */
 
-export type StaticRoute = "/" | "/install" | "/architecture" | "/build" | "/next" | "/team";
+export type StaticRoute = "/" | "/architecture" | "/build" | "/next" | "/team";
 /** Docs pages are /docs and /docs/<folder>/<page> (resolved against docs/wiki by the Docs page). */
 export type Route = StaticRoute | "/docs" | `/docs/${string}` | "404";
-export const ROUTES: StaticRoute[] = ["/", "/install", "/architecture", "/build", "/next", "/team"];
+export const ROUTES: StaticRoute[] = ["/", "/architecture", "/build", "/next", "/team"];
+
+/** Old addresses kept working: the install page moved into the docs. */
+const MOVED: Record<string, string> = { "/install": "/docs/install" };
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, ""); // "" or "/arkivector"
 
@@ -19,6 +22,10 @@ function current(): Route {
   let p = window.location.pathname;
   if (BASE && p.startsWith(BASE)) p = p.slice(BASE.length);
   p = p.replace(/\/+$/, "") || "/";
+  if (MOVED[p]) {
+    p = MOVED[p];
+    window.history.replaceState({}, "", BASE + p + window.location.hash);
+  }
   if (p === "/docs" || p.startsWith("/docs/")) return p as Route;
   return (ROUTES as string[]).includes(p) ? (p as Route) : "404";
 }

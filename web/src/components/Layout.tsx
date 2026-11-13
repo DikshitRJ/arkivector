@@ -2,15 +2,13 @@ import type { ReactNode } from "react";
 import { useSound } from "../audio/sound";
 import { scribble } from "../ink/paths";
 import { ORANGE } from "../ink/colors";
-import { Link, type Route } from "../router";
+import { Link, type Route, type StaticRoute } from "../router";
 import { VectorField } from "./VectorField";
 
 export const REPO = "https://github.com/DikshitRJ/arkivector";
 
-const NAV: { to: Exclude<Route, "404">; label: string }[] = [
+const NAV: { to: StaticRoute; label: string }[] = [
   { to: "/", label: "home" },
-  { to: "/install", label: "install" },
-  { to: "/docs", label: "docs" },
   { to: "/architecture", label: "architecture" },
   { to: "/build", label: "build" },
   { to: "/next", label: "what's next" },
@@ -61,6 +59,28 @@ function SoundToggle() {
   );
 }
 
+/** Docs: a real button in the header, next to the GitHub chip; inverted while you are in the docs. */
+function DocsButton({ active }: { active: boolean }) {
+  return (
+    <Link
+      to="/docs"
+      aria-current={active ? "page" : undefined}
+      className={
+        "flex items-center gap-1.5 whitespace-nowrap border-2 border-ink px-2 sm:px-3 py-1 text-[11px] sm:text-[12.5px] font-semibold no-underline " +
+        "shadow-[2px_2px_0_#000] transition-[transform,box-shadow] duration-75 hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_#000] " +
+        "active:translate-x-[2px] active:translate-y-[2px] active:shadow-none " +
+        (active ? "bg-ink text-paper" : "bg-paper text-ink")
+      }
+    >
+      <svg width="13" height="14" viewBox="0 0 13 14" aria-hidden className="shrink-0">
+        <path d="M1.5 1.5h7l3 3v8h-10z" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M4 7h5M4 9.5h5" stroke="currentColor" strokeWidth="1.2" />
+      </svg>
+      <span>docs</span>
+    </Link>
+  );
+}
+
 function RepoChip() {
   return (
     <a
@@ -87,7 +107,8 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
             <Logo />
             <span className="font-display text-[19px] font-bold tracking-tight">arkivector</span>
           </Link>
-          <div className="ml-auto lg:ml-0 lg:justify-self-end lg:order-3">
+          <div className="ml-auto lg:ml-0 lg:justify-self-end lg:order-3 flex items-center gap-2 sm:gap-3">
+            <DocsButton active={route.startsWith("/docs")} />
             <RepoChip />
           </div>
           <nav
@@ -95,7 +116,7 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
             className="order-last lg:order-2 w-full lg:w-auto lg:mx-0 -mx-1 px-1 flex items-center gap-4 sm:gap-5 text-[13.5px] overflow-x-auto lg:overflow-visible"
           >
             {NAV.map((n) => {
-              const active = route === n.to || (n.to === "/docs" && route.startsWith("/docs"));
+              const active = route === n.to;
               return (
                 <Link
                   key={n.to}

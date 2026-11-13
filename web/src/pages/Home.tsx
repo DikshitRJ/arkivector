@@ -2,6 +2,7 @@ import { HeroDemo } from "../anim/HeroDemo";
 import { SearchDemo } from "../anim/SearchDemo";
 import { Page, REPO } from "../components/Layout";
 import { ArkivMark, Button, CodeBlock, H2, Note } from "../components/ui";
+import { Link } from "../router";
 
 const FACTS: { n: string; what: string }[] = [
   { n: "97", what: "parity tests against pgvector 0.8.7 running in Postgres. Every distance is bit-identical or within float32 rounding." },
@@ -22,6 +23,29 @@ client.upsert("agent.memory", [
 res = client.search("agent.memory", vector=[1, 0.05, 0, 0], k=2, filter=F.eq("topic", "pets"))
 print([(h.id, h.distance) for h in res.hits])`;
 
+/** The main call to action: one big, gently animated button into the install guide. */
+function StartButton() {
+  return (
+    <Link to="/docs/install" className="start-btn group mt-7 no-underline" aria-label="Install and get started">
+      <span className="start-btn__sweep" aria-hidden />
+      <span className="relative flex flex-col items-start">
+        <span className="text-[11.5px] sm:text-[12.5px] font-normal text-arkiv-orange tracking-wide">
+          docker · wallet · SDK · ~10 minutes
+        </span>
+        <span className="font-display text-[22px] sm:text-[28px] font-bold leading-tight">
+          Install and get started
+        </span>
+        <span className="mt-1 text-[12px] sm:text-[13px] font-normal opacity-80">
+          $ docker run ghcr.io/dikshitrj/arkivectord<span className="start-btn__cursor">▍</span>
+        </span>
+      </span>
+      <svg className="start-btn__arrow relative shrink-0" width="44" height="28" viewBox="0 0 44 28" aria-hidden>
+        <path d="M2 14 H38 M27 3 L40 14 L27 25" fill="none" stroke="#fe7445" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </Link>
+  );
+}
+
 export function Home() {
   return (
     <>
@@ -38,15 +62,18 @@ export function Home() {
               Arkivector runs pgvector's distance functions over entities stored on the Arkiv chain. Your embeddings are{" "}
               <span className="marker">written on chain by your wallet</span>, and you query them with one REST call or from Python and Node.js.
             </p>
-            <div className="mt-6 flex flex-wrap gap-4">
-              <Button href="/install">Install</Button>
-              <Button href="/docs" variant="outline">
-                Docs
-              </Button>
-              <Button href="/architecture" variant="outline">
-                Watch how it works
-              </Button>
-            </div>
+            <StartButton />
+            <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[13.5px] bg-paper w-fit">
+              <Link to="/docs/getting-started/quickstart" className="ink-link">
+                quick start
+              </Link>
+              <Link to="/architecture" className="ink-link">
+                watch how it works
+              </Link>
+              <Link to="/docs/mcp" className="ink-link">
+                connect an AI agent
+              </Link>
+            </p>
           </div>
           <Note className="hidden md:block -rotate-3 pb-2 text-[30px]! lg:text-[38px]! leading-[1.05]!">
             pgvector, except the rows live on a blockchain
@@ -125,7 +152,7 @@ export function Home() {
               you always see your own write.
             </p>
             <div className="mt-5 flex flex-wrap gap-4">
-              <Button href="/install">Get started</Button>
+              <Button href="/docs/install">Install and get started</Button>
               <Button href={REPO} variant="outline" external>
                 Source on GitHub
               </Button>

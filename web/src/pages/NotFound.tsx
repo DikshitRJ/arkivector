@@ -44,8 +44,8 @@ export function NotFound() {
           </p>
           <div className="mt-6 flex flex-wrap gap-4">
             <Button href="/">Back to the start</Button>
-            <Button href="/install" variant="outline">
-              Install
+            <Button href="/docs/install" variant="outline">
+              Install and get started
             </Button>
           </div>
           <Note className="mt-6 -rotate-2">unlike Arkiv entities, this one expired without a block number.</Note>
