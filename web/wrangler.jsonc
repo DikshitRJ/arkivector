@@ -8,5 +8,8 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Required by `npx wrangler preview` (the deploy command for non-production builds);
+  // assets and compatibility settings stay at the top level. Empty is valid.
+  "previews": {}
 }

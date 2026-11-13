@@ -4,7 +4,7 @@
 
 This file is the whole website ({{SITE}}) as Markdown, written for AI agents and LLMs. It is generated at build time from the same sources as the site. All documentation on one page: [{{SITE}}/docs.md]({{SITE}}/docs.md). Index in the llms.txt format: [{{SITE}}/llms.txt]({{SITE}}/llms.txt).
 
-- Current release: **v{{VERSION}}**
+- Current release: **v{{VERSION}}** (always at https://github.com/DikshitRJ/arkivector/releases/latest)
 - Source: <https://github.com/DikshitRJ/arkivector>
 - Install guide: [{{SITE}}/docs/install]({{SITE}}/docs/install) (Markdown: [{{SITE}}/docs/install.md]({{SITE}}/docs/install.md))
 - License: MIT. The copied pgvector code keeps its PostgreSQL License.
@@ -99,31 +99,32 @@ One workflow, `.github/workflows/release.yml`, runs on every `v*` tag (or a manu
 **Python SDK** ([pypi.org/project/arkivector](https://pypi.org/project/arkivector/)). Pure Python, no dependencies. Wheel and sdist are also attached to every GitHub release.
 
 ```bash
-pip install arkivector=={{VERSION}}
+pip install arkivector
 ```
 
 **Node.js SDK** (GitHub Packages, `@dikshitrj/arkivector`). ESM, TypeScript types, zero runtime dependencies. GitHub Packages asks for a token with `read:packages`; the tarball is also attached to each release.
 
 ```bash
 echo "@dikshitrj:registry=https://npm.pkg.github.com" >> .npmrc
-npm install @dikshitrj/arkivector@{{VERSION}}
+npm install @dikshitrj/arkivector
 ```
 
-**Daemon, container image** (`ghcr.io/dikshitrj/arkivectord`). 18 MB Alpine image, linux/amd64, runs as a non-root user, index in the `/data` volume. Tags `:{{VERSION}}`, `:1`, `:latest`.
+**Daemon, container image** (`ghcr.io/dikshitrj/arkivectord`). 18 MB Alpine image, linux/amd64, runs as a non-root user, index in the `/data` volume. Tags `:latest`, `:1`, `:<version>`.
 
 ```bash
 docker run -d -p 127.0.0.1:8080:8080 -v arkivector-data:/data \
   -e ARKIVECTOR_ARKIV_ACCESS_KEY=... -e ARKIV_PRIVATE_KEY \
-  ghcr.io/dikshitrj/arkivectord:{{VERSION}}
+  ghcr.io/dikshitrj/arkivectord:latest
 ```
 
 **Daemon, Linux binary** (GitHub Releases). x86_64 glibc build with libcurl bundled; needs libuv and OpenSSL 3 from the OS.
 
 ```bash
-curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v{{VERSION}}/arkivectord-{{VERSION}}-linux-x86_64.tar.gz
-curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v{{VERSION}}/SHA256SUMS
+VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/DikshitRJ/arkivector/releases/latest | sed 's|.*/tag/v||')   # latest release
+curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/arkivectord-${VERSION}-linux-x86_64.tar.gz
+curl -LO https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
-tar xzf arkivectord-{{VERSION}}-linux-x86_64.tar.gz
+tar xzf arkivectord-${VERSION}-linux-x86_64.tar.gz
 ```
 
 **Arkiv Rabdi testnet** (not something we ship: the chain the daemon reads from and writes to). Chain id 7794095 (`0x76edaf`), 2 s blocks, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network`. Test GLM from the faucet at <https://hub.arkiv.network/faucet>.

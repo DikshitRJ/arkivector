@@ -9,7 +9,7 @@ echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc   # a refer
 npm install @dikshitrj/arkivector
 ```
 
-The package is published to GitHub Packages, which needs a token (classic, `read:packages`) even for public packages. Without a token, install the tarball attached to each [release](https://github.com/DikshitRJ/arkivector/releases): `npm install https://github.com/DikshitRJ/arkivector/releases/download/v1.2.0/arkivector-node-1.2.0.tgz`.
+The package is published to GitHub Packages, which needs a token (classic, `read:packages`) even for public packages. Without a token, install `arkivector-node-<version>.tgz` from the [latest release](https://github.com/DikshitRJ/arkivector/releases/latest): `npm install https://github.com/DikshitRJ/arkivector/releases/download/v${VERSION}/arkivector-node-${VERSION}.tgz`, where `VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/DikshitRJ/arkivector/releases/latest | sed 's|.*/tag/v||')`.
 
 You need a running daemon ([Installation](../install.md)). The client finds it through `ARKIVECTOR_URL` (default `http://127.0.0.1:8080`).
 
