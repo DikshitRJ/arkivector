@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Arkivector Daemon API
-  version: 1.0.0
+  version: 1.1.0
   summary: Contract between arkivectord (C daemon) and all Arkivector SDKs.
   description: |
     This file is the machine-readable contract. Human documentation lives in `docs/api/`.
@@ -82,14 +82,16 @@ paths:
               schema: { $ref: "#/components/schemas/VersionInfo" }
               example:
                 daemon_version: 0.1.0
-                api_version: 1.0.0
+                api_version: 1.1.0
                 pgvector_version: 0.8.7
                 kernel_tier: x86-64-v3
                 chain_id: 7794095
                 writes_enabled: false
+                signer: null
                 capabilities: [ops.version, ops.sync, collections.read, collections.write, collections.follow,
-                               entities.read, search.exact, search.filter.json, search.filter.where,
-                               search.explain, scroll, count, consistency.min_block]
+                               entities.read, entities.prepare, entities.submit, search.exact,
+                               search.filter.json, search.filter.where, search.explain, scroll, count,
+                               consistency.min_block]
 
   /v1/sync:
     get:
@@ -267,13 +269,62 @@ paths:
               schema: { $ref: "#/components/schemas/PrepareResponse" }
               example:
                 chain_id: 7794095
+                from: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                fees: { max_fee_per_gas: "0x77359400", max_priority_fee_per_gas: "0x5f5e100", source: fee_history }
                 transactions:
-                  - to: "0x4400000000000000000000000000000000000044"
+                  - type: 2
+                    chain_id: 7794095
+                    from: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+                    to: "0x4400000000000000000000000000000000000044"
                     data: "0x49650044000000000000000000000000000000000000000000000000000000000000002000"
                     value: "0x0"
                     nonce: 12
                     gas_estimate: 412000
+                    gas: 412000
+                    max_fee_per_gas: "0x77359400"
+                    max_priority_fee_per_gas: "0x5f5e100"
                 results: [ { id: doc-900, key: "0x5e1f0c0d9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d", op: create } ]
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/collections/{name}/entities:submit:
+    parameters: [ { $ref: "#/components/parameters/CollectionName" } ]
+    post:
+      tags: [entities]
+      operationId: submitEntities
+      summary: Broadcast client-signed transactions (or wait for wallet-broadcast ones) and wait for indexing.
+      description: |
+        Second half of client-side signing (CCR-0001). Give exactly one of:
+        * `signed_transactions`: raw EIP-1559 transactions signed by the client (from `entities:prepare`).
+          The daemon decodes each one and checks chain id, `to` = Arkiv contract, value 0, execute(...)
+          calldata and that the recovered sender is a writer of the collection, before broadcasting any
+          of them in order with `eth_sendRawTransaction`.
+        * `tx_hashes`: transactions a wallet already broadcast itself (e.g. MetaMask `eth_sendTransaction`).
+        With `wait` receipt/indexed the daemon waits for the receipts (and for its index) and returns the
+        keys of the entities created. No signer is needed on the daemon. Capability `entities.submit`.
+      parameters: [ { $ref: "#/components/parameters/IdempotencyKey" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitRequest" }
+            example:
+              signed_transactions: ["0x02f8728376edaf0c8405f5e100847735940083064960944400000000000000000000000000000000000044808449650044c001a0b6ffe9d116c613e3fa4db43e5f7c78a1ace651248a44742ba2ecfe5add4ce9d1a01640311f561f174232f07245c37f835e0f1860f2103135ae5d30e38afb330cbc"]
+              wait: indexed
+      responses:
+        "200":
+          description: Included on chain (wait=receipt) or indexed (wait=indexed).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmitResponse" }
+              example:
+                tx_hashes: ["0x7d1c3b5a9e8f7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a392817060504"]
+                block_number: 582160
+                created_keys: ["0x5e1f0c0d9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d"]
+        "202":
+          description: Broadcast but not yet included (wait=none).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmitResponse" }
         default: { $ref: "#/components/responses/Error" }
 
   /v1/collections/{name}/entities:delete:
@@ -747,22 +798,68 @@ components:
       properties:
         entities: { type: array, items: { $ref: "#/components/schemas/EntityInput" }, minItems: 1, maxItems: 1000 }
         from: { $ref: "#/components/schemas/Address" }
+    HexQuantity:
+      type: string
+      pattern: "^0x(0|[1-9a-f][0-9a-f]*)$"
+      description: Unsigned integer in wei as 0x-hex (Ethereum JSON-RPC quantity).
     UnsignedTx:
       type: object
       required: [to, data, value, nonce]
+      description: |
+        One unsigned EIP-1559 transaction. Since 1.1.0 (CCR-0001) it carries every field needed to sign
+        it as is (type, chain_id, from, gas, fee suggestion); the client may replace the fees.
       properties:
+        type: { const: 2, description: "EIP-1559 transaction type (since 1.1.0)." }
+        chain_id: { type: integer, description: "Since 1.1.0." }
+        from: { $ref: "#/components/schemas/Address" }
         to: { $ref: "#/components/schemas/Address" }
         data: { type: string, pattern: "^0x([0-9a-f]{2})*$" }
         value: { const: "0x0" }
         nonce: { type: integer, minimum: 0, description: "Arkiv account tx nonce assumed for key prediction." }
         gas_estimate: { type: [integer, "null"] }
+        gas: { type: integer, minimum: 21000, description: "Gas limit to sign with (eth_estimateGas + margin). Since 1.1.0." }
+        max_fee_per_gas: { $ref: "#/components/schemas/HexQuantity" }
+        max_priority_fee_per_gas: { $ref: "#/components/schemas/HexQuantity" }
+    FeeSuggestion:
+      type: object
+      required: [max_fee_per_gas, max_priority_fee_per_gas, source]
+      properties:
+        max_fee_per_gas: { $ref: "#/components/schemas/HexQuantity" }
+        max_priority_fee_per_gas: { $ref: "#/components/schemas/HexQuantity" }
+        source: { type: string, enum: [fee_history, gas_price, static] }
     PrepareResponse:
       type: object
       required: [chain_id, transactions, results]
       properties:
         chain_id: { type: integer }
+        from: { $ref: "#/components/schemas/Address" }
+        fees: { $ref: "#/components/schemas/FeeSuggestion" }
         transactions: { type: array, items: { $ref: "#/components/schemas/UnsignedTx" } }
         results: { type: array, items: { $ref: "#/components/schemas/OpResult" } }
+    SubmitRequest:
+      type: object
+      additionalProperties: false
+      description: Exactly one of signed_transactions / tx_hashes.
+      properties:
+        signed_transactions:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { type: string, pattern: "^0x02([0-9a-fA-F]{2})+$", maxLength: 1048578 }
+          description: Raw signed EIP-1559 transactions, in the order they must be mined.
+        tx_hashes: { type: array, minItems: 1, maxItems: 256, items: { $ref: "#/components/schemas/TxHash" } }
+        wait: { type: string, enum: [none, receipt, indexed], default: receipt }
+        timeout_ms: { type: integer, minimum: 1, maximum: 600000, default: 60000 }
+    SubmitResponse:
+      type: object
+      required: [tx_hashes, block_number, created_keys]
+      properties:
+        tx_hashes: { type: array, items: { $ref: "#/components/schemas/TxHash" } }
+        block_number: { oneOf: [ { $ref: "#/components/schemas/BlockNumber" }, { type: "null" } ], description: "Highest receipt block; null when wait=none." }
+        created_keys:
+          type: array
+          items: { $ref: "#/components/schemas/EntityKey" }
+          description: Keys from the EntityCreated logs of the receipts, in order (empty when wait=none).
     DeleteRequest:
       type: object
       additionalProperties: false
@@ -1003,6 +1100,15 @@ components:
         kernel_tier: { type: string, enum: [x86-64, x86-64-v3, x86-64-v4, aarch64, native] }
         chain_id: { type: integer }
         writes_enabled: { type: boolean }
+        signer:
+          description: The managed signer (since 1.1.0); null when the daemon has none. Never key material.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [kind, address]
+              properties:
+                kind: { type: string, enum: [env, keystore, remote] }
+                address: { $ref: "#/components/schemas/Address" }
         capabilities: { type: array, items: { type: string } }
     SyncStatus:
       type: object

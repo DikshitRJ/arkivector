@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.0.0",
+  "spec_version": "1.1.0",
   "note": "GET /v1/version returns the subset this daemon build supports. SDKs must check before calling and must map HTTP 501 not_implemented to a typed error.",
   "capabilities": [
     {"name": "ops.version",            "phase": "D3", "endpoints": ["GET /v1/version", "GET /healthz", "GET /readyz"]},
@@ -13,6 +13,7 @@
     {"name": "entities.verify",        "phase": "D6", "endpoints": ["GET /v1/collections/{name}/entities/{ref}?verify=true"]},
     {"name": "entities.write",         "phase": "D5", "endpoints": ["POST /v1/collections/{name}/entities", "DELETE /v1/collections/{name}/entities/{ref}", "POST /v1/collections/{name}/entities:delete", "POST /v1/collections/{name}/entities:extend"]},
     {"name": "entities.prepare",       "phase": "D5", "endpoints": ["POST /v1/collections/{name}/entities:prepare"]},
+    {"name": "entities.submit",        "phase": "D5", "endpoints": ["POST /v1/collections/{name}/entities:submit"], "since": "1.1.0"},
     {"name": "search.exact",           "phase": "D3", "endpoints": ["POST /v1/collections/{name}/search (exact=true or flat plan)"]},
     {"name": "search.hnsw",            "phase": "D4", "endpoints": ["POST /v1/collections/{name}/search (approximate plans)"]},
     {"name": "search.filter.json",     "phase": "D3", "endpoints": ["search/scroll/count with 'filter'"]},

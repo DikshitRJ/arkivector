@@ -43,7 +43,9 @@ Clients are cheap to create, safe for concurrent use (where the language allows 
 | `scroll_page` | POST …/scroll, one page | scroll | `{entities, next_cursor, as_of_block}` |
 | `count` | POST …/count | count | `{count, as_of_block}` |
 | `upsert` | POST …/entities | entities.write | UpsertResult |
-| `prepare` | POST …/entities:prepare | entities.prepare | PrepareResult |
+| `prepare` | POST …/entities:prepare | entities.prepare | PrepareResult (transactions ready to sign; helpers convert them for eth_account / EIP-1193 / viem / ethers) |
+| `submit` | POST …/entities:submit | entities.submit | SubmitResult `{tx_hashes, block_number, created_keys}` |
+| `upsert_signed` | prepare → caller's signer → submit | entities.prepare + entities.submit | UpsertResult (keys from the receipts). Default `wait: "indexed"` |
 | `delete` | POST …/entities:delete, or DELETE …/{ref} for a single ref | entities.write | TxResult |
 | `extend` | POST …/entities:extend | entities.write | TxResult |
 
@@ -71,6 +73,11 @@ for e in c.scroll("demo.docs", filter=F.gte("score", T.dec("4.0")), limit=100): 
 c.count("demo.docs", where="published = true").count
 c.upsert("demo.docs", [{"id": "x", "vector": [...], "attributes": {...}, "ttl": Ttl.days(30)}], wait="receipt")
 c.prepare("demo.docs", entities, from_address="0x…"); c.delete("demo.docs", refs=["x"]); c.extend("demo.docs", Ttl.days(30), refs=["x"])
+# Client-side signing (no key on the daemon). sign returns raw signed bytes/hex; send returns a tx hash.
+p = c.prepare("demo.docs", entities, from_address=acct.address)
+raws = [acct.sign_transaction(tx.to_eth_account()).raw_transaction for tx in p.transactions]
+c.submit("demo.docs", signed_transactions=raws, wait="indexed")      # or tx_hashes=[...]
+c.upsert_signed("demo.docs", entities, from_address=acct.address, sign=eth_account_signer(acct))
 ```
 Extras (lazy imports): `arkivector.langchain.ArkivectorVectorStore` (LangChain `VectorStore`), `arkivector.llama_index.ArkivectorVectorStore` (LlamaIndex `BasePydanticVectorStore`). numpy arrays are accepted when numpy is installed. pgvector-python objects (`pgvector.Vector` & co.) are accepted when installed.
 
@@ -85,6 +92,11 @@ const r = await c.search("demo.docs", { vector: new HalfVector([...]), k: 5, fil
 for await (const e of c.scroll("demo.docs", { where: "published = true" })) { … }
 await c.count("demo.docs", { filter }); await c.upsert("demo.docs", entities, { wait: "receipt" });
 await c.prepare("demo.docs", entities, { from }); await c.delete("demo.docs", { refs }); await c.extend("demo.docs", Ttl.days(30), { refs });
+// Client-side signing: signer = EIP-1193 provider (window.ethereum), viem WalletClient, ethers Signer,
+// or (tx) => Promise<rawTx | txHash>.
+await c.upsertSigned("demo.docs", entities, { signer: window.ethereum, wait: "indexed" });
+const p = await c.prepare("demo.docs", entities, { from }); /* sign p.transactions anywhere */
+await c.submit("demo.docs", { signedTransactions: raws }); // or { txHashes }
 ```
 camelCase in the API, snake_case on the wire. LangChain.js adapter at subpath `@arkivector/client/langchain` (peer dependency `@langchain/core`).
 

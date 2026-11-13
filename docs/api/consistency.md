@@ -18,7 +18,8 @@ The daemon applies Arkiv changes **block by block** and publishes each block ato
 
 Typical flows:
 - Managed write with `wait: "receipt"` → use the returned `block_number` as `min_block` on the next read. Or use `wait: "indexed"` and skip `min_block`.
-- Direct or prepared write by the client → use its own receipt `blockNumber`.
+- Prepared write signed by the client → submit it with `entities:submit` and `wait: "indexed"`, or use the returned `block_number` as `min_block`.
+- Direct write with another Arkiv client → use its own receipt `blockNumber`.
 
 SDKs SHOULD offer a "session consistency" option that remembers the highest `block_number` seen from its own writes and sends it automatically as `min_block`.
 

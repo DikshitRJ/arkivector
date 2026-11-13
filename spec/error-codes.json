@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.0.0",
+  "spec_version": "1.1.0",
   "type_prefix": "urn:arkivector:error:",
   "errors": [
     {"code": "bad_request",            "status": 400, "retryable": false, "meaning": "Malformed JSON, wrong JSON types, or unknown top-level fields."},

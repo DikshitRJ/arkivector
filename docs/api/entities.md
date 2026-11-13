@@ -24,7 +24,7 @@ An **entity** is one Arkiv entity that belongs to a collection: one vector plus 
 
 ## 3. Managed upsert: `POST /v1/collections/{name}/entities`
 
-Requires a configured signer (`writes_enabled: true`, capability `entities.write`). Otherwise `403 write_disabled`.
+Requires a configured signer (`writes_enabled: true`, capability `entities.write`): an environment key, an encrypted keystore, or a remote signer (see `GET /v1/version` → `signer`). Otherwise `403 write_disabled`; use [client-side signing](#4-client-side-signing-prepare--sign--submit) instead.
 
 Request:
 
@@ -60,22 +60,66 @@ Response:
 
 `results` is in request order.
 
-## 4. Prepare (client-side signing): `POST /v1/collections/{name}/entities:prepare`
+## 4. Client-side signing: prepare → sign → submit
 
-For wallets that must sign themselves (browser wallets, KMS). Capability `entities.prepare`. **No signer needed on the daemon.**
+For apps where **each user signs with their own wallet** (browser wallets such as MetaMask, Rabby or WalletConnect, hardware wallets, `eth_account`, viem, ethers, a KMS). **No signer is needed on the daemon.** The daemon builds the transactions, the client signs them however it likes, and the daemon broadcasts them (or watches the ones the wallet broadcast) and waits until they are indexed.
 
-Request: `{ "entities": [EntityInput…], "from": "0xYourAddress" }`. The upsert-by-id logic uses `from` as the would-be owner.
+```
+SDK/app ── prepare ──▶ daemon            (unsigned EIP-1559 txs + predicted keys)
+SDK/app ── sign ─────▶ wallet / KMS      (or hand the txs to a browser and let MetaMask sign)
+SDK/app ── submit ───▶ daemon ──▶ Arkiv  (signed txs, or the hashes the wallet broadcast)
+```
+
+### 4.1 Prepare: `POST /v1/collections/{name}/entities:prepare`
+
+Capability `entities.prepare`. Request: `{ "entities": [EntityInput…], "from": "0xYourAddress" }`. The upsert-by-id logic uses `from` as the would-be owner. `from` must be a writer of the collection (unless `membership = "open"`) or the daemon will not index the result.
+
+Response (fields marked *1.1* were added by CCR-0001):
+
+```json
+{ "chain_id": 7794095,
+  "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "fees": { "max_fee_per_gas": "0x77359400", "max_priority_fee_per_gas": "0x5f5e100", "source": "fee_history" },
+  "transactions": [ { "type": 2, "chain_id": 7794095, "from": "0x7099…79C8",
+                      "to": "0x4400000000000000000000000000000000000044", "data": "0x49650044…",
+                      "value": "0x0", "nonce": 12, "gas_estimate": 412000, "gas": 412000,
+                      "max_fee_per_gas": "0x77359400", "max_priority_fee_per_gas": "0x5f5e100" } ],
+  "results": [ { "id": "doc-900", "key": "0x5e1f…", "op": "create" } ] }
+```
+
+| Field | Meaning |
+| :--- | :--- |
+| `transactions[]` | Unsigned EIP-1559 transactions, in the order they must be mined. Each one is complete: sign it as is, or rename the keys to camelCase and pass it to a wallet's `eth_sendTransaction` (the SDKs have helpers) |
+| `type`, `chain_id`, `from` *1.1* | Always `2`, the daemon's Arkiv chain id, and the request's `from` |
+| `gas` *1.1* | Gas limit to sign with: `eth_estimateGas` + `write.gas_margin_pct` (same as `gas_estimate`) |
+| `max_fee_per_gas`, `max_priority_fee_per_gas` *1.1* | 0x-hex wei. The fee the managed writer would use now (`eth_feeHistory` → `eth_gasPrice` → static). The client may replace them |
+| `fees` *1.1* | The same fee suggestion once per response, with its `source` |
+| `nonce` | Pending transaction count of `from` (first tx), then +1 per tx |
+| `results` | Predicted keys and operations, in request order |
+
+Predicted keys are valid only if the transactions are mined in order, with the given `nonce`, from `from`, and nothing else creates entities from `from` in between. `entities:submit` with `wait` receipt/indexed returns the real keys from the receipts.
+
+### 4.2 Submit: `POST /v1/collections/{name}/entities:submit` *(1.1, CCR-0001)*
+
+Capability `entities.submit`. Accepts `Idempotency-Key`. Exactly one of:
+
+| Field | Use when |
+| :--- | :--- |
+| `signed_transactions` | The client signed the transactions (raw `0x02…` hex, 1–256, in order). The daemon broadcasts them with `eth_sendRawTransaction` |
+| `tx_hashes` | The wallet already broadcast them (MetaMask and most browser wallets only offer `eth_sendTransaction`, which signs **and** sends). The daemon only waits |
+
+Plus `wait` (`none` / `receipt` (default) / `indexed`, same meaning as for upsert) and `timeout_ms` (default 60,000, max 600,000).
+
+Checks on `signed_transactions`, all done **before anything is broadcast**: each must decode as a canonical signed EIP-1559 transaction with a low-s signature, its chain id must be the daemon's, `to` must be the Arkiv contract, `value` must be 0, the calldata must be an `execute(...)` call, and the recovered sender must be a writer of the collection (unless it is `open`). Violations → `422 invalid_argument` (`403 forbidden` for a sender that is not a writer). A node rejection is `409 tx_reverted`; transactions before the rejected one stay broadcast. "already known" counts as accepted, so a retried submit is harmless. For `tx_hashes` the receipt must be a call to the Arkiv contract from a writer.
 
 Response:
 
 ```json
-{ "chain_id": 7794095,
-  "transactions": [ { "to": "0x4400000000000000000000000000000000000044", "data": "0x49650044…",
-                      "value": "0x0", "nonce": 12, "gas_estimate": 412000 } ],
-  "results": [ { "id": "doc-900", "key": "0x5e1f…", "op": "create" } ] }
+{ "tx_hashes": ["0x7d1c…0504"], "block_number": 582160,
+  "created_keys": ["0x5e1f…3c2d"] }
 ```
 
-The client signs each transaction as EIP-1559 (it chooses fees), broadcasts it to Arkiv itself, and may then search with `consistency.min_block` = its receipt block. Predicted keys are valid only if the transactions are mined in order, with the given `nonce`, from `from`.
+`created_keys` lists the keys of the `EntityCreated` logs of the receipts, in order (empty with `wait: "none"`). `block_number` is the highest receipt block, `null` with `wait: "none"` (status `202`). With `wait: "indexed"` a following search sees the writes without `min_block`. The daemon does not replace a stuck client-signed transaction (it cannot re-sign); the client resubmits with higher fees.
 
 ## 5. Delete and extend
 
@@ -84,6 +128,8 @@ The client signs each transaction as EIP-1559 (it chooses fees), broadcasts it t
 | `DELETE /v1/collections/{name}/entities/{ref}` | — | `DELETE` op for one entity |
 | `POST /v1/collections/{name}/entities:delete` | exactly one of `refs` (≤ 1000), `filter`, `where` | `DELETE` ops for all matching live entities owned by the signer |
 | `POST /v1/collections/{name}/entities:extend` | `ttl` + exactly one of `refs`, `filter`, `where` | `EXTEND_EXPIRY` ops |
+
+These use the managed signer. With a user wallet, build the `DELETE` / `EXTEND_EXPIRY` ops with the Arkiv SDK, sign them, and pass the signed transactions or hashes to `entities:submit` to wait for indexing.
 
 Response `TxResponse { affected, tx_hashes, block_number }`. Entities not owned by the signer are skipped for filter-based calls (not counted in `affected`) and give `409 not_owner` for `refs`-based calls. Filter-based calls are capped at 10,000 entities. Beyond that the call fails with `invalid_argument`, before anything is sent.
 
