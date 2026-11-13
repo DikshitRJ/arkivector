@@ -11,7 +11,6 @@ const NAV: { to: StaticRoute; label: string }[] = [
   { to: "/", label: "home" },
   { to: "/architecture", label: "architecture" },
   { to: "/build", label: "build" },
-  { to: "/next", label: "what's next" },
   { to: "/team", label: "team" },
 ];
 
@@ -137,23 +136,162 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <footer className="bg-paper border-t-[1.5px] border-ink">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 pb-20 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-[13px]">
-          <p className="flex flex-wrap gap-x-4 gap-y-1">
-            <span>Built for ETHGlobal Mumbai 2026.</span>
-            <a className="ink-link" href={REPO} target="_blank" rel="noreferrer">source</a>
-            <a className="ink-link" href={`${REPO}/releases`} target="_blank" rel="noreferrer">releases</a>
-            <a className="ink-link" href="https://pypi.org/project/arkivector/" target="_blank" rel="noreferrer">pypi</a>
-          </p>
-          <p className="sm:text-right">
-            © 2026 DikshitRJ ·{" "}
-            <a className="ink-link" href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer">
-              MIT License
-            </a>
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
+  );
+}
+
+const SOCIAL: { href: string; label: string; text: string; icon: ReactNode }[] = [
+  {
+    href: "https://www.linkedin.com/in/dikshitrj",
+    label: "LinkedIn",
+    text: "linkedin.com/in/dikshitrj",
+    icon: <path d="M4.5 3.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM3 9h3v12H3zM9 9h2.9v1.7h.04c.4-.76 1.38-1.56 2.85-1.56 3.05 0 3.61 2 3.61 4.6V21h-3v-6.4c0-1.52-.03-3.48-2.12-3.48-2.13 0-2.45 1.66-2.45 3.37V21H9z" fill="currentColor" />,
+  },
+  {
+    href: "https://github.com/DikshitRJ",
+    label: "GitHub",
+    text: "github.com/dikshitrj",
+    icon: <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" fill="currentColor" />,
+  },
+  {
+    href: "mailto:dikshitrjain@gmail.com",
+    label: "Email",
+    text: "dikshitrjain@gmail.com",
+    icon: <path d="M3 5h18v14H3zM3.5 5.5 12 13l8.5-7.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />,
+  },
+  {
+    href: "https://dikshitrj.in",
+    label: "Website",
+    text: "dikshitrj.in",
+    icon: <><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3Z" fill="none" stroke="currentColor" strokeWidth="1.6" /></>,
+  },
+];
+
+const FOOTER_COLUMNS: { title: string; links: { to?: string; href?: string; label: string }[] }[] = [
+  {
+    title: "Get started",
+    links: [
+      { to: "/docs/install", label: "Install" },
+      { to: "/docs/getting-started/quickstart", label: "Quick start" },
+      { to: "/docs/getting-started/concepts", label: "Concepts" },
+      { to: "/docs/getting-started/configuration", label: "Configuration" },
+    ],
+  },
+  {
+    title: "Docs",
+    links: [
+      { to: "/docs", label: "Documentation" },
+      { to: "/docs/api", label: "REST API" },
+      { to: "/docs/python", label: "Python SDK" },
+      { to: "/docs/node", label: "Node.js SDK" },
+      { to: "/docs/mcp", label: "MCP server" },
+      { to: "/docs/operations/deployment", label: "Deployment" },
+    ],
+  },
+  {
+    title: "Site",
+    links: [
+      { to: "/", label: "Home" },
+      { to: "/architecture", label: "Architecture" },
+      { to: "/build", label: "Build artifacts" },
+      { to: "/team", label: "Team" },
+      { href: "/agents.md", label: "For AI agents" },
+    ],
+  },
+  {
+    title: "Project",
+    links: [
+      { href: REPO, label: "Source on GitHub" },
+      { href: `${REPO}/releases`, label: "Releases" },
+      { href: `${REPO}/issues/19`, label: "Roadmap" },
+      { href: "https://pypi.org/project/arkivector/", label: "PyPI" },
+      { href: "https://arkiv.network", label: "Arkiv" },
+    ],
+  },
+];
+
+function Footer() {
+  return (
+    <footer className="bg-paper border-t-[1.5px] border-ink text-[13px]">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-8 pb-6 grid gap-8 md:grid-cols-[minmax(0,1.3fr)_minmax(0,2.7fr)]">
+        <div>
+          <Link to="/" className="flex items-center gap-2 no-underline" aria-label="Arkivector home">
+            <Logo size={22} />
+            <span className="font-display font-bold text-[18px]">arkivector</span>
+          </Link>
+          <p className="mt-2 max-w-[34ch]">
+            Vector search for{" "}
+            <a href="https://arkiv.network" target="_blank" rel="noreferrer" className="ink-link font-semibold text-arkiv-blue">
+              Arkiv
+            </a>
+            , with pgvector's own math. Built for ETHGlobal Mumbai 2026.
+          </p>
+          <div className="mt-5">
+            <p className="flex items-center gap-2.5">
+              <span className="font-display font-bold text-[16px]">DikshitRJ</span>
+              <span className="flex items-center gap-1.5">
+                {SOCIAL.map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target={s.href.startsWith("mailto:") ? undefined : "_blank"}
+                    rel="noreferrer"
+                    aria-label={s.label}
+                    title={s.label}
+                    className="grid place-items-center w-7 h-7 border-[1.5px] border-ink hover:bg-ink hover:text-paper transition-colors"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden>
+                      {s.icon}
+                    </svg>
+                  </a>
+                ))}
+              </span>
+            </p>
+            <ul className="mt-2 space-y-0.5">
+              {SOCIAL.map((s) => (
+                <li key={s.label}>
+                  <a href={s.href} target={s.href.startsWith("mailto:") ? undefined : "_blank"} rel="noreferrer" className="ink-link">
+                    {s.text}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <nav aria-label="Footer" className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+          {FOOTER_COLUMNS.map((col) => (
+            <div key={col.title}>
+              <p className="font-semibold mb-2">{col.title}</p>
+              <ul className="space-y-1">
+                {col.links.map((l) => (
+                  <li key={l.label}>
+                    {l.to ? (
+                      <Link to={l.to} className="ink-link">
+                        {l.label}
+                      </Link>
+                    ) : (
+                      <a href={l.href} className="ink-link" {...(l.href?.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}>
+                        {l.label}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </div>
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 pb-20 pt-4 border-t border-dashed border-ink flex flex-col sm:flex-row gap-2 sm:justify-between">
+        <p>
+          © 2026 DikshitRJ ·{" "}
+          <a className="ink-link" href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer">
+            MIT License
+          </a>
+        </p>
+        <p className="opacity-80">pgvector code keeps its PostgreSQL License.</p>
+      </div>
+    </footer>
   );
 }
 
