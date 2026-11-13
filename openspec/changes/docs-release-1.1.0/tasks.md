@@ -60,3 +60,9 @@ Graphify review of #9, checked:
       repository's wiki (that is how the common wiki-publishing actions work), so not changed; added an optional
       WIKI_TOKEN secret fallback for organisations that restrict it
 - [x] "DOCS fans out to 7 callees": coupling metric, no change
+
+## 7. Release and green main (owner: "merge it yourself", 2026-11-13)
+- [x] 7.1 release.yml: workflow_dispatch input create_release creates the tag v<version> on the commit and the
+      GitHub Release (this session cannot push tags; the workflow's GITHUB_TOKEN can)
+- [x] 7.2 wiki.yml: publish skips with a warning and a job summary while the wiki repository does not exist (GitHub
+      creates it only after a first page is saved in the web UI); main stays green and publishing starts on its own
