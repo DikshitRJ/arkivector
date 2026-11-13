@@ -138,7 +138,7 @@ Tracked on GitHub: <https://github.com/DikshitRJ/arkivector/issues/19>. Everythi
 | Linux and Docker only | macOS and Windows use the container | Port the glibc-specific calls | [#17](https://github.com/DikshitRJ/arkivector/issues/17) |
 | Two SDK languages | SDKs for Python and Node.js | C, C++ and Rust SDKs | [#18](https://github.com/DikshitRJ/arkivector/issues/18) |
 
-Done since v1.1.0:
+Done in v1.2.0:
 
 | Fixed | What changed | Issue |
 | :--- | :--- | :--- |

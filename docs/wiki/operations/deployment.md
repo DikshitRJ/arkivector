@@ -5,7 +5,7 @@
 ```yaml
 services:
   arkivectord:
-    image: ghcr.io/dikshitrj/arkivectord:1.1.0
+    image: ghcr.io/dikshitrj/arkivectord:1.2.0
     restart: unless-stopped
     ports: ["127.0.0.1:8080:8080"]
     volumes:
@@ -23,7 +23,7 @@ volumes:
   arkivector-data:
 ```
 
-The image runs as a non-root user and keeps state in `/data`. Pin a version tag in production (`:1.1.0`, or `:1` for the latest 1.x).
+The image runs as a non-root user and keeps state in `/data`. Pin a version tag in production (`:1.2.0`, or `:1` for the latest 1.x).
 
 ## systemd (binary)
 

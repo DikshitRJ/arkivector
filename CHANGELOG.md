@@ -2,7 +2,7 @@
 
 All notable changes to Arkivector (daemon `arkivectord`, Python SDK `arkivector`, Node SDK `@dikshitrj/arkivector`). Versions follow the release tags; the REST API contract is at `1.1.0` (`spec/VERSION`, [contract changelog](docs/api/changelog.md)).
 
-## Unreleased
+## 1.2.0 (2026-11-13)
 
 ### Daemon
 - **HNSW graphs survive restarts** ([#11](https://github.com/DikshitRJ/arkivector/issues/11)). Graphs are grouped into expiry bands (`[hnsw] band_blocks`, default 30 days) and saved to `<data_dir>/segments/<collection>/<band>.hnsw` after background builds, at checkpoints and at shutdown (`[hnsw] persist`). At start each file is validated completely and only vectors added since the save are indexed. A corrupt or mismatched file is logged, deleted and rebuilt in the background, never a crash (fuzzed: `fuzz_hnsw_file`).

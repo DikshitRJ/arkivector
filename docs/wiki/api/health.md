@@ -36,7 +36,7 @@ curl -s $AV/v1/version
 
 ```json
 {
-  "daemon_version": "1.1.0",
+  "daemon_version": "1.2.0",
   "api_version": "1.1.0",
   "pgvector_version": "0.8.7",
   "kernel_tier": "x86-64-v4",

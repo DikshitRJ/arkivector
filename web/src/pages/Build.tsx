@@ -3,7 +3,7 @@ import { ArchDiagram } from "../anim/ArchDiagram";
 import { Page, REPO } from "../components/Layout";
 import { CodeBlock, H2, Note } from "../components/ui";
 
-const V = "1.1.0";
+const V = "1.2.0";
 
 type Artifact = { n: number; what: string; where: { label: string; url: string }[]; cmd: string; lang: string; note: ReactNode };
 

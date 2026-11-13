@@ -112,5 +112,5 @@ Add the daemon wallet's address to each collection's `writers`, otherwise the da
 
 ## Known limitations
 - Verified on the Arkiv **Rabdi testnet** only; mainnet is untested.
-- HNSW graphs are kept in memory and rebuilt from the local store at startup; rebuilds after many updates run on the sync thread.
+- Client-side signing was tested against a mock chain with `eth_account`, viem and ethers signers; a Rabdi run with MetaMask in a browser is still to do.
 - The remote signer is reached without authentication: run it on localhost or a private network.
