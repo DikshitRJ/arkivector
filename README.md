@@ -11,8 +11,6 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-arkivector.dikshitrj.in-fe7445)](https://arkivector.dikshitrj.in/docs)
 
-> **Your AI agent's long-term memory is a row in someone else's database. One expired credit card and it has amnesia.**
-
 Most RAG pipelines keep their embeddings in a hosted vector database: a company's servers, a company's pricing page, a company's terms of service. Arkivector stores your vectors on [Arkiv](https://arkiv.network), a chain where data is owned by a wallet, and gives you the similarity search you already know from pgvector on top of it.
 
 ```python
