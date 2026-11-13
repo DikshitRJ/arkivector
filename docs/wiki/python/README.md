@@ -6,7 +6,7 @@
 pip install arkivector
 ```
 
-You need a running daemon ([Installation](../getting-started/installation.md)). The client finds it through `ARKIVECTOR_URL` (default `http://127.0.0.1:8080`).
+You need a running daemon ([Installation](../install.md)). The client finds it through `ARKIVECTOR_URL` (default `http://127.0.0.1:8080`).
 
 ## Quick start
 

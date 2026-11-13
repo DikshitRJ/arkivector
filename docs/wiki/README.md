@@ -8,7 +8,7 @@ Website: [arkivector.dikshitrj.in](https://arkivector.dikshitrj.in) · Source: [
 
 | If you want to | Read |
 | :--- | :--- |
-| Run the daemon | [Installation](getting-started/installation.md) |
+| Install the daemon, a wallet and an SDK | [Install and get started](install.md) |
 | Store and search vectors in five minutes | [Quick start](getting-started/quickstart.md) |
 | Understand collections, entities, blocks and TTLs | [Concepts](getting-started/concepts.md) |
 | Call it from any language or a shell | [REST API](api/README.md) |

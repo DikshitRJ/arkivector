@@ -1,6 +1,6 @@
 # Connect a client
 
-The daemon must be running ([Installation](../getting-started/installation.md)). The MCP URL is the daemon URL plus `/mcp`, e.g. `http://127.0.0.1:8080/mcp`. If the daemon uses API keys, give the client a key: a `read` key for search-only agents, a `write` key if the agent may store memories.
+The daemon must be running ([Installation](../install.md)). The MCP URL is the daemon URL plus `/mcp`, e.g. `http://127.0.0.1:8080/mcp`. If the daemon uses API keys, give the client a key: a `read` key for search-only agents, a `write` key if the agent may store memories.
 
 ## Claude Code
 

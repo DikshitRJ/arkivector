@@ -2,7 +2,7 @@
 
 ## What's new
 
-See [CHANGELOG.md](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) for the changes in ${TAG}. Documentation: [arkivector.dikshitrj.in/docs](https://arkivector.dikshitrj.in/docs) (also in the [wiki](https://github.com/${REPO}/wiki)): [installation](https://arkivector.dikshitrj.in/docs/getting-started/installation), [REST API](https://arkivector.dikshitrj.in/docs/api), [Python SDK](https://arkivector.dikshitrj.in/docs/python), [Node.js SDK](https://arkivector.dikshitrj.in/docs/node), [MCP server](https://arkivector.dikshitrj.in/docs/mcp).
+See [CHANGELOG.md](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) for the changes in ${TAG}. Documentation: [arkivector.dikshitrj.in/docs](https://arkivector.dikshitrj.in/docs) (also in the [wiki](https://github.com/${REPO}/wiki)): [installation](https://arkivector.dikshitrj.in/docs/install), [REST API](https://arkivector.dikshitrj.in/docs/api), [Python SDK](https://arkivector.dikshitrj.in/docs/python), [Node.js SDK](https://arkivector.dikshitrj.in/docs/node), [MCP server](https://arkivector.dikshitrj.in/docs/mcp).
 
 ## Assets
 

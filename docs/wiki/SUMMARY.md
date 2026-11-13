@@ -1,8 +1,8 @@
 # Summary
 
 - [Home](README.md)
+- [Install and get started](install.md)
 - Getting started
-  - [Installation](getting-started/installation.md)
   - [Quick start](getting-started/quickstart.md)
   - [Concepts](getting-started/concepts.md)
   - [Configuration](getting-started/configuration.md)
