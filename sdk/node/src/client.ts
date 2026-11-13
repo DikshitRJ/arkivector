@@ -30,6 +30,8 @@ import {
   TxResult,
   UpsertOptions,
   PrepareOptions,
+  SubmitOptions,
+  SubmitResult,
   DeleteEntitiesOptions,
   ExtendEntitiesOptions,
   DirectAttribute,
@@ -50,10 +52,31 @@ import {
   parseCountResult,
   parseUpsertResult,
   parsePrepareResult,
+  parseSubmitResult,
   parseTxResult,
   plainAttributes,
 } from "./models.js";
 import { Vector, HalfVector, Bit, SparseVector } from "./types.js";
+import {
+  TransactionSigner,
+  classifySigned,
+  resolveSigner,
+  toHex,
+} from "./signing.js";
+
+/**
+ * Options for upsertSigned(): prepare → sign with the caller's wallet → submit.
+ */
+export interface UpsertSignedOptions {
+  /** Wallet / signer (see signing.ts): EIP-1193 provider, viem WalletClient, ethers Signer, function. */
+  signer: TransactionSigner;
+  /** Signing address. Optional when the signer can tell (wallets, viem, ethers). */
+  from?: string;
+  /** Default "indexed": a following search sees the writes. */
+  wait?: "none" | "receipt" | "indexed" | string;
+  timeoutMs?: number;
+  idempotencyKey?: string;
+}
 
 /**
  * Arkivector SDK client.
@@ -654,6 +677,120 @@ export class Arkivector {
     );
 
     return parsePrepareResult(raw);
+  }
+
+  /**
+   * Hand transactions signed outside the daemon back to it (contract 1.1.0):
+   * POST /v1/collections/{name}/entities:submit. Give exactly one of signedTransactions (the
+   * daemon broadcasts them in order) or txHashes (a wallet already broadcast them).
+   * Docs: docs/api/entities.md §4.2
+   */
+  async submit(
+    collection: string,
+    options: SubmitOptions,
+  ): Promise<SubmitResult> {
+    await this.checkCapability("entities.submit");
+    const hasRaw = options.signedTransactions !== undefined;
+    const hasHash = options.txHashes !== undefined;
+    if (hasRaw === hasHash) {
+      throw new Error(
+        "submit: give exactly one of signedTransactions or txHashes",
+      );
+    }
+    const wait = options.wait ?? "receipt";
+    const body: Record<string, unknown> = { wait };
+    if (hasRaw) {
+      const raws = (options.signedTransactions ?? []).map((t) => {
+        const c = classifySigned(t);
+        if (c.kind !== "raw") {
+          throw new Error(
+            "submit: signedTransactions must be signed EIP-1559 (0x02…) transactions; pass hashes as txHashes",
+          );
+        }
+        return c.value;
+      });
+      if (raws.length === 0)
+        throw new Error("submit: signedTransactions is empty");
+      body.signed_transactions = raws;
+    } else {
+      const hashes = (options.txHashes ?? []).map((h) => {
+        const v = toHex(h);
+        if (!/^0x[0-9a-f]{64}$/.test(v)) {
+          throw new Error(`submit: ${h} is not a transaction hash`);
+        }
+        return v;
+      });
+      if (hashes.length === 0) throw new Error("submit: txHashes is empty");
+      body.tx_hashes = hashes;
+    }
+    if (options.timeoutMs !== undefined) body.timeout_ms = options.timeoutMs;
+    const timeoutMs =
+      wait === "none"
+        ? this.timeoutMs
+        : Math.max(this.timeoutMs, (options.timeoutMs ?? 60000) + 5000);
+    const idempotencyKey = this.resolveIdempotencyKey(options);
+    const raw = await this.transport.post<Record<string, unknown>>(
+      `/v1/collections/${encodeURIComponent(collection)}/entities:submit`,
+      body,
+      { idempotencyKey, timeoutMs },
+    );
+    const result = parseSubmitResult(raw);
+    this.updateLastWriteBlock(result.blockNumber);
+    return result;
+  }
+
+  /**
+   * Upsert signed by the caller's own wallet: prepare → sign/send → submit (contract 1.1.0).
+   * The daemon needs no key. Works with MetaMask (`window.ethereum`), viem, ethers, or a
+   * function. With wait receipt/indexed the returned keys are the mined ones.
+   * Docs: docs/api/entities.md §4
+   */
+  async upsertSigned(
+    collection: string,
+    entities: EntityInput[],
+    options: UpsertSignedOptions,
+  ): Promise<UpsertResult> {
+    const signer = resolveSigner(options.signer);
+    const from = options.from ?? (await signer.address());
+    if (!from) {
+      throw new Error(
+        "upsertSigned: pass options.from (this signer cannot tell its address)",
+      );
+    }
+    const prepared = await this.prepare(collection, entities, { from });
+    if (prepared.transactions.length === 0) {
+      return new UpsertResult({ results: prepared.results, txHashes: [] });
+    }
+    await signer.prepareChain(prepared.chainId);
+    const signed = [];
+    for (const tx of prepared.transactions) signed.push(await signer.sign(tx));
+    const raws = signed.filter((s) => s.kind === "raw").map((s) => s.value);
+    const hashes = signed.filter((s) => s.kind === "hash").map((s) => s.value);
+    if (raws.length > 0 && hashes.length > 0) {
+      throw new Error(
+        "upsertSigned: the signer broadcast some transactions and only signed others",
+      );
+    }
+    const sub = await this.submit(collection, {
+      ...(raws.length > 0
+        ? { signedTransactions: raws }
+        : { txHashes: hashes }),
+      wait: options.wait ?? "indexed",
+      timeoutMs: options.timeoutMs,
+      idempotencyKey: options.idempotencyKey,
+    });
+    const results = prepared.results.map((r) => ({ ...r }));
+    const creates = results.filter((r) => r.op === "create");
+    if (creates.length === sub.createdKeys.length) {
+      creates.forEach((r, i) => {
+        r.key = sub.createdKeys[i];
+      });
+    }
+    return new UpsertResult({
+      results,
+      txHashes: sub.txHashes,
+      blockNumber: sub.blockNumber,
+    });
   }
 
   /**

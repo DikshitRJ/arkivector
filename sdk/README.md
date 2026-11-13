@@ -47,5 +47,6 @@ npm install @langchain/core
 - [Filter AST & Arkiv Query Language](../docs/api/filters.md)
 - [Search Operations & Options](../docs/api/search.md)
 - [Entities, Direct Writes & Upsert](../docs/api/entities.md)
+- [Signing Writes With Your Own Wallet (prepare + submit)](../docs/wiki/getting-started/signing.md)
 - [Collections Management](../docs/api/collections.md)
 - [OpenAPI Specification](../spec/openapi.yaml)

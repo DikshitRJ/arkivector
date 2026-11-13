@@ -24,5 +24,8 @@ export * from "./models.js";
 // HTTP transport and helpers
 export * from "./http.js";
 
+// Client-side signing helpers (EIP-1193 / viem / ethers converters)
+export * from "./signing.js";
+
 // Client
 export * from "./client.js";
