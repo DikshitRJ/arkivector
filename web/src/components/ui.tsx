@@ -112,9 +112,14 @@ export function H2({ children, id }: { children: ReactNode; id?: string }) {
 }
 
 /** The Arkiv wordmark as Arkiv writes it: bracketed capitals, in Arkiv blue. */
-export function ArkivMark({ className = "" }: { className?: string }) {
-  return (
-    <span className={`font-display font-bold tracking-[0.02em] whitespace-nowrap text-arkiv-blue ${className}`} aria-label="Arkiv">
+export function ArkivMark({ className = "", href }: { className?: string; href?: string }) {
+  const cls = `font-display font-bold tracking-[0.02em] whitespace-nowrap text-arkiv-blue ${className}`;
+  return href ? (
+    <a href={href} target="_blank" rel="noreferrer" className={`${cls} no-underline hover:underline decoration-2 underline-offset-[6px]`} aria-label="Arkiv (arkiv.network)">
+      [&nbsp;ARKIV&nbsp;]
+    </a>
+  ) : (
+    <span className={cls} aria-label="Arkiv">
       [&nbsp;ARKIV&nbsp;]
     </span>
   );

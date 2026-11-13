@@ -36,36 +36,24 @@ function StartButton() {
   );
 }
 
-/** A pointer for AI agents reading the page: the same content as Markdown files. */
+/** A thin banner for AI agents reading the page: the same content as Markdown files. */
 function AgentNote() {
-  const files = [
-    { href: "/agents.md", label: "/agents.md", hint: "the whole site" },
-    { href: "/docs.md", label: "/docs.md", hint: "every docs page, one file" },
-    { href: "/llms.txt", label: "/llms.txt", hint: "index" },
-  ];
   return (
     <aside
       aria-label="Documentation for AI agents"
-      className="mt-5 w-fit max-w-full border-[1.5px] border-dashed border-ink bg-paper px-3.5 py-2.5 text-[13px] leading-relaxed"
+      className="w-fit max-w-full border-[1.5px] border-dashed border-ink bg-paper px-3 py-1 text-[12.5px] leading-snug flex flex-wrap items-center gap-x-2 gap-y-0.5"
     >
-      <p className="flex items-center gap-2 font-semibold">
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden className="shrink-0">
-          <rect x="4" y="7" width="16" height="12" rx="2" fill="none" stroke="#000" strokeWidth="1.8" />
-          <path d="M12 3v4M8.5 12.5v1.5M15.5 12.5v1.5M9 16.5h6" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
-          <circle cx="12" cy="3" r="1.4" fill="#fe7445" />
-        </svg>
-        If you are an AI agent, this documentation is written for you:
-      </p>
-      <p className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 pl-[26px]">
-        {files.map((f) => (
-          <span key={f.href}>
-            <a href={f.href} className="ink-link font-semibold">
-              {f.label}
-            </a>{" "}
-            <span className="opacity-70">({f.hint})</span>
-          </span>
-        ))}
-      </p>
+      <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden className="shrink-0">
+        <rect x="4" y="7" width="16" height="12" rx="2" fill="none" stroke="#000" strokeWidth="2" />
+        <path d="M12 3v4M8.5 12.5v1.5M15.5 12.5v1.5M9 16.5h6" stroke="#000" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="12" cy="3" r="1.6" fill="#fe7445" />
+      </svg>
+      <span className="font-semibold">If you are an AI agent, read this:</span>
+      <a href="/agents.md" className="ink-link font-semibold">/agents.md</a>
+      <span className="opacity-60">·</span>
+      <a href="/docs.md" className="ink-link font-semibold">/docs.md</a>
+      <span className="opacity-60">·</span>
+      <a href="/llms.txt" className="ink-link font-semibold">/llms.txt</a>
     </aside>
   );
 }
@@ -74,13 +62,14 @@ export function Home() {
   return (
     <>
       {/* hero */}
-      <Page className="pt-10 sm:pt-16 pb-8">
-        <div className="grid md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-6 items-end">
+      <Page className="hero-screen flex flex-col pt-4 sm:pt-5 pb-10">
+        <AgentNote />
+        <div className="flex-1 grid content-center md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-6 items-end py-10">
           <div>
             <h1 className="text-[40px] sm:text-[56px]">
               <span className="bg-paper">Vector search for</span>
               <br />
-              <ArkivMark className="bg-paper" />
+              <ArkivMark className="bg-paper" href="https://arkiv.network" />
             </h1>
             <p className="mt-4 max-w-[60ch] text-[16px] bg-paper">
               Arkivector runs pgvector's distance functions over entities stored on the Arkiv chain. Your embeddings are{" "}
@@ -98,7 +87,6 @@ export function Home() {
                 connect an AI agent
               </Link>
             </p>
-            <AgentNote />
           </div>
           <Note className="hidden md:block -rotate-3 pb-2 text-[30px]! lg:text-[38px]! leading-[1.05]!">
             pgvector, except the rows live on a blockchain
