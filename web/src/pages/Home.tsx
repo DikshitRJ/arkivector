@@ -28,18 +28,8 @@ function StartButton() {
   return (
     <Link to="/docs/install" className="start-btn group mt-7 no-underline" aria-label="Install and get started">
       <span className="start-btn__sweep" aria-hidden />
-      <span className="relative flex flex-col items-start">
-        <span className="text-[11.5px] sm:text-[12.5px] font-normal text-arkiv-orange tracking-wide">
-          docker · wallet · SDK · ~10 minutes
-        </span>
-        <span className="font-display text-[22px] sm:text-[28px] font-bold leading-tight">
-          Install and get started
-        </span>
-        <span className="mt-1 text-[12px] sm:text-[13px] font-normal opacity-80">
-          $ docker run ghcr.io/dikshitrj/arkivectord<span className="start-btn__cursor">▍</span>
-        </span>
-      </span>
-      <svg className="start-btn__arrow relative shrink-0" width="44" height="28" viewBox="0 0 44 28" aria-hidden>
+      <span className="relative font-display text-[22px] sm:text-[26px] font-bold leading-tight">Install and get started</span>
+      <svg className="start-btn__arrow relative shrink-0" width="38" height="24" viewBox="0 0 44 28" aria-hidden>
         <path d="M2 14 H38 M27 3 L40 14 L27 25" fill="none" stroke="#fe7445" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </Link>
