@@ -6,7 +6,7 @@
 **[Website](https://arkivector.dikshitrj.in)** · **[Documentation](https://arkivector.dikshitrj.in/docs)** · [Wiki](https://github.com/DikshitRJ/arkivector/wiki) · [Releases](https://github.com/DikshitRJ/arkivector/releases)
 
 [![Release](https://img.shields.io/github/v/release/DikshitRJ/arkivector)](https://github.com/DikshitRJ/arkivector/releases)
-[![PyPI](https://img.shields.io/pypi/v/arkivector)](https://pypi.org/project/arkivector/)
+[![PyPI](https://img.shields.io/pypi/v/arkivector?cacheSeconds=3600)](https://pypi.org/project/arkivector/)
 [![Container](https://img.shields.io/badge/ghcr.io-arkivectord-blue)](https://github.com/DikshitRJ/arkivector/pkgs/container/arkivectord)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-arkivector.dikshitrj.in-fe7445)](https://arkivector.dikshitrj.in/docs)
