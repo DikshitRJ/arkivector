@@ -209,25 +209,41 @@ def decode_execute(calldata: bytes) -> list[Op]:
     return ops
 
 
-def execute_raw_tx(chain: Chain, raw_bytes: bytes) -> str:
-    tx_hash = keccak256(raw_bytes)
-    tx_hash_hex = "0x" + tx_hash.hex()
+class RawTx:
+    """Decoded signed transaction (EIP-1559 or legacy)."""
 
+    def __init__(
+        self, tx_hash: bytes, sender: bytes, nonce: int, to: bytes, data: bytes, tip: int, max_fee: int, gas: int = 0
+    ) -> None:
+        self.hash = tx_hash
+        self.sender = sender
+        self.nonce = nonce
+        self.to = to
+        self.data = data
+        self.tip = tip
+        self.max_fee = max_fee
+        self.gas = gas
+
+
+def decode_raw_tx(raw_bytes: bytes) -> RawTx:
+    tx_hash = keccak256(raw_bytes)
+    if not raw_bytes:
+        raise RpcError(-32602, "empty raw transaction")
     if raw_bytes[0] == 0x02:
         # EIP-1559
         items, _ = rlp_decode(raw_bytes[1:])
         if len(items) != 12:
             raise RpcError(-32602, f"invalid EIP-1559 tx fields count: {len(items)}")
-        chain_id = int.from_bytes(items[0], "big")
         nonce = int.from_bytes(items[1], "big")
+        tip = int.from_bytes(items[2], "big")
+        max_fee = int.from_bytes(items[3], "big")
+        gas = int.from_bytes(items[4], "big")
         to = items[5]
         data = items[7]
         v_parity = int.from_bytes(items[9], "big")
         r = int.from_bytes(items[10], "big")
         s = int.from_bytes(items[11], "big")
-
-        sighash_payload = b"\x02" + rlp_encode(items[:9])
-        sighash = keccak256(sighash_payload)
+        sighash = keccak256(b"\x02" + rlp_encode(items[:9]))
         sender = recover_sender(sighash, r, s, v_parity)
     else:
         # Legacy
@@ -235,23 +251,30 @@ def execute_raw_tx(chain: Chain, raw_bytes: bytes) -> str:
         if len(items) != 9:
             raise RpcError(-32602, f"invalid legacy tx fields count: {len(items)}")
         nonce = int.from_bytes(items[0], "big")
+        gas_price = int.from_bytes(items[1], "big")
+        tip = max_fee = gas_price
+        gas = int.from_bytes(items[2], "big")
         to = items[3]
         data = items[5]
         v = int.from_bytes(items[6], "big")
         r = int.from_bytes(items[7], "big")
         s = int.from_bytes(items[8], "big")
-
-        v_parity = v % 2
         sighash = keccak256(rlp_encode(items[:6]))
-        sender = recover_sender(sighash, r, s, v_parity)
+        sender = recover_sender(sighash, r, s, v % 2)
+    return RawTx(tx_hash, sender, nonce, to, data, tip, max_fee, gas)
 
-    if to.lower() == chain.contract.lower() and len(data) >= 4 and data[:4] == EXECUTE_SELECTOR:
+
+def execute_decoded(chain: Chain, tx: RawTx) -> str:
+    if tx.to.lower() == chain.contract.lower() and len(tx.data) >= 4 and tx.data[:4] == EXECUTE_SELECTOR:
         try:
-            ops = decode_execute(data)
-            chain.apply_ops(sender, ops, tx_hash=tx_hash, calldata=data)
+            ops = decode_execute(tx.data)
+            chain.apply_ops(tx.sender, ops, tx_hash=tx.hash, calldata=tx.data)
         except Revert as exc:
             raise RpcError(-32000, f"execution reverted: {exc.name}", exc.to_obj()) from exc
         except Exception as exc:
             raise RpcError(-32000, f"execution failed: {exc}") from exc
+    return "0x" + tx.hash.hex()
 
-    return tx_hash_hex
+
+def execute_raw_tx(chain: Chain, raw_bytes: bytes) -> str:
+    return execute_decoded(chain, decode_raw_tx(raw_bytes))

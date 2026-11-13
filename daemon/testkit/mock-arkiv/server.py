@@ -36,6 +36,106 @@ class Mock:
         self.sub_counter = 0
         self.auto_mine_ms = 0
         self.auto_task: asyncio.Task[None] | None = None
+        self.fees_reset()
+
+    # ------------------------------------------------------------------
+    # Fees and the held mempool (issue #14 tests)
+    # ------------------------------------------------------------------
+
+    FEE_FIELDS = ("base_fee_wei", "tip_wei", "min_tip_wei", "fee_history", "gas_price")
+
+    def fees_reset(self) -> None:
+        self.base_fee_wei = 1_000_000_000  # 1 gwei
+        self.tip_wei = 100_000_000  # 0.1 gwei
+        self.min_tip_wei = 0  # txs below this tip are held (stuck) until replaced
+        self.fee_history_enabled = True
+        self.gas_price_enabled = True
+        self.held: dict[tuple[bytes, int], Any] = {}
+        self.held_total = 0
+        self.replaced_total = 0
+        self.fee_calls = {"eth_feeHistory": 0, "eth_gasPrice": 0}
+        self.last_tx: dict[str, Any] | None = None
+
+    def fees_update(self, body: Any) -> None:
+        if not isinstance(body, dict):
+            raise ControlError("body must be an object")
+        extra = set(body) - set(self.FEE_FIELDS)
+        if extra:
+            raise ControlError(f"unknown fee fields {sorted(extra)}")
+        for f in ("base_fee_wei", "tip_wei", "min_tip_wei"):
+            if f in body:
+                v = body[f]
+                if isinstance(v, bool) or not isinstance(v, int) or v < 0:
+                    raise ControlError(f"{f} must be a non-negative integer")
+                setattr(self, f, v)
+        if "fee_history" in body:
+            self.fee_history_enabled = bool(body["fee_history"])
+        if "gas_price" in body:
+            self.gas_price_enabled = bool(body["gas_price"])
+
+    def fees_obj(self) -> dict[str, Any]:
+        return {
+            "base_fee_wei": self.base_fee_wei,
+            "tip_wei": self.tip_wei,
+            "min_tip_wei": self.min_tip_wei,
+            "fee_history": self.fee_history_enabled,
+            "gas_price": self.gas_price_enabled,
+            "held": len(self.held),
+            "held_total": self.held_total,
+            "replaced_total": self.replaced_total,
+            "calls": dict(self.fee_calls),
+            "last_tx": self.last_tx,
+        }
+
+    def fee_history(self, params: list[Any]) -> dict[str, Any]:
+        if not 2 <= len(params) <= 3:
+            raise RpcError(-32602, "Invalid params", "expected [blockCount, newestBlock, rewardPercentiles?]")
+        cnt = params[0]
+        n = int(cnt, 16) if isinstance(cnt, str) else cnt
+        if not isinstance(n, int) or not 1 <= n <= 1024:
+            raise RpcError(-32602, "Invalid params", "blockCount must be 1..1024")
+        newest = self.block_number(params[1], "newestBlock")
+        n = min(n, newest + 1)
+        pct = params[2] if len(params) > 2 else []
+        if not isinstance(pct, list):
+            raise RpcError(-32602, "Invalid params", "rewardPercentiles must be an array")
+        out: dict[str, Any] = {
+            "oldestBlock": qty(newest - n + 1),
+            "baseFeePerGas": [qty(self.base_fee_wei)] * (n + 1),
+            "gasUsedRatio": [0.5] * n,
+        }
+        if pct:
+            out["reward"] = [[qty(self.tip_wei)] * len(pct) for _ in range(n)]
+        return out
+
+    def send_raw(self, raw_bytes: bytes) -> str:
+        from raw_tx import decode_raw_tx, execute_decoded
+
+        tx = decode_raw_tx(raw_bytes)
+        self.last_tx = {
+            "hash": "0x" + tx.hash.hex(),
+            "nonce": tx.nonce,
+            "tip": tx.tip,
+            "max_fee": tx.max_fee,
+            "gas": tx.gas,
+            "data_len": len(tx.data),
+        }
+        key = (tx.sender, tx.nonce)
+        old = self.held.get(key)
+        if old is not None:
+            # geth's replacement rule: both fees at least +10%
+            if tx.tip * 10 < old.tip * 11 or tx.max_fee * 10 < old.max_fee * 11:
+                raise RpcError(-32000, "replacement transaction underpriced")
+        if self.min_tip_wei > 0 and tx.tip < self.min_tip_wei:
+            if old is not None:
+                self.replaced_total += 1
+            self.held[key] = tx
+            self.held_total += 1
+            return "0x" + tx.hash.hex()
+        if old is not None:
+            del self.held[key]
+            self.replaced_total += 1
+        return execute_decoded(self.chain, tx)
 
     # ------------------------------------------------------------------
     # Mining + pub/sub
@@ -148,7 +248,15 @@ class Mock:
         if method == "eth_syncing":
             return False
         if method == "eth_gasPrice":
-            return "0x3b9aca00"
+            self.fee_calls["eth_gasPrice"] += 1
+            if not self.gas_price_enabled:
+                raise RpcError(-32601, "Method not found", method)
+            return qty(self.base_fee_wei + self.tip_wei)
+        if method == "eth_feeHistory":
+            self.fee_calls["eth_feeHistory"] += 1
+            if not self.fee_history_enabled:
+                raise RpcError(-32601, "Method not found", method)
+            return self.fee_history(params)
         if method == "eth_blockNumber":
             return qty(c.head)
         if method in ("eth_getBlockByNumber", "eth_getBlockByHash"):
@@ -200,8 +308,7 @@ class Mock:
             if not params or not isinstance(params[0], str):
                 raise RpcError(-32602, "Invalid params", "expected [rawTransactionHex]")
             raw_bytes = self.hex_param(params[0], None, "rawTransaction")
-            from raw_tx import execute_raw_tx
-            return execute_raw_tx(c, raw_bytes)
+            return self.send_raw(raw_bytes)
         if method in ("eth_subscribe", "eth_unsubscribe"):
             raise RpcError(-32601, f"{method} requires a WebSocket connection")
         raise RpcError(-32601, "Method not found", method)
@@ -478,6 +585,13 @@ async def c_faults(request: web.Request) -> web.Response:
     return web.json_response(m.faults.to_obj())
 
 
+async def c_fees(request: web.Request) -> web.Response:
+    m: Mock = request.app["mock"]
+    if request.method == "POST":
+        m.fees_update(await body_json(request))
+    return web.json_response(m.fees_obj())
+
+
 async def c_state(request: web.Request) -> web.Response:
     m: Mock = request.app["mock"]
     c = m.chain
@@ -509,6 +623,7 @@ async def c_reset(request: web.Request) -> web.Response:
     m.set_auto_mine(0)
     m.chain.reset(seed)
     m.faults.reseed(seed)
+    m.fees_reset()
     if not body.get("keep_faults"):
         m.faults.clear()
     return web.json_response({"head": 0, "seed": seed})
@@ -538,6 +653,7 @@ def make_app(args: argparse.Namespace) -> web.Application:
     r.add_post("/_mock/auto_mine", c_auto_mine)
     r.add_post("/_mock/reorg", c_reorg)
     r.add_route("*", "/_mock/faults", c_faults)
+    r.add_route("*", "/_mock/fees", c_fees)
     r.add_get("/_mock/state", c_state)
     r.add_post("/_mock/reset", c_reset)
     r.add_route("*", "/", rpc_endpoint)
