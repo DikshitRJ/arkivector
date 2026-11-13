@@ -349,6 +349,7 @@ rpc_urls = ["{self.mock.url}"]
 ws_url = "{self.mock.ws_url}"
 chain_id = 7794095
 confirmations = 0
+rpc_budget_per_sec = 1000  # local mock: the 20/s default (public Rabdi pool) cannot follow 10 blocks/s
 
 [storage]
 data_dir = "{wd / 'data'}"

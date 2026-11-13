@@ -246,6 +246,9 @@ void av_router_match(const av_router *r, const char *method, const char *path, a
         if (ns == AV_ROUTER_MAX_SEGMENTS) {
             return;
         }
+        if (len == 0 && end == NULL && ns > 0) {
+            break; /* one trailing slash ("/qdrant/") matches the route without it */
+        }
         sv[ns] = p;
         sl[ns] = len;
         ns++;

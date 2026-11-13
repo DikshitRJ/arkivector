@@ -212,6 +212,7 @@ set(AV_CORE_SOURCES
     src/server/auth.c
     src/server/ratelimit.c
     src/server/qdrant.c
+    src/server/qdrant_map.c
     src/server/mcp.c
     src/sync/discovery.c
     src/core/fileio.c
